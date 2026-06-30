@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "webnative.webnative",
+    "vscjava.vscode-java-pack",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode"
+  ]
+}
