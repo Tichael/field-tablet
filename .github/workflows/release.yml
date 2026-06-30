@@ -64,7 +64,7 @@ jobs:
         run: npm run build
 
       - name: Upload Web Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: web-dist
           path: dist
@@ -95,7 +95,7 @@ jobs:
         run: npm ci
 
       - name: Download Web Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: dist
@@ -107,7 +107,7 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
-          echo $KEYSTORE_B64 | base64 --decode > android/app/release.keystore
+          echo "$KEYSTORE_B64" | base64 -d -i > android/app/release.keystore
 
       - name: Inject Version into Android
         working-directory: ./android/app
@@ -138,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Web Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: web-dist
           path: dist
