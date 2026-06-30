@@ -35,10 +35,43 @@ jobs:
             @semantic-release/changelog
             @semantic-release/git
 
-  build-android:
-    name: Build Android
+  build-web:
+    name: Build Web App
     needs: release
     if: needs.release.outputs.new_release_published == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: v${{ needs.release.outputs.new_release_version }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Inject App Version
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.new_release_version }}
+        run: npm version $RELEASE_VERSION --no-git-tag-version --allow-same-version
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist
+
+  build-android:
+    name: Build Android
+    needs: [release, build-web]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,8 +94,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Web App
-        run: npm run build
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -72,6 +108,15 @@ jobs:
           KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
         run: |
           echo $KEYSTORE_B64 | base64 --decode > android/app/release.keystore
+
+      - name: Inject Version into Android
+        working-directory: ./android/app
+        env:
+          RELEASE_VERSION: ${{ needs.release.outputs.new_release_version }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          sed -i "s/versionCode 0/versionCode $RUN_NUMBER/g" build.gradle
+          sed -i "s/versionName \"0.0.0-dev\"/versionName \"$RELEASE_VERSION\"/g" build.gradle
 
       - name: Build Android Release
         working-directory: ./android
@@ -92,22 +137,11 @@ jobs:
     needs: build-android
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - name: Download Web Artifact
+        uses: actions/download-artifact@v4
         with:
-          ref: v${{ needs.release.outputs.new_release_version }}
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
+          name: web-dist
+          path: dist
 
       - name: Setup Pages
         uses: actions/configure-pages@v6
