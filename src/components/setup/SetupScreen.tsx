@@ -4,10 +4,10 @@ import { useAppStore } from "../../store/app-store";
 import { useConfigStore } from "../../store/config-store";
 import { Button } from "../ui/button";
 import { Capacitor } from "@capacitor/core";
-import { get } from "idb-keyval";
+// idb-keyval is no longer needed here
 import { Input } from "../ui/input";
 
-import { FileJson, ChevronRight } from "lucide-react";
+import { GenericFileBrowser } from "../documents/GenericFileBrowser";
 
 export function SetupScreen() {
   const isSyncing = useAppStore((state) => state.isSyncing);
@@ -27,8 +27,8 @@ export function SetupScreen() {
   const isBrowserSupported = "showDirectoryPicker" in window;
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [jsonFiles, setJsonFiles] = useState<string[]>([]);
   const [newFileName, setNewFileName] = useState("");
+  const [browserPath, setBrowserPath] = useState("");
 
   const [smbHost, setSmbHost] = useState("");
   const [smbShare, setSmbShare] = useState("");
@@ -36,24 +36,10 @@ export function SetupScreen() {
   const [smbUser, setSmbUser] = useState("");
   const [smbPass, setSmbPass] = useState("");
 
-  const fetchJsonFiles = async () => {
-    try {
-      const files = await get("app_config_files");
-      if (files && Array.isArray(files)) {
-        const jsonNames = files
-          .filter((f) => f.name.endsWith(".json"))
-          .map((f) => f.name);
-        setJsonFiles(jsonNames);
-      }
-    } catch (e) {
-      console.error("Failed to load files from cache", e);
-    }
-  };
-
   useEffect(() => {
     if (localStorage.getItem("skipSetupStep1") === "true") {
       localStorage.removeItem("skipSetupStep1");
-      fetchJsonFiles().then(() => setStep(2));
+      setStep(2);
     }
   }, []);
 
@@ -61,7 +47,6 @@ export function SetupScreen() {
     try {
       const success = await syncManager.configure({ forcePrompt: true });
       if (success) {
-        await fetchJsonFiles();
         setStep(2);
       }
     } catch (e) {
@@ -83,7 +68,6 @@ export function SetupScreen() {
       if (!success) {
         alert("Failed to connect to SMB share. Please check your credentials.");
       } else {
-        await fetchJsonFiles();
         setStep(2);
       }
     } catch (e: any) {
@@ -111,43 +95,27 @@ export function SetupScreen() {
   if (step === 2) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
-        <div className="max-w-md w-full bg-background rounded-xl shadow-lg border p-8 space-y-6">
-          <div className="text-center">
+        <div className="max-w-2xl w-full bg-background rounded-xl shadow-lg border p-8 space-y-6 flex flex-col h-[80vh]">
+          <div className="text-center shrink-0">
             <h1 className="text-2xl font-bold tracking-tight">
               Select Configuration
             </h1>
             <p className="mt-2 text-muted-foreground text-sm">
-              Please choose a configuration file to load.
+              Please browse and select the active configuration (.json) file.
             </p>
           </div>
 
-          <div className="space-y-3">
-            {jsonFiles.length > 0 ? (
-              <div className="border rounded-lg overflow-hidden divide-y">
-                {jsonFiles.map((file) => (
-                  <button
-                    key={file}
-                    onClick={() => selectConfigFile(file)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-muted/50 transition-colors text-left bg-background"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileJson className="h-5 w-5 text-muted-foreground" />
-                      <span className="font-medium text-sm">{file}</span>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-muted-foreground/50" />
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No .json files found.
-              </p>
-            )}
+          <div className="flex-1 overflow-hidden">
+            <GenericFileBrowser 
+              onFileSelect={(path) => selectConfigFile(path)}
+              onPathChange={setBrowserPath}
+              allowedExtensions={[".json"]}
+            />
           </div>
 
-          <div className="border-t pt-4 space-y-3 mt-4">
+          <div className="border-t pt-4 space-y-3 mt-4 shrink-0">
             <h3 className="text-sm font-medium">
-              Or create a new configuration:
+              Or create a new configuration {browserPath ? `in /${browserPath}` : 'at root'}:
             </h3>
             <div className="flex gap-2">
               <Input
@@ -161,13 +129,8 @@ export function SetupScreen() {
                   const jsonName = name.endsWith(".json")
                     ? name
                     : name + ".json";
-                  if (jsonFiles.includes(jsonName)) {
-                    alert(
-                      `A configuration file named "${jsonName}" already exists. Please choose another name or load the existing one.`,
-                    );
-                    return;
-                  }
-                  selectConfigFile(name, true);
+                  const fullPath = browserPath ? `${browserPath}/${jsonName}` : jsonName;
+                  selectConfigFile(fullPath, true);
                 }}
               >
                 Create
@@ -219,6 +182,13 @@ export function SetupScreen() {
               Your browser does not support the required File System
               capabilities. Please use a recent Chromium-based browser (Chrome,
               Edge, Opera).
+            </p>
+          </div>
+        ) : !isNative ? (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg text-sm mb-4">
+            <p className="font-semibold mb-1">Important: Select the Main Folder</p>
+            <p>
+              Please make sure to select the main, top-level folder of your server drive. If you select a sub-folder, the paths might not match and the app may not work correctly on other devices.
             </p>
           </div>
         ) : null}

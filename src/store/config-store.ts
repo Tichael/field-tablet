@@ -11,6 +11,7 @@ export interface AppConfig {
     appTitle: string;
     logoBase64?: string;
   };
+  syncFolders?: string[];
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -71,12 +72,13 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
       // If not in cache or parse failed, try to read from adapter directly if possible,
       // but syncManager is supposed to cache it. Let's sync and try again.
       if (syncManager.getAdapter().isAvailable()) {
-        const freshFiles = await syncManager.getAdapter().getFiles();
-        const file = freshFiles.find((f: any) => f.name === activeConfigFile);
-        if (file) {
-          const parsed = JSON.parse(file.content);
+        try {
+          const content = await syncManager.getAdapter().readFileText(activeConfigFile);
+          const parsed = JSON.parse(content);
           set({ config: { ...DEFAULT_CONFIG, ...parsed }, isLoading: false });
           return;
+        } catch (e) {
+          console.error("Failed to load active config file directly", e);
         }
       }
 
