@@ -23,6 +23,8 @@ import {
 import { useAppStore } from "../../store/app-store";
 
 import { applyTheme } from "../../lib/theme";
+import { GenericFileBrowser } from "../documents/GenericFileBrowser";
+import { FolderPlus, Trash2 } from "lucide-react";
 
 interface ConfigEditorScreenProps {
   onClose: () => void;
@@ -33,6 +35,25 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   const isSyncing = useAppStore((state) => state.isSyncing);
 
   const [formData, setFormData] = useState<AppConfig>(config || DEFAULT_CONFIG);
+  const [isBrowserOpen, setBrowserOpen] = useState(false);
+
+  const handleAddSyncFolder = (path: string) => {
+    setFormData((prev) => {
+      const folders = prev.syncFolders || [];
+      if (!folders.includes(path)) {
+        return { ...prev, syncFolders: [...folders, path] };
+      }
+      return prev;
+    });
+    setBrowserOpen(false);
+  };
+
+  const handleRemoveSyncFolder = (path: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      syncFolders: (prev.syncFolders || []).filter((f) => f !== path),
+    }));
+  };
 
   const [saveAsName, setSaveAsName] = useState(
     activeConfigFile || "app-config.json",
@@ -165,9 +186,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
       </div>
 
       <Tabs defaultValue="theme" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="theme">Theme & Layout</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
+          <TabsTrigger value="sync">Sync Folders</TabsTrigger>
         </TabsList>
 
         <TabsContent value="theme">
@@ -280,7 +302,57 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="sync">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sync Folders</CardTitle>
+              <CardDescription>
+                Configure the folders that should be synchronized for offline document viewing.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Folders to Sync</Label>
+                {(!formData.syncFolders || formData.syncFolders.length === 0) ? (
+                  <p className="text-sm text-muted-foreground italic">No sync folders added.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {formData.syncFolders.map(folder => (
+                      <li key={folder} className="flex items-center justify-between p-2 border rounded bg-muted/20">
+                        <span className="font-mono text-sm truncate">/{folder}</span>
+                        <Button variant="ghost" size="sm" onClick={() => handleRemoveSyncFolder(folder)} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button variant="outline" className="w-full mt-2" onClick={() => setBrowserOpen(true)}>
+                  <FolderPlus className="w-4 h-4 mr-2" /> Add Folder
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {isBrowserOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center">
+              <h3 className="font-semibold">Select Folder to Sync</h3>
+              <Button variant="ghost" size="sm" onClick={() => setBrowserOpen(false)}>Cancel</Button>
+            </div>
+            <div className="flex-1 overflow-hidden p-4">
+              <GenericFileBrowser 
+                onFolderSelect={handleAddSyncFolder} 
+                onFileSelect={() => {}} // No-op, we only care about folders
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-6 space-y-4">

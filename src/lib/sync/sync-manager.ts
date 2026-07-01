@@ -25,10 +25,23 @@ export class SyncManager {
 
   async initialize() {
     if (this.adapter.isAvailable()) {
-      // Don't auto-request on start unless we know we already had it configured,
-      // but since we want to reduce prompts, we'll check if a handle is in idb.
-      // Actually we will let the SetupScreen trigger the first prompt.
-      // For initialization, we will just sync if we are already configured.
+      const isNative = Capacitor.isNativePlatform();
+      const isConfigured = useAppStore.getState().isConfigured;
+
+      if (!isConfigured) return;
+
+      if (!isNative) {
+        const hasPermission = await this.adapter.verifyPermission();
+        if (!hasPermission) {
+          console.log("Browser requires user gesture to restore access.");
+          useAppStore.getState().setNeedsPermission(true);
+          return;
+        }
+      }
+      
+      // We have permission, sync.
+      this.sync().catch(e => console.error("Initial sync failed", e));
+      this.startPeriodicSync();
     }
   }
 
@@ -74,13 +87,23 @@ export class SyncManager {
     try {
       useAppStore.getState().setSyncing(true);
       if (this.isNative && forceNative) {
-        await SmbSync.forceSync();
+        const { useConfigStore } = await import("../../store/config-store");
+        const configState = useConfigStore.getState();
+        const syncFolders = configState.config?.syncFolders || [];
+        const configFile = configState.activeConfigFile || "";
+        const result = await SmbSync.forceSync({ syncFolders, configFile });
+        if (result && result.success === false && result.error === "MISSING_FOLDER") {
+          throw new Error(`MISSING_FOLDER:${result.folder}`);
+        }
       }
       const files = await this.adapter.getFiles();
       await set(CACHED_FILES_KEY, files);
       useAppStore.getState().setLastSyncTime(Date.now());
-    } catch (e) {
+      useAppStore.getState().setError(null);
+    } catch (e: any) {
       console.error("Sync failed", e);
+      useAppStore.getState().setError(e.message || "Sync Failed");
+      throw e;
     } finally {
       useAppStore.getState().setSyncing(false);
     }
@@ -88,7 +111,13 @@ export class SyncManager {
 
   startPeriodicSync() {
     if (this.isNative) {
-      SmbSync.startBackgroundSync({ intervalMinutes: 15 });
+      // For background sync, we must read the config store dynamically
+      import("../../store/config-store").then(({ useConfigStore }) => {
+        const configState = useConfigStore.getState();
+        const syncFolders = configState.config?.syncFolders || [];
+        const configFile = configState.activeConfigFile || "";
+        SmbSync.startBackgroundSync({ intervalMinutes: 15, syncFolders, configFile });
+      });
     } else {
       if (this.syncTimer !== null) {
         clearInterval(this.syncTimer);
