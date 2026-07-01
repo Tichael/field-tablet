@@ -39,8 +39,10 @@ function App() {
     <div className="min-h-screen bg-muted/20">
       <header className="bg-background border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-semibold tracking-tight">Field Tablet App</h1>
-          <Button 
+          <h1 className="text-xl font-semibold tracking-tight">
+            Field Tablet App
+          </h1>
+          <Button
             onClick={() => setShowSettings(!showSettings)}
             variant={showSettings ? "secondary" : "outline"}
           >
@@ -54,8 +56,12 @@ function App() {
         ) : (
           <div className="px-4 py-6 sm:px-0">
             <div className="border-2 border-dashed border-muted-foreground/25 rounded-xl h-96 flex flex-col items-center justify-center bg-background/50">
-              <p className="text-muted-foreground font-medium">Main App Content</p>
-              <p className="text-sm text-muted-foreground/70 mt-2">Forms and templates will be loaded here.</p>
+              <p className="text-muted-foreground font-medium">
+                Main App Content
+              </p>
+              <p className="text-sm text-muted-foreground/70 mt-2">
+                Forms and templates will be loaded here.
+              </p>
             </div>
           </div>
         )}

@@ -8,7 +8,7 @@ export function SettingsScreen() {
   const setConfigured = useAppStore((state) => state.setConfigured);
 
   const handleManualSync = () => {
-    syncManager.sync();
+    syncManager.sync(true);
   };
 
   const handleChangeFolder = async () => {
@@ -23,9 +23,11 @@ export function SettingsScreen() {
     <div className="p-8 bg-background border rounded-xl shadow-sm max-w-2xl mx-auto mt-10 space-y-8">
       <div>
         <h2 className="text-2xl font-semibold tracking-tight">Settings</h2>
-        <p className="text-sm text-muted-foreground mt-1">Manage your app configuration and synchronization.</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Manage your app configuration and synchronization.
+        </p>
       </div>
-      
+
       <div className="space-y-6">
         <div className="bg-muted/50 p-4 rounded-lg border">
           <h3 className="text-sm font-medium">Sync Status</h3>
