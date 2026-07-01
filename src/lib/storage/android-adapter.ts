@@ -8,7 +8,7 @@ export class AndroidSmbAdapter implements StorageAdapter {
     return true;
   }
 
-  async requestPermission(): Promise<boolean> {
+  async requestPermission(_forcePrompt?: boolean): Promise<boolean> {
     return true; // Config is handled by SetupScreen directly on Android
   }
 

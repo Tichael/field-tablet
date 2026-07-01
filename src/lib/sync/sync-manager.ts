@@ -39,7 +39,6 @@ export class SyncManager {
       try {
         const result = await SmbSync.configure(options);
         if (result.success) {
-          useAppStore.getState().setConfigured(true);
           await this.sync(true);
           this.startPeriodicSync();
           return true;
@@ -53,10 +52,11 @@ export class SyncManager {
 
     if (this.adapter.isAvailable()) {
       console.log("Adapter is available, requesting permission...");
-      const hasPermission = await this.adapter.requestPermission();
+      const hasPermission = await this.adapter.requestPermission(
+        options?.forcePrompt,
+      );
       console.log("Has permission:", hasPermission);
       if (hasPermission) {
-        useAppStore.getState().setConfigured(true);
         await this.sync();
         this.startPeriodicSync();
         return true;

@@ -10,9 +10,9 @@ export class WebStorageAdapter implements StorageAdapter {
     return "showDirectoryPicker" in window;
   }
 
-  async requestPermission(): Promise<boolean> {
+  async requestPermission(forcePrompt = false): Promise<boolean> {
     try {
-      let handle = await get(DIRECTORY_HANDLE_KEY);
+      let handle = forcePrompt ? null : await get(DIRECTORY_HANDLE_KEY);
       if (!handle) {
         // @ts-ignore
         handle = await window.showDirectoryPicker({ mode: "readwrite" });
