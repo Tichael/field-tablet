@@ -116,8 +116,8 @@ jobs:
           RELEASE_VERSION: ${{ needs.release.outputs.new_release_version }}
           RUN_NUMBER: ${{ github.run_number }}
         run: |
-          sed -i "s/versionCode 0/versionCode $RUN_NUMBER/g" build.gradle
-          sed -i "s/versionName \"0.0.0-dev\"/versionName \"$RELEASE_VERSION\"/g" build.gradle
+          sed -i "s/versionCode [0-9]*/versionCode $RUN_NUMBER/g" build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$RELEASE_VERSION\"/g" build.gradle
 
       - name: Build Android Release
         working-directory: ./android

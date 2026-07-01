@@ -11,6 +11,15 @@ export default defineConfig({
   server: {
     host: true,
   },
+  build: {
+    chunkSizeWarningLimit: 2000,
+    rolldownOptions: {
+      onwarn(warning: any, warn: any) {
+        if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+        warn(warning);
+      },
+    },
+  },
   plugins: [
     tailwindcss(),
     react(),
