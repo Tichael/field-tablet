@@ -31,10 +31,13 @@ function App() {
 
   useEffect(() => {
     const init = async () => {
-      await syncManager.initialize();
       if (isConfigured) {
         await loadConfig();
+      }
+      await syncManager.initialize();
+      if (isConfigured) {
         if (localStorage.getItem("openEditor") === "true") {
+          localStorage.removeItem("openEditor");
           setSettingsOpen(true);
         }
       }

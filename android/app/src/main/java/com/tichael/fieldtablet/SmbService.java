@@ -91,15 +91,34 @@ public class SmbService {
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
                 
+                List<String> effectiveSyncFolders = syncFolders;
                 if (configFile != null && !configFile.isEmpty()) {
                     downloadFile(share, configFile, configFile);
+                    java.io.File localConfigFile = new java.io.File(context.getFilesDir(), configFile);
+                    if (localConfigFile.exists()) {
+                        try (java.io.FileInputStream fis = new java.io.FileInputStream(localConfigFile)) {
+                            byte[] data = new byte[(int) localConfigFile.length()];
+                            fis.read(data);
+                            String content = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                            JSONObject configJson = new JSONObject(content);
+                            if (configJson.has("syncFolders")) {
+                                JSONArray arr = configJson.getJSONArray("syncFolders");
+                                effectiveSyncFolders = new ArrayList<>();
+                                for (int i = 0; i < arr.length(); i++) {
+                                    effectiveSyncFolders.add(arr.getString(i));
+                                }
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Failed to parse updated config file for sync folders", e);
+                        }
+                    }
                 } else {
                     // Sync json in root if no config folder specified
                     syncRootConfig(share);
                 }
 
-                if (syncFolders != null) {
-                    for (String folder : syncFolders) {
+                if (effectiveSyncFolders != null) {
+                    for (String folder : effectiveSyncFolders) {
                         try {
                             syncDirectory(share, folder, folder);
                         } catch (Exception e) {
@@ -152,6 +171,30 @@ public class SmbService {
             } else {
                 downloadFile(share, childSmbPath, childLocalPath);
             }
+        }
+    }
+
+    public void uploadFile(String host, String shareName, String username, String password, String domain, String path, String content) throws Exception {
+        SMBClient client = new SMBClient();
+        try (Connection connection = client.connect(host)) {
+            String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
+            AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
+            Session session = connection.authenticate(ac);
+            try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
+                try (File smbFile = share.openFile(path.replace("/", "\\"), 
+                        EnumSet.of(AccessMask.GENERIC_WRITE),
+                        null,
+                        SMB2ShareAccess.ALL,
+                        SMB2CreateDisposition.FILE_OVERWRITE_IF,
+                        null)) {
+                    
+                    try (java.io.OutputStream os = smbFile.getOutputStream()) {
+                        os.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    }
+                }
+            }
+        } finally {
+            client.close();
         }
     }
 

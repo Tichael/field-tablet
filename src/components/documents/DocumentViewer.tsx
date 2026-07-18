@@ -179,7 +179,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
 
     if (isPDF) {
       return (
-        <div ref={containerRef} className="overflow-auto h-full w-full bg-muted/20 touch-none">
+        <div ref={containerRef} className="overflow-auto h-full w-full bg-muted/20">
           <div className="min-h-full min-w-full flex p-4 pb-24">
             <div 
               style={{ 
@@ -228,7 +228,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
 
     if (isImage) {
       return (
-        <div ref={containerRef} className="overflow-auto h-full w-full bg-muted/20 touch-none">
+        <div ref={containerRef} className="overflow-auto h-full w-full bg-muted/20">
           <div className="min-h-full min-w-full flex p-4">
             <div 
               style={{ 

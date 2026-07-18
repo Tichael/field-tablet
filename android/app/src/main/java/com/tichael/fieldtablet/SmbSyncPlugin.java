@@ -41,7 +41,7 @@ public class SmbSyncPlugin extends Plugin {
             return;
         }
 
-        bridge.execute(() -> {
+        new Thread(() -> {
             try {
                 SmbService smbService = new SmbService(getContext());
                 smbService.testConnection(host, share, user, pass, domain);
@@ -60,7 +60,7 @@ public class SmbSyncPlugin extends Plugin {
                 Log.e(TAG, "Error configuring SMB", e);
                 call.reject("Failed to connect: " + e.getMessage(), e);
             }
-        });
+        }).start();
     }
 
     @PluginMethod
@@ -120,7 +120,7 @@ public class SmbSyncPlugin extends Plugin {
             Log.e(TAG, "Error parsing syncFolders", e);
         }
 
-        bridge.execute(() -> {
+        new Thread(() -> {
             try {
                 SecureStorage storage = new SecureStorage(getContext());
                 String host = storage.getString("smb_host");
@@ -150,7 +150,7 @@ public class SmbSyncPlugin extends Plugin {
                     call.reject("Sync error", e);
                 }
             }
-        });
+        }).start();
     }
 
     @PluginMethod
@@ -194,12 +194,24 @@ public class SmbSyncPlugin extends Plugin {
             return;
         }
 
-        bridge.execute(() -> {
+        new Thread(() -> {
             try {
                 File file = new File(getContext().getFilesDir(), path);
                 FileOutputStream fos = new FileOutputStream(file);
                 fos.write(content.getBytes(StandardCharsets.UTF_8));
                 fos.close();
+
+                SecureStorage storage = new SecureStorage(getContext());
+                String host = storage.getString("smb_host");
+                String share = storage.getString("smb_share");
+                String user = storage.getString("smb_user");
+                String pass = storage.getString("smb_pass");
+                String domain = storage.getString("smb_domain");
+
+                if (host != null && share != null && user != null && pass != null) {
+                    SmbService smbService = new SmbService(getContext());
+                    smbService.uploadFile(host, share, user, pass, domain, path, content);
+                }
                 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -207,13 +219,13 @@ public class SmbSyncPlugin extends Plugin {
             } catch (Exception e) {
                 call.reject("Error saving file", e);
             }
-        });
+        }).start();
     }
 
     @PluginMethod
     public void listRemoteFiles(PluginCall call) {
         String path = call.getString("path", "");
-        bridge.execute(() -> {
+        new Thread(() -> {
             try {
                 SecureStorage storage = new SecureStorage(getContext());
                 String host = storage.getString("smb_host");
@@ -237,7 +249,7 @@ public class SmbSyncPlugin extends Plugin {
             } catch (Exception e) {
                 call.reject("Error listing remote files", e);
             }
-        });
+        }).start();
     }
 
     @PluginMethod
@@ -277,7 +289,7 @@ public class SmbSyncPlugin extends Plugin {
         }
         File file = new File(getContext().getFilesDir(), path);
         JSObject ret = new JSObject();
-        ret.put("url", file.toURI().toString());
+        ret.put("url", file.getAbsolutePath());
         call.resolve(ret);
     }
 

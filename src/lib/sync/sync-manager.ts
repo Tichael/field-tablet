@@ -40,7 +40,7 @@ export class SyncManager {
       }
       
       // We have permission, sync.
-      this.sync().catch(e => console.error("Initial sync failed", e));
+      this.sync(true).catch(e => console.error("Initial sync failed", e));
       this.startPeriodicSync();
     }
   }
