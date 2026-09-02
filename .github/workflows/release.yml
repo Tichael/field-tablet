@@ -110,21 +110,14 @@ jobs:
         run: |
           echo "$KEYSTORE_B64" | base64 -d -i > android/app/release.keystore
 
-      - name: Inject Version into Android
-        working-directory: ./android/app
-        env:
-          RELEASE_VERSION: ${{ needs.release.outputs.new_release_version }}
-          RUN_NUMBER: ${{ github.run_number }}
-        run: |
-          sed -i "s/versionCode 0/versionCode $RUN_NUMBER/g" build.gradle
-          sed -i "s/versionName \"0.0.0-dev\"/versionName \"$RELEASE_VERSION\"/g" build.gradle
-
       - name: Build Android Release
         working-directory: ./android
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ vars.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: ${{ needs.release.outputs.new_release_version }}
         run: ./gradlew assembleRelease
 
       - name: Upload APK to Release

@@ -9,6 +9,24 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
     <link rel="mask-icon" href="/mask-icon.svg" color="#ffffff" />
     <title>Vite + React + TS</title>
+    <script>
+      // If running inside Capacitor Native WebView, ensure any lingering Service Workers are unregistered
+      if (
+        window.Capacitor !== undefined ||
+        window.location.protocol === "capacitor:" ||
+        (window.location.hostname === "localhost" && !window.location.port)
+      ) {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker
+            .getRegistrations()
+            .then(function (registrations) {
+              for (var i = 0; i < registrations.length; i++) {
+                registrations[i].unregister();
+              }
+            });
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
