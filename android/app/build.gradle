@@ -1,5 +1,23 @@
 apply plugin: 'com.android.application'
 
+def getAppVersionCode() {
+    def code = project.findProperty('versionCode') ?: System.getenv('VERSION_CODE') ?: System.getenv('RUN_NUMBER')
+    return code ? code.toInteger() : 1
+}
+
+def getAppVersionName() {
+    def name = project.findProperty('versionName') ?: System.getenv('VERSION_NAME') ?: System.getenv('RELEASE_VERSION')
+    if (name) return name
+    try {
+        def pkgJsonFile = file("../../package.json")
+        if (pkgJsonFile.exists()) {
+            def pkgJson = new groovy.json.JsonSlurper().parse(pkgJsonFile)
+            if (pkgJson.version && pkgJson.version != "0.0.0") return pkgJson.version
+        }
+    } catch (Exception ignored) {}
+    return "0.0.0-dev"
+}
+
 android {
     namespace = "com.tichael.fieldtablet"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +25,8 @@ android {
         applicationId "com.tichael.fieldtablet"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "0.0.0-dev"
+        versionCode getAppVersionCode()
+        versionName getAppVersionName()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
