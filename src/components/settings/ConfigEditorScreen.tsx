@@ -24,7 +24,8 @@ import { useAppStore } from "../../store/app-store";
 
 import { applyTheme } from "../../lib/theme";
 import { GenericFileBrowser } from "../documents/GenericFileBrowser";
-import { FolderPlus, Trash2 } from "lucide-react";
+import { Folder, FolderPlus, Trash2, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ConfigEditorScreenProps {
   onClose: () => void;
@@ -36,15 +37,59 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
   const [formData, setFormData] = useState<AppConfig>(config || DEFAULT_CONFIG);
   const [isBrowserOpen, setBrowserOpen] = useState(false);
+  const [folderNotice, setFolderNotice] = useState<{ type: "info" | "warning"; message: string } | null>(null);
 
   const handleAddSyncFolder = (path: string) => {
-    setFormData((prev) => {
-      const folders = prev.syncFolders || [];
-      if (!folders.includes(path)) {
-        return { ...prev, syncFolders: [...folders, path] };
+    const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
+    if (!cleanPath) {
+      setBrowserOpen(false);
+      return;
+    }
+
+    const currentFolders = formData.syncFolders || [];
+    const normalizedCurrent = currentFolders.map((f) => f.trim().replace(/^\/+|\/+$/g, ""));
+
+    // Check 1: Already exists in sync list
+    if (normalizedCurrent.includes(cleanPath)) {
+      setFolderNotice({
+        type: "warning",
+        message: `Folder "/${cleanPath}" is already configured to sync.`,
+      });
+      setBrowserOpen(false);
+      return;
+    }
+
+    // Check 2: Parent folder is already in sync list
+    const parentFolder = normalizedCurrent.find((f) => cleanPath.startsWith(`${f}/`));
+    if (parentFolder) {
+      const confirmed = window.confirm(
+        `Folder "/${cleanPath}" is inside "/${parentFolder}", which is already being synced. Do you still want to add it as a separate sync folder?`,
+      );
+      if (!confirmed) {
+        setBrowserOpen(false);
+        return;
       }
-      return prev;
-    });
+    }
+
+    // Check 3: If adding a parent of already synced subfolders, clean up redundant subfolders
+    const childFolders = normalizedCurrent.filter((f) => f.startsWith(`${cleanPath}/`));
+    let newFolders: string[];
+    if (childFolders.length > 0) {
+      newFolders = normalizedCurrent.filter((f) => !f.startsWith(`${cleanPath}/`));
+      newFolders.push(cleanPath);
+      setFolderNotice({
+        type: "info",
+        message: `Added "/${cleanPath}" and merged redundant subfolder(s): ${childFolders.map((c) => `/${c}`).join(", ")}.`,
+      });
+    } else {
+      newFolders = [...normalizedCurrent, cleanPath];
+      setFolderNotice(null);
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      syncFolders: newFolders,
+    }));
     setBrowserOpen(false);
   };
 
@@ -312,16 +357,42 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {folderNotice && (
+                <div
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
+                    folderNotice.type === "warning"
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{folderNotice.message}</span>
+                  </div>
+                  <button
+                    onClick={() => setFolderNotice(null)}
+                    className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Folders to Sync</Label>
                 {(!formData.syncFolders || formData.syncFolders.length === 0) ? (
-                  <p className="text-sm text-muted-foreground italic">No sync folders added.</p>
+                  <p className="text-sm text-muted-foreground italic">No sync folders added. Root files will be synced.</p>
                 ) : (
                   <ul className="space-y-2">
                     {formData.syncFolders.map(folder => (
-                      <li key={folder} className="flex items-center justify-between p-2 border rounded bg-muted/20">
-                        <span className="font-mono text-sm truncate">/{folder}</span>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveSyncFolder(folder)} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10">
+                      <li key={folder} className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Folder className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span className="font-mono text-sm truncate">/{folder}</span>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => handleRemoveSyncFolder(folder)} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0" title={`Remove /${folder}`}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </li>
@@ -339,15 +410,23 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
       {isBrowserOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-background rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col">
-            <div className="p-4 border-b flex justify-between items-center">
-              <h3 className="font-semibold">Select Folder to Sync</h3>
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col overflow-hidden border">
+            <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
+              <div>
+                <h3 className="font-semibold text-lg">Select Folder to Sync</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Browse or create a folder to synchronize with this device.
+                </p>
+              </div>
               <Button variant="ghost" size="sm" onClick={() => setBrowserOpen(false)}>Cancel</Button>
             </div>
-            <div className="flex-1 overflow-hidden p-4">
+            <div className="flex-1 overflow-hidden p-3 sm:p-4">
               <GenericFileBrowser 
                 onFolderSelect={handleAddSyncFolder} 
                 onFileSelect={() => {}} // No-op, we only care about folders
+                allowCreateFolder={true}
+                allowSelectRoot={false}
+                existingFolders={formData.syncFolders || []}
               />
             </div>
           </div>

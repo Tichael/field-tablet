@@ -38,6 +38,15 @@ export class AndroidSmbAdapter implements StorageAdapter {
     }
   }
 
+  async createDirectory(path: string): Promise<void> {
+    try {
+      await SmbSync.createDirectory({ path });
+    } catch (e) {
+      console.error("Failed to create directory in native storage", e);
+      throw e;
+    }
+  }
+
   async listRemoteFiles(path: string): Promise<FileInfo[]> {
     const result = await SmbSync.listRemoteFiles({ path });
     return result.files || [];

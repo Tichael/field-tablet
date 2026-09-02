@@ -30,6 +30,8 @@ export interface SmbSyncPlugin {
     content: string;
   }): Promise<{ success: boolean }>;
 
+  createDirectory(options: { path: string }): Promise<{ success: boolean }>;
+
   listRemoteFiles(options: { path: string }): Promise<{ files: FileInfo[] }>;
   listLocalFiles(options: { path: string }): Promise<{ files: FileInfo[] }>;
   getFileUrl(options: { path: string }): Promise<{ url: string }>;

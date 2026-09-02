@@ -319,4 +319,40 @@ public class SmbSyncPlugin extends Plugin {
             call.reject("Error reading file", e);
         }
     }
+
+    @PluginMethod
+    public void createDirectory(PluginCall call) {
+        String path = call.getString("path");
+        if (path == null || path.trim().isEmpty()) {
+            call.reject("Path is required");
+            return;
+        }
+        new Thread(() -> {
+            try {
+                File localDir = new File(getContext().getFilesDir(), path);
+                if (!localDir.exists()) {
+                    localDir.mkdirs();
+                }
+
+                SecureStorage storage = new SecureStorage(getContext());
+                String host = storage.getString("smb_host");
+                String share = storage.getString("smb_share");
+                String user = storage.getString("smb_user");
+                String pass = storage.getString("smb_pass");
+                String domain = storage.getString("smb_domain");
+
+                if (host != null && share != null && user != null && pass != null) {
+                    SmbService smbService = new SmbService(getContext());
+                    smbService.createDirectory(host, share, user, pass, domain, path);
+                }
+
+                JSObject ret = new JSObject();
+                ret.put("success", true);
+                call.resolve(ret);
+            } catch (Exception e) {
+                Log.e(TAG, "Error creating directory", e);
+                call.reject("Error creating directory: " + e.getMessage(), e);
+            }
+        }).start();
+    }
 }

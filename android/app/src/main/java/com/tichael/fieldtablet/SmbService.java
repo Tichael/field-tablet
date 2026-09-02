@@ -198,6 +198,32 @@ public class SmbService {
         }
     }
 
+    public void createDirectory(String host, String shareName, String username, String password, String domain, String path) throws Exception {
+        SMBClient client = new SMBClient();
+        try (Connection connection = client.connect(host)) {
+            String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
+            AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
+            Session session = connection.authenticate(ac);
+            try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
+                String[] parts = path.split("[/\\\\]");
+                StringBuilder current = new StringBuilder();
+                for (String part : parts) {
+                    if (part.isEmpty()) continue;
+                    if (current.length() > 0) {
+                        current.append("\\");
+                    }
+                    current.append(part);
+                    String subPath = current.toString();
+                    if (!share.folderExists(subPath)) {
+                        share.mkdir(subPath);
+                    }
+                }
+            }
+        } finally {
+            client.close();
+        }
+    }
+
     private void downloadFile(DiskShare share, String smbPath, String localRelativePath) throws Exception {
         java.io.File localFile = new java.io.File(context.getFilesDir(), localRelativePath);
         
