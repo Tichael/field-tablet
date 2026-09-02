@@ -38,9 +38,12 @@ export function initPWA() {
         onRegisteredSW(_swScriptUrl, registration) {
           if (registration) {
             // Check for updates every hour
-            setInterval(() => {
-              registration.update();
-            }, 60 * 60 * 1000);
+            setInterval(
+              () => {
+                registration.update();
+              },
+              60 * 60 * 1000,
+            );
 
             // Check for updates when user refocuses the app/tab
             document.addEventListener("visibilitychange", () => {
