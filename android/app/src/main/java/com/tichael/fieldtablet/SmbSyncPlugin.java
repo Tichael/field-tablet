@@ -120,6 +120,18 @@ public class SmbSyncPlugin extends Plugin {
             Log.e(TAG, "Error parsing syncFolders", e);
         }
 
+        try {
+            SecureStorage storage = new SecureStorage(getContext());
+            if (syncFoldersArray != null && syncFoldersArray.length() > 0) {
+                storage.saveString("sync_folders", syncFoldersArray.toString());
+            }
+            if (configFile != null && !configFile.isEmpty()) {
+                storage.saveString("config_file", configFile);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to update sync options in forceSync", e);
+        }
+
         new Thread(() -> {
             try {
                 SecureStorage storage = new SecureStorage(getContext());
@@ -197,6 +209,11 @@ public class SmbSyncPlugin extends Plugin {
         new Thread(() -> {
             try {
                 File file = new File(getContext().getFilesDir(), path);
+                File parent = file.getParentFile();
+                if (parent != null && !parent.exists()) {
+                    parent.mkdirs();
+                }
+
                 FileOutputStream fos = new FileOutputStream(file);
                 fos.write(content.getBytes(StandardCharsets.UTF_8));
                 fos.close();
@@ -217,7 +234,8 @@ public class SmbSyncPlugin extends Plugin {
                 ret.put("success", true);
                 call.resolve(ret);
             } catch (Exception e) {
-                call.reject("Error saving file", e);
+                Log.e(TAG, "Error saving file", e);
+                call.reject("Error saving file: " + e.getMessage(), e);
             }
         }).start();
     }
@@ -352,6 +370,39 @@ public class SmbSyncPlugin extends Plugin {
             } catch (Exception e) {
                 Log.e(TAG, "Error creating directory", e);
                 call.reject("Error creating directory: " + e.getMessage(), e);
+            }
+        }).start();
+    }
+
+    @PluginMethod
+    public void checkConnection(PluginCall call) {
+        new Thread(() -> {
+            try {
+                SecureStorage storage = new SecureStorage(getContext());
+                String host = storage.getString("smb_host");
+                String share = storage.getString("smb_share");
+                String user = storage.getString("smb_user");
+                String pass = storage.getString("smb_pass");
+                String domain = storage.getString("smb_domain");
+
+                if (host == null || share == null || user == null || pass == null) {
+                    JSObject ret = new JSObject();
+                    ret.put("connected", false);
+                    call.resolve(ret);
+                    return;
+                }
+
+                SmbService smbService = new SmbService(getContext());
+                smbService.testConnection(host, share, user, pass, domain);
+
+                JSObject ret = new JSObject();
+                ret.put("connected", true);
+                call.resolve(ret);
+            } catch (Exception e) {
+                JSObject ret = new JSObject();
+                ret.put("connected", false);
+                ret.put("error", e.getMessage());
+                call.resolve(ret);
             }
         }).start();
     }

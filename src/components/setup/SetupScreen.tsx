@@ -8,6 +8,7 @@ import { Capacitor } from "@capacitor/core";
 import { Input } from "../ui/input";
 
 import { GenericFileBrowser } from "../documents/GenericFileBrowser";
+import { ChevronLeft } from "lucide-react";
 
 export function SetupScreen() {
   const isSyncing = useAppStore((state) => state.isSyncing);
@@ -96,13 +97,24 @@ export function SetupScreen() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
         <div className="max-w-2xl w-full bg-background rounded-xl shadow-lg border p-8 space-y-6 flex flex-col h-[80vh]">
-          <div className="text-center shrink-0">
-            <h1 className="text-2xl font-bold tracking-tight">
-              Select Configuration
-            </h1>
-            <p className="mt-2 text-muted-foreground text-sm">
-              Please browse and select the active configuration (.json) file.
-            </p>
+          <div className="flex items-center justify-between shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setStep(1)}
+              className="gap-1 -ml-2 text-muted-foreground hover:text-foreground"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Back</span>
+            </Button>
+            <div className="text-center flex-1 pr-14">
+              <h1 className="text-2xl font-bold tracking-tight">
+                Select Configuration
+              </h1>
+              <p className="mt-1 text-muted-foreground text-sm">
+                Please browse and select the active configuration (.json) file.
+              </p>
+            </div>
           </div>
 
           <div className="flex-1 overflow-hidden">

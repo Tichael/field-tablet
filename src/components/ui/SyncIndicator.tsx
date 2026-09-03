@@ -8,7 +8,10 @@ export function SyncIndicator() {
 
   if (isSyncing) {
     return (
-      <div className="flex items-center text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-200">
+      <div 
+        className="flex items-center text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-200 cursor-default"
+        title="Synchronizing files with remote share..."
+      >
         <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
         <span>Syncing...</span>
       </div>
@@ -17,7 +20,10 @@ export function SyncIndicator() {
 
   if (error) {
     return (
-      <div className="flex items-center text-sm text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200">
+      <div 
+        className="flex items-center text-sm text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200 cursor-help"
+        title={`Sync error: ${error}`}
+      >
         <AlertCircle className="w-4 h-4 mr-2" />
         <span>Sync Failed</span>
       </div>
@@ -25,8 +31,12 @@ export function SyncIndicator() {
   }
 
   if (lastSyncTime) {
+    const timeStr = new Date(lastSyncTime).toLocaleTimeString();
     return (
-      <div className="flex items-center text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-200">
+      <div 
+        className="flex items-center text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-200 cursor-default"
+        title={`Last synchronized at ${timeStr}`}
+      >
         <CheckCircle className="w-4 h-4 mr-2" />
         <span>Synced</span>
       </div>

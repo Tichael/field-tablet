@@ -62,8 +62,23 @@ export class AndroidSmbAdapter implements StorageAdapter {
     return Capacitor.convertFileSrc(result.url);
   }
 
+  async getNativeFilePath(path: string): Promise<string> {
+    const result = await SmbSync.getFileUrl({ path });
+    return result.url;
+  }
+
   async readFileText(path: string): Promise<string> {
     const result = await SmbSync.readFileText({ path });
     return result.content;
+  }
+
+  async checkConnection(): Promise<boolean> {
+    try {
+      const result = await SmbSync.checkConnection();
+      return Boolean(result && result.connected);
+    } catch (e) {
+      console.error("Failed to check SMB connection", e);
+      return false;
+    }
   }
 }

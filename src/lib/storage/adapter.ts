@@ -14,6 +14,8 @@ export interface StorageAdapter {
   listRemoteFiles(path: string): Promise<FileInfo[]>;
   listLocalFiles(path: string): Promise<FileInfo[]>;
   getFileUrl(path: string): Promise<string>;
+  getNativeFilePath?(path: string): Promise<string>;
   readFileText(path: string): Promise<string>;
   verifyPermission(): Promise<boolean>;
+  checkConnection?(): Promise<boolean>;
 }

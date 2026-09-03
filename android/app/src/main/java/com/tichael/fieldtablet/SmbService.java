@@ -56,7 +56,8 @@ public class SmbService {
                 
                 JSONArray result = new JSONArray();
                 try {
-                    List<FileIdBothDirectoryInformation> files = share.list(path);
+                    String smbPath = (path == null) ? "" : path.replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "");
+                    List<FileIdBothDirectoryInformation> files = share.list(smbPath);
                     for (FileIdBothDirectoryInformation fileInfo : files) {
                         String fileName = fileInfo.getFileName();
                         if (fileName.equals(".") || fileName.equals("..")) continue;
@@ -65,7 +66,8 @@ public class SmbService {
                         
                         JSONObject obj = new JSONObject();
                         obj.put("name", fileName);
-                        obj.put("path", (path == null || path.isEmpty()) ? fileName : path + "/" + fileName);
+                        String cleanPath = (path == null || path.isEmpty()) ? fileName : path.replaceAll("^/+|/+$", "") + "/" + fileName;
+                        obj.put("path", cleanPath);
                         obj.put("isDirectory", isDirectory);
                         result.put(obj);
                     }
@@ -93,7 +95,15 @@ public class SmbService {
                 
                 List<String> effectiveSyncFolders = syncFolders;
                 if (configFile != null && !configFile.isEmpty()) {
-                    downloadFile(share, configFile, configFile);
+                    try {
+                        downloadFile(share, configFile, configFile);
+                    } catch (SMBApiException e) {
+                        if (e.getStatusCode() == 0xC0000034) { // STATUS_OBJECT_NAME_NOT_FOUND
+                            Log.w(TAG, "Config file does not exist on remote share yet: " + configFile);
+                        } else {
+                            throw e;
+                        }
+                    }
                     java.io.File localConfigFile = new java.io.File(context.getFilesDir(), configFile);
                     if (localConfigFile.exists()) {
                         try (java.io.FileInputStream fis = new java.io.FileInputStream(localConfigFile)) {
@@ -117,15 +127,19 @@ public class SmbService {
                     syncRootConfig(share);
                 }
 
+                List<String> missingFolders = new ArrayList<>();
                 if (effectiveSyncFolders != null) {
                     for (String folder : effectiveSyncFolders) {
                         try {
                             syncDirectory(share, folder, folder);
                         } catch (Exception e) {
                             Log.e(TAG, "Missing or failed to sync folder: " + folder, e);
-                            throw new Exception("MISSING_FOLDER:" + folder);
+                            missingFolders.add(folder);
                         }
                     }
+                }
+                if (!missingFolders.isEmpty()) {
+                    throw new Exception("MISSING_FOLDER:" + String.join(",", missingFolders));
                 }
             }
         } finally {
@@ -181,7 +195,14 @@ public class SmbService {
             AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
-                try (File smbFile = share.openFile(path.replace("/", "\\"), 
+                String smbPath = path.replace("/", "\\");
+                int lastSlash = smbPath.lastIndexOf('\\');
+                if (lastSlash > 0) {
+                    String parentSmbDir = smbPath.substring(0, lastSlash);
+                    ensureDirectoriesExist(share, parentSmbDir);
+                }
+
+                try (File smbFile = share.openFile(smbPath, 
                         EnumSet.of(AccessMask.GENERIC_WRITE),
                         null,
                         SMB2ShareAccess.ALL,
@@ -205,22 +226,30 @@ public class SmbService {
             AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
-                String[] parts = path.split("[/\\\\]");
-                StringBuilder current = new StringBuilder();
-                for (String part : parts) {
-                    if (part.isEmpty()) continue;
-                    if (current.length() > 0) {
-                        current.append("\\");
-                    }
-                    current.append(part);
-                    String subPath = current.toString();
-                    if (!share.folderExists(subPath)) {
-                        share.mkdir(subPath);
-                    }
-                }
+                ensureDirectoriesExist(share, path);
             }
         } finally {
             client.close();
+        }
+    }
+
+    private void ensureDirectoriesExist(DiskShare share, String path) {
+        String[] parts = path.split("[/\\\\]");
+        StringBuilder current = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) continue;
+            if (current.length() > 0) {
+                current.append("\\");
+            }
+            current.append(part);
+            String subPath = current.toString();
+            try {
+                if (!share.folderExists(subPath)) {
+                    share.mkdir(subPath);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Could not ensure directory exists: " + subPath, e);
+            }
         }
     }
 

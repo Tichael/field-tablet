@@ -39,9 +39,13 @@ export class WebStorageAdapter implements StorageAdapter {
       // @ts-ignore
       const permission = await handle.queryPermission({ mode: "readwrite" });
       return permission === "granted";
-    } catch (e) {
+    } catch {
       return false;
     }
+  }
+
+  async checkConnection(): Promise<boolean> {
+    return this.verifyPermission();
   }
 
   async getFiles(

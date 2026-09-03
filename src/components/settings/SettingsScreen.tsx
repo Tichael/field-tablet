@@ -52,7 +52,7 @@ export function SettingsScreen() {
     const isNative = Capacitor.isNativePlatform();
     const target = isNative ? "SMB share" : "source folder";
     const confirmed = window.confirm(
-      `Are you sure you want to reset the app? You will need to reconnect to your ${target}. (Unsynced forms/data will not be deleted from your device).`,
+      `Are you sure you want to reset the app? You will need to reconnect to your ${target}. If you are offline, any unsynced changes will not be pushed to the share.`,
     );
     if (!confirmed) return;
 
@@ -98,9 +98,6 @@ export function SettingsScreen() {
           <Button onClick={handleLoadConfig} variant="outline">
             Load Configuration File
           </Button>
-          <Button onClick={handleClear} variant="destructive">
-            Clear Configuration
-          </Button>
         </div>
 
         <div className="pt-6 border-t">
@@ -111,6 +108,21 @@ export function SettingsScreen() {
             onClick={() => setEditingConfig(true)}
           >
             Open Configuration Editor
+          </Button>
+        </div>
+
+        <div className="pt-6 border-t flex flex-col items-start gap-1.5">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Danger Zone</h3>
+          <p className="text-xs text-muted-foreground">
+            Disconnect from the current network share and reset app settings. Works while offline.
+          </p>
+          <Button
+            onClick={handleClear}
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/30 mt-2"
+          >
+            Reset Configuration
           </Button>
         </div>
       </div>

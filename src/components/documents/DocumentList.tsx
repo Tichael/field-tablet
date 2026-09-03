@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { syncManager } from "../../lib/sync/sync-manager";
 import type { FileInfo } from "../../lib/storage/adapter";
 import { Folder, ChevronLeft, FileText, Image as ImageIcon, FileVideo, File } from "lucide-react";
@@ -10,8 +10,10 @@ interface DocumentListProps {
   onClose: () => void;
 }
 
+const EMPTY_SYNC_FOLDERS: string[] = [];
+
 export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
-  const syncFolders = useConfigStore((state) => state.config?.syncFolders) || [];
+  const syncFolders = useConfigStore((state) => state.config?.syncFolders) ?? EMPTY_SYNC_FOLDERS;
   
   const initialPath = basePath || (syncFolders.length === 1 ? syncFolders[0] : "");
   const effectiveBasePath = basePath || (syncFolders.length === 1 ? syncFolders[0] : "");
@@ -21,11 +23,7 @@ export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadDirectory(currentPath);
-  }, [currentPath]);
-
-  const loadDirectory = async (path: string) => {
+  const loadDirectory = useCallback(async (path: string) => {
     if (path === "") {
       if (syncFolders.length === 0) {
         setFiles([]);
@@ -62,7 +60,11 @@ export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [syncFolders]);
+
+  useEffect(() => {
+    loadDirectory(currentPath);
+  }, [currentPath, loadDirectory]);
 
   const navigateUp = () => {
     if (currentPath === effectiveBasePath) {

@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useAppStore } from "../../store/app-store";
+import { syncManager } from "../../lib/sync/sync-manager";
 
 import { applyTheme } from "../../lib/theme";
 import { GenericFileBrowser } from "../documents/GenericFileBrowser";
@@ -34,10 +35,13 @@ interface ConfigEditorScreenProps {
 export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   const { config, saveConfig, activeConfigFile } = useConfigStore();
   const isSyncing = useAppStore((state) => state.isSyncing);
+  const isConfigured = useAppStore((state) => state.isConfigured);
 
   const [formData, setFormData] = useState<AppConfig>(config || DEFAULT_CONFIG);
   const [isBrowserOpen, setBrowserOpen] = useState(false);
   const [folderNotice, setFolderNotice] = useState<{ type: "info" | "warning"; message: string } | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [checkingConnection, setCheckingConnection] = useState(false);
 
   const handleAddSyncFolder = (path: string) => {
     const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
@@ -111,17 +115,46 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     }
   }, [config]);
 
-  // Live preview effect
+  // Check network share connection on mount (unless unconfigured initial setup)
   useEffect(() => {
-    const cleanup = applyTheme(formData.theme);
+    if (!isConfigured) {
+      setIsConnected(true);
+      return;
+    }
+    let isMounted = true;
+    setCheckingConnection(true);
+    syncManager
+      .checkShareConnection()
+      .then((connected) => {
+        if (isMounted) {
+          setIsConnected(connected);
+          setCheckingConnection(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsConnected(false);
+          setCheckingConnection(false);
+        }
+      });
     return () => {
-      cleanup();
-      // On unmount, restore the original theme if we have one
+      isMounted = false;
+    };
+  }, [isConfigured]);
+
+  // Live preview effect: apply changes as user adjusts settings
+  useEffect(() => {
+    applyTheme(formData.theme);
+  }, [formData.theme]);
+
+  // On unmount, restore the original saved theme if the editor was closed without saving
+  useEffect(() => {
+    return () => {
       if (config) {
         applyTheme(config.theme);
       }
     };
-  }, [formData.theme, config]);
+  }, [config]);
 
   // Warn on browser navigate/close if there are unsaved changes
   useEffect(() => {
@@ -229,6 +262,18 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
           </p>
         </div>
       </div>
+
+      {isConfigured && isConnected === false && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in duration-150">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-semibold">Network Share Disconnected</p>
+            <p className="text-xs mt-0.5">
+              Configuration cannot be edited while offline to prevent conflicts. Please reconnect to your network share to make and save changes.
+            </p>
+          </div>
+        </div>
+      )}
 
       <Tabs defaultValue="theme" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
@@ -458,11 +503,24 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               className="flex-1"
               size="lg"
               onClick={handleSave}
-              disabled={isSaving || isSyncing || !saveAsName.trim()}
+              disabled={
+                isSaving ||
+                isSyncing ||
+                !saveAsName.trim() ||
+                (isConfigured && isConnected === false) ||
+                checkingConnection
+              }
+              title={
+                isConfigured && isConnected === false
+                  ? "Cannot save while disconnected from network share"
+                  : undefined
+              }
             >
               {isSaving || isSyncing
                 ? "Saving..."
-                : "Save & Apply Configuration"}
+                : checkingConnection
+                  ? "Checking Connection..."
+                  : "Save & Apply Configuration"}
             </Button>
           </div>
         </CardContent>

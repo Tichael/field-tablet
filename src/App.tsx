@@ -79,20 +79,40 @@ function App() {
           <p className="text-muted-foreground text-sm">
             For security reasons, your browser requires you to confirm access to your local folder after a refresh.
           </p>
-          <Button 
-            className="w-full mt-4" 
-            onClick={async () => {
-              const success = await syncManager.getAdapter().requestPermission(false);
-              if (success) {
-                useAppStore.getState().setNeedsPermission(false);
-                syncManager.sync().catch(console.error);
-                syncManager.startPeriodicSync();
-                loadConfig();
-              }
-            }}
-          >
-            Grant Permission
-          </Button>
+          <div className="space-y-2 mt-4">
+            <Button 
+              className="w-full" 
+              onClick={async () => {
+                const success = await syncManager.getAdapter().requestPermission(false);
+                if (success) {
+                  useAppStore.getState().setNeedsPermission(false);
+                  syncManager.sync().catch(console.error);
+                  syncManager.startPeriodicSync();
+                  loadConfig();
+                }
+              }}
+            >
+              Grant Permission
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground hover:text-destructive"
+              onClick={async () => {
+                const confirmed = window.confirm(
+                  "Reset folder configuration? You will need to select a folder again.",
+                );
+                if (confirmed) {
+                  const { del } = await import("idb-keyval");
+                  await del("app_config_directory_handle");
+                  useAppStore.getState().setNeedsPermission(false);
+                  useAppStore.getState().setConfigured(false);
+                }
+              }}
+            >
+              Reset Folder Selection
+            </Button>
+          </div>
         </div>
       </div>
     );

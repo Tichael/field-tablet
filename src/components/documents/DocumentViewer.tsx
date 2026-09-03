@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { syncManager } from "../../lib/sync/sync-manager";
 import { X, ExternalLink } from "lucide-react";
 import { Capacitor } from "@capacitor/core";
@@ -17,6 +17,26 @@ interface DocumentViewerProps {
   onClose: () => void;
 }
 
+const getContentType = (path: string) => {
+  const ext = path.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "pdf": return "application/pdf";
+    case "doc": return "application/msword";
+    case "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case "xls": return "application/vnd.ms-excel";
+    case "xlsx": return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    case "ppt": return "application/vnd.ms-powerpoint";
+    case "pptx": return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "txt": return "text/plain";
+    case "csv": return "text/csv";
+    case "png": return "image/png";
+    case "jpg":
+    case "jpeg": return "image/jpeg";
+    case "mp4": return "video/mp4";
+    default: return "";
+  }
+};
+
 export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,19 +54,62 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
   const isImage = /\.(png|jpe?g|gif|webp)$/i.test(filePath);
   const isVideo = /\.(mp4|webm|ogg)$/i.test(filePath);
 
+  const urlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    urlRef.current = url;
+  }, [url]);
+
   useEffect(() => {
     scaleRef.current = scale;
   }, [scale]);
 
+  const openExternal = useCallback(async (fileUrl: string) => {
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const adapter = syncManager.getAdapter();
+        const nativePath = adapter.getNativeFilePath
+          ? await adapter.getNativeFilePath(filePath)
+          : fileUrl;
+        await FileOpener.open({ filePath: nativePath, contentType: getContentType(filePath) });
+      } else {
+        window.open(fileUrl, "_blank");
+      }
+    } catch (e) {
+      console.error("Failed to open externally", e);
+      setError("Could not open this file type.");
+    }
+  }, [filePath]);
+
   useEffect(() => {
-    loadUrl();
-    return () => {
-      // Clean up object URLs for PWA
-      if (url && url.startsWith("blob:")) {
-        URL.revokeObjectURL(url);
+    let active = true;
+    const loadUrl = async () => {
+      try {
+        const adapter = syncManager.getAdapter();
+        const fileUrl = await adapter.getFileUrl(filePath);
+        if (!active) return;
+        setUrl(fileUrl);
+
+        // On native platform, try opening unsupported types automatically
+        if (Capacitor.isNativePlatform() && !isPDF && !isImage && !isVideo) {
+          openExternal(fileUrl);
+        }
+      } catch (e) {
+        if (!active) return;
+        console.error("Failed to load document URL", e);
+        setError("Failed to load document");
       }
     };
-  }, [filePath]);
+
+    loadUrl();
+    return () => {
+      active = false;
+      // Clean up object URLs for PWA
+      if (urlRef.current && urlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(urlRef.current);
+      }
+    };
+  }, [filePath, isPDF, isImage, isVideo, openExternal]);
 
   useEffect(() => {
     setBaseDims({ width: 0, height: 0 });
@@ -124,41 +187,6 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
       container.removeEventListener("touchend", onTouchEnd);
     };
   }, [url]);
-
-  const loadUrl = async () => {
-    try {
-      const adapter = syncManager.getAdapter();
-      const fileUrl = await adapter.getFileUrl(filePath);
-      setUrl(fileUrl);
-
-      // If it's an unsupported file type, try opening it natively
-      if (!isPDF && !isImage && !isVideo) {
-        openExternal(fileUrl);
-      }
-    } catch (e) {
-      console.error("Failed to load document URL", e);
-      setError("Failed to load document");
-    }
-  };
-
-  const openExternal = async (fileUrl: string) => {
-    try {
-      if (Capacitor.isNativePlatform()) {
-        await FileOpener.open({ filePath: fileUrl, contentType: getContentType(filePath) });
-      } else {
-        window.open(fileUrl, "_blank");
-      }
-    } catch (e) {
-      console.error("Failed to open externally", e);
-      setError("Could not open this file type.");
-    }
-  };
-
-  const getContentType = (path: string) => {
-    if (path.endsWith(".doc") || path.endsWith(".docx")) return "application/msword";
-    if (path.endsWith(".xls") || path.endsWith(".xlsx")) return "application/vnd.ms-excel";
-    return "application/octet-stream";
-  };
 
   const handleZoomIn = () => setScale(s => Math.min(s + 0.25, 5));
   const handleZoomOut = () => setScale(s => Math.max(s - 0.25, 0.25));

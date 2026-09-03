@@ -97,6 +97,16 @@ export class SyncManager {
         }
       }
       const files = await this.adapter.getFiles();
+      const { useConfigStore } = await import("../../store/config-store");
+      const activeConfigFile = useConfigStore.getState().activeConfigFile;
+      if (activeConfigFile && !files.some((f) => f.name === activeConfigFile)) {
+        try {
+          const content = await this.adapter.readFileText(activeConfigFile);
+          files.push({ name: activeConfigFile, content });
+        } catch {
+          // If the file does not exist locally yet, ignore
+        }
+      }
       await set(CACHED_FILES_KEY, files);
       useAppStore.getState().setLastSyncTime(Date.now());
       useAppStore.getState().setError(null);
@@ -107,6 +117,13 @@ export class SyncManager {
     } finally {
       useAppStore.getState().setSyncing(false);
     }
+  }
+
+  async checkShareConnection(): Promise<boolean> {
+    if (this.adapter.checkConnection) {
+      return await this.adapter.checkConnection();
+    }
+    return true;
   }
 
   startPeriodicSync() {

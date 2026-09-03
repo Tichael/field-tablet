@@ -36,6 +36,7 @@ export interface SmbSyncPlugin {
   listLocalFiles(options: { path: string }): Promise<{ files: FileInfo[] }>;
   getFileUrl(options: { path: string }): Promise<{ url: string }>;
   readFileText(options: { path: string }): Promise<{ content: string }>;
+  checkConnection(): Promise<{ connected: boolean; error?: string }>;
 }
 
 export const SmbSync = registerPlugin<SmbSyncPlugin>("SmbSync");
