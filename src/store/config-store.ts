@@ -77,7 +77,9 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
       // but syncManager is supposed to cache it. Let's sync and try again.
       if (syncManager.getAdapter().isAvailable()) {
         try {
-          const content = await syncManager.getAdapter().readFileText(activeConfigFile);
+          const content = await syncManager
+            .getAdapter()
+            .readFileText(activeConfigFile);
           const parsed = JSON.parse(content);
           set({ config: { ...DEFAULT_CONFIG, ...parsed }, isLoading: false });
           return;

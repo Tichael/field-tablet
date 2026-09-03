@@ -69,7 +69,7 @@ export class WebStorageAdapter implements StorageAdapter {
   }
 
   async saveFile(path: string, content: string): Promise<void> {
-    const parts = path.split("/").filter(p => p);
+    const parts = path.split("/").filter((p) => p);
     const fileName = parts.pop();
     if (!fileName) throw new Error("Invalid file path");
 
@@ -77,7 +77,9 @@ export class WebStorageAdapter implements StorageAdapter {
     const dirHandle = await this.getHandleFromPath(dirPath, true);
 
     // @ts-ignore
-    const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
+    const fileHandle = await dirHandle.getFileHandle(fileName, {
+      create: true,
+    });
     const writable = await fileHandle.createWritable();
     await writable.write(content);
     await writable.close();
@@ -89,13 +91,16 @@ export class WebStorageAdapter implements StorageAdapter {
     await this.getHandleFromPath(cleanPath, true);
   }
 
-  private async getHandleFromPath(path: string, create: boolean = false): Promise<any> {
+  private async getHandleFromPath(
+    path: string,
+    create: boolean = false,
+  ): Promise<any> {
     const rootHandle = await get(DIRECTORY_HANDLE_KEY);
     if (!rootHandle) throw new Error("No directory handle found");
-    
+
     if (!path || path === "/" || path === "") return rootHandle;
 
-    const parts = path.split("/").filter(p => p);
+    const parts = path.split("/").filter((p) => p);
     let current = rootHandle;
     for (const part of parts) {
       // @ts-ignore
@@ -117,7 +122,7 @@ export class WebStorageAdapter implements StorageAdapter {
         files.push({
           name: entry.name,
           path: path ? `${path}/${entry.name}` : entry.name,
-          isDirectory: entry.kind === "directory"
+          isDirectory: entry.kind === "directory",
         });
       }
       return files;
@@ -129,13 +134,13 @@ export class WebStorageAdapter implements StorageAdapter {
 
   async getFileUrl(path: string): Promise<string> {
     try {
-      const parts = path.split("/").filter(p => p);
+      const parts = path.split("/").filter((p) => p);
       const fileName = parts.pop();
       if (!fileName) throw new Error("Invalid file path");
 
       const dirPath = parts.join("/");
       const dirHandle = await this.getHandleFromPath(dirPath);
-      
+
       // @ts-ignore
       const fileHandle = await dirHandle.getFileHandle(fileName);
       const file = await fileHandle.getFile();
@@ -148,13 +153,13 @@ export class WebStorageAdapter implements StorageAdapter {
 
   async readFileText(path: string): Promise<string> {
     try {
-      const parts = path.split("/").filter(p => p);
+      const parts = path.split("/").filter((p) => p);
       const fileName = parts.pop();
       if (!fileName) throw new Error("Invalid file path");
 
       const dirPath = parts.join("/");
       const dirHandle = await this.getHandleFromPath(dirPath);
-      
+
       // @ts-ignore
       const fileHandle = await dirHandle.getFileHandle(fileName);
       const file = await fileHandle.getFile();

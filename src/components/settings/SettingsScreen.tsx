@@ -112,9 +112,12 @@ export function SettingsScreen() {
         </div>
 
         <div className="pt-6 border-t flex flex-col items-start gap-1.5">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Danger Zone</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Danger Zone
+          </h3>
           <p className="text-xs text-muted-foreground">
-            Disconnect from the current network share and reset app settings. Works while offline.
+            Disconnect from the current network share and reset app settings.
+            Works while offline.
           </p>
           <Button
             onClick={handleClear}

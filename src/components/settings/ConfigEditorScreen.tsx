@@ -39,7 +39,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
   const [formData, setFormData] = useState<AppConfig>(config || DEFAULT_CONFIG);
   const [isBrowserOpen, setBrowserOpen] = useState(false);
-  const [folderNotice, setFolderNotice] = useState<{ type: "info" | "warning"; message: string } | null>(null);
+  const [folderNotice, setFolderNotice] = useState<{
+    type: "info" | "warning";
+    message: string;
+  } | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(false);
 
@@ -51,7 +54,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     }
 
     const currentFolders = formData.syncFolders || [];
-    const normalizedCurrent = currentFolders.map((f) => f.trim().replace(/^\/+|\/+$/g, ""));
+    const normalizedCurrent = currentFolders.map((f) =>
+      f.trim().replace(/^\/+|\/+$/g, ""),
+    );
 
     // Check 1: Already exists in sync list
     if (normalizedCurrent.includes(cleanPath)) {
@@ -64,7 +69,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     }
 
     // Check 2: Parent folder is already in sync list
-    const parentFolder = normalizedCurrent.find((f) => cleanPath.startsWith(`${f}/`));
+    const parentFolder = normalizedCurrent.find((f) =>
+      cleanPath.startsWith(`${f}/`),
+    );
     if (parentFolder) {
       const confirmed = window.confirm(
         `Folder "/${cleanPath}" is inside "/${parentFolder}", which is already being synced. Do you still want to add it as a separate sync folder?`,
@@ -76,10 +83,14 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     }
 
     // Check 3: If adding a parent of already synced subfolders, clean up redundant subfolders
-    const childFolders = normalizedCurrent.filter((f) => f.startsWith(`${cleanPath}/`));
+    const childFolders = normalizedCurrent.filter((f) =>
+      f.startsWith(`${cleanPath}/`),
+    );
     let newFolders: string[];
     if (childFolders.length > 0) {
-      newFolders = normalizedCurrent.filter((f) => !f.startsWith(`${cleanPath}/`));
+      newFolders = normalizedCurrent.filter(
+        (f) => !f.startsWith(`${cleanPath}/`),
+      );
       newFolders.push(cleanPath);
       setFolderNotice({
         type: "info",
@@ -269,7 +280,8 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
           <div className="text-sm">
             <p className="font-semibold">Network Share Disconnected</p>
             <p className="text-xs mt-0.5">
-              Configuration cannot be edited while offline to prevent conflicts. Please reconnect to your network share to make and save changes.
+              Configuration cannot be edited while offline to prevent conflicts.
+              Please reconnect to your network share to make and save changes.
             </p>
           </div>
         </div>
@@ -398,7 +410,8 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
             <CardHeader>
               <CardTitle>Sync Folders</CardTitle>
               <CardDescription>
-                Configure the folders that should be synchronized for offline document viewing.
+                Configure the folders that should be synchronized for offline
+                document viewing.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -427,24 +440,41 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
               <div className="space-y-2">
                 <Label>Folders to Sync</Label>
-                {(!formData.syncFolders || formData.syncFolders.length === 0) ? (
-                  <p className="text-sm text-muted-foreground italic">No sync folders added. Root files will be synced.</p>
+                {!formData.syncFolders || formData.syncFolders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    No sync folders added. Root files will be synced.
+                  </p>
                 ) : (
                   <ul className="space-y-2">
-                    {formData.syncFolders.map(folder => (
-                      <li key={folder} className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20">
+                    {formData.syncFolders.map((folder) => (
+                      <li
+                        key={folder}
+                        className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20"
+                      >
                         <div className="flex items-center gap-2 min-w-0">
                           <Folder className="w-4 h-4 text-blue-500 shrink-0" />
-                          <span className="font-mono text-sm truncate">/{folder}</span>
+                          <span className="font-mono text-sm truncate">
+                            /{folder}
+                          </span>
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveSyncFolder(folder)} className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0" title={`Remove /${folder}`}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSyncFolder(folder)}
+                          className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
+                          title={`Remove /${folder}`}
+                        >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </li>
                     ))}
                   </ul>
                 )}
-                <Button variant="outline" className="w-full mt-2" onClick={() => setBrowserOpen(true)}>
+                <Button
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => setBrowserOpen(true)}
+                >
                   <FolderPlus className="w-4 h-4 mr-2" /> Add Folder
                 </Button>
               </div>
@@ -463,11 +493,17 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   Browse or create a folder to synchronize with this device.
                 </p>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => setBrowserOpen(false)}>Cancel</Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setBrowserOpen(false)}
+              >
+                Cancel
+              </Button>
             </div>
             <div className="flex-1 overflow-hidden p-3 sm:p-4">
-              <GenericFileBrowser 
-                onFolderSelect={handleAddSyncFolder} 
+              <GenericFileBrowser
+                onFolderSelect={handleAddSyncFolder}
                 onFileSelect={() => {}} // No-op, we only care about folders
                 allowCreateFolder={true}
                 allowSelectRoot={false}

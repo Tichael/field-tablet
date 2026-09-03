@@ -110,7 +110,6 @@ jobs:
         run: |
           echo "$KEYSTORE_B64" | base64 -d -i > android/app/release.keystore
 
-
       - name: Build Android Release
         working-directory: ./android
         env:

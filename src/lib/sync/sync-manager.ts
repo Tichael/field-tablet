@@ -38,9 +38,9 @@ export class SyncManager {
           return;
         }
       }
-      
+
       // We have permission, sync.
-      this.sync(true).catch(e => console.error("Initial sync failed", e));
+      this.sync(true).catch((e) => console.error("Initial sync failed", e));
       this.startPeriodicSync();
     }
   }
@@ -92,7 +92,11 @@ export class SyncManager {
         const syncFolders = configState.config?.syncFolders || [];
         const configFile = configState.activeConfigFile || "";
         const result = await SmbSync.forceSync({ syncFolders, configFile });
-        if (result && result.success === false && result.error === "MISSING_FOLDER") {
+        if (
+          result &&
+          result.success === false &&
+          result.error === "MISSING_FOLDER"
+        ) {
           throw new Error(`MISSING_FOLDER:${result.folder}`);
         }
       }
@@ -133,7 +137,11 @@ export class SyncManager {
         const configState = useConfigStore.getState();
         const syncFolders = configState.config?.syncFolders || [];
         const configFile = configState.activeConfigFile || "";
-        SmbSync.startBackgroundSync({ intervalMinutes: 15, syncFolders, configFile });
+        SmbSync.startBackgroundSync({
+          intervalMinutes: 15,
+          syncFolders,
+          configFile,
+        });
       });
     } else {
       if (this.syncTimer !== null) {

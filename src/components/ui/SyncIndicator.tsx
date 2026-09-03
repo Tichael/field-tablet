@@ -8,7 +8,7 @@ export function SyncIndicator() {
 
   if (isSyncing) {
     return (
-      <div 
+      <div
         className="flex items-center text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-200 cursor-default"
         title="Synchronizing files with remote share..."
       >
@@ -20,7 +20,7 @@ export function SyncIndicator() {
 
   if (error) {
     return (
-      <div 
+      <div
         className="flex items-center text-sm text-red-600 bg-red-50 px-2 py-1 rounded-full border border-red-200 cursor-help"
         title={`Sync error: ${error}`}
       >
@@ -33,7 +33,7 @@ export function SyncIndicator() {
   if (lastSyncTime) {
     const timeStr = new Date(lastSyncTime).toLocaleTimeString();
     return (
-      <div 
+      <div
         className="flex items-center text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full border border-green-200 cursor-default"
         title={`Last synchronized at ${timeStr}`}
       >

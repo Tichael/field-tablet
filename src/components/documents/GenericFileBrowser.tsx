@@ -49,11 +49,17 @@ export function GenericFileBrowser({
   // Helper to normalize paths (trim whitespace and leading/trailing slashes)
   const normalizePath = (p: string) => p.trim().replace(/^\/+|\/+$/g, "");
 
-  const normalizedExisting = new Set((existingFolders || []).map(normalizePath).filter(Boolean));
+  const normalizedExisting = new Set(
+    (existingFolders || []).map(normalizePath).filter(Boolean),
+  );
   const normalizedCurrent = normalizePath(currentPath);
-  const isCurrentPathExisting = Boolean(normalizedCurrent && normalizedExisting.has(normalizedCurrent));
+  const isCurrentPathExisting = Boolean(
+    normalizedCurrent && normalizedExisting.has(normalizedCurrent),
+  );
   const parentOfCurrentPath = normalizedCurrent
-    ? Array.from(normalizedExisting).find((existing) => normalizedCurrent.startsWith(`${existing}/`))
+    ? Array.from(normalizedExisting).find((existing) =>
+        normalizedCurrent.startsWith(`${existing}/`),
+      )
     : undefined;
 
   // Folder creation state
@@ -63,34 +69,39 @@ export function GenericFileBrowser({
   const [createError, setCreateError] = useState<string | null>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
-  const loadDirectory = useCallback(async (path: string) => {
-    setLoading(true);
-    try {
-      const adapter = syncManager.getAdapter();
-      // For configuration, we might need listRemoteFiles for Android, listLocalFiles for PWA.
-      // But both are mapped in the adapters.
-      const entries = await adapter.listRemoteFiles(path);
+  const loadDirectory = useCallback(
+    async (path: string) => {
+      setLoading(true);
+      try {
+        const adapter = syncManager.getAdapter();
+        // For configuration, we might need listRemoteFiles for Android, listLocalFiles for PWA.
+        // But both are mapped in the adapters.
+        const entries = await adapter.listRemoteFiles(path);
 
-      const filtered = entries.filter((e) => {
-        if (e.isDirectory) return true;
-        if (!allowedExtensions) return true;
-        return allowedExtensions.some((ext) => e.name.toLowerCase().endsWith(ext));
-      });
+        const filtered = entries.filter((e) => {
+          if (e.isDirectory) return true;
+          if (!allowedExtensions) return true;
+          return allowedExtensions.some((ext) =>
+            e.name.toLowerCase().endsWith(ext),
+          );
+        });
 
-      // Sort: folders first, then alphabetically
-      filtered.sort((a, b) => {
-        if (a.isDirectory && !b.isDirectory) return -1;
-        if (!a.isDirectory && b.isDirectory) return 1;
-        return a.name.localeCompare(b.name);
-      });
+        // Sort: folders first, then alphabetically
+        filtered.sort((a, b) => {
+          if (a.isDirectory && !b.isDirectory) return -1;
+          if (!a.isDirectory && b.isDirectory) return 1;
+          return a.name.localeCompare(b.name);
+        });
 
-      setFiles(filtered);
-    } catch (e) {
-      console.error("Failed to load directory", e);
-    } finally {
-      setLoading(false);
-    }
-  }, [allowedExtensions]);
+        setFiles(filtered);
+      } catch (e) {
+        console.error("Failed to load directory", e);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [allowedExtensions],
+  );
 
   useEffect(() => {
     loadDirectory(currentPath);
@@ -115,11 +126,15 @@ export function GenericFileBrowser({
     if (!trimmed) return;
 
     if (/[/\\:*?"<>|]/.test(trimmed)) {
-      setCreateError("Folder name cannot contain / \\ : * ? \" < > |");
+      setCreateError('Folder name cannot contain / \\ : * ? " < > |');
       return;
     }
 
-    if (files.some((f) => f.isDirectory && f.name.toLowerCase() === trimmed.toLowerCase())) {
+    if (
+      files.some(
+        (f) => f.isDirectory && f.name.toLowerCase() === trimmed.toLowerCase(),
+      )
+    ) {
       setCreateError(`A folder named "${trimmed}" already exists.`);
       return;
     }
@@ -145,13 +160,23 @@ export function GenericFileBrowser({
   };
 
   const getIcon = (file: FileInfo) => {
-    if (file.isDirectory) return <Folder className="w-5 h-5 text-blue-500 fill-blue-500/20 shrink-0" />;
+    if (file.isDirectory)
+      return (
+        <Folder className="w-5 h-5 text-blue-500 fill-blue-500/20 shrink-0" />
+      );
     const name = file.name.toLowerCase();
-    if (name.endsWith(".json")) return <FileText className="w-5 h-5 text-amber-500 shrink-0" />;
-    if (name.endsWith(".pdf")) return <FileText className="w-5 h-5 text-red-500 shrink-0" />;
-    if (name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg"))
+    if (name.endsWith(".json"))
+      return <FileText className="w-5 h-5 text-amber-500 shrink-0" />;
+    if (name.endsWith(".pdf"))
+      return <FileText className="w-5 h-5 text-red-500 shrink-0" />;
+    if (
+      name.endsWith(".png") ||
+      name.endsWith(".jpg") ||
+      name.endsWith(".jpeg")
+    )
       return <Image className="w-5 h-5 text-green-500 shrink-0" />;
-    if (name.endsWith(".mp4")) return <FileVideo className="w-5 h-5 text-purple-500 shrink-0" />;
+    if (name.endsWith(".mp4"))
+      return <FileVideo className="w-5 h-5 text-purple-500 shrink-0" />;
     return <File className="w-5 h-5 text-muted-foreground shrink-0" />;
   };
 
@@ -180,7 +205,9 @@ export function GenericFileBrowser({
               onClick={() => setCurrentPath("")}
               className={cn(
                 "flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-accent transition-colors",
-                !currentPath ? "font-bold text-foreground" : "text-muted-foreground hover:text-foreground",
+                !currentPath
+                  ? "font-bold text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
               title="Root directory"
             >
@@ -222,7 +249,9 @@ export function GenericFileBrowser({
             disabled={loading}
             title="Refresh directory"
           >
-            <RotateCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
+            <RotateCw
+              className={cn("w-3.5 h-3.5", loading && "animate-spin")}
+            />
           </Button>
 
           {allowCreateFolder && (
@@ -245,7 +274,9 @@ export function GenericFileBrowser({
             <Button
               size="xs"
               onClick={() => onFolderSelect(currentPath || "")}
-              disabled={(!currentPath && !allowSelectRoot) || isCurrentPathExisting}
+              disabled={
+                (!currentPath && !allowSelectRoot) || isCurrentPathExisting
+              }
               className="gap-1 text-xs font-semibold shadow-xs"
               title={
                 isCurrentPathExisting
@@ -302,7 +333,11 @@ export function GenericFileBrowser({
               disabled={!newFolderName.trim() || creatingFolder}
               className="gap-1 font-medium"
             >
-              {creatingFolder ? <Loader2 className="w-3 h-3 animate-spin" /> : "Create"}
+              {creatingFolder ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                "Create"
+              )}
             </Button>
             <Button
               size="xs"
@@ -356,9 +391,12 @@ export function GenericFileBrowser({
           <ul className="space-y-1">
             {files.map((file) => {
               const normalizedFilePath = normalizePath(file.path);
-              const isFileExisting = file.isDirectory && normalizedExisting.has(normalizedFilePath);
+              const isFileExisting =
+                file.isDirectory && normalizedExisting.has(normalizedFilePath);
               const parentOfFile = file.isDirectory
-                ? Array.from(normalizedExisting).find((existing) => normalizedFilePath.startsWith(`${existing}/`))
+                ? Array.from(normalizedExisting).find((existing) =>
+                    normalizedFilePath.startsWith(`${existing}/`),
+                  )
                 : undefined;
 
               return (
@@ -383,8 +421,9 @@ export function GenericFileBrowser({
                   </button>
 
                   {/* For folders when in folder selection mode, provide explicit Select action or status badge */}
-                  {onFolderSelect && file.isDirectory && (
-                    isFileExisting ? (
+                  {onFolderSelect &&
+                    file.isDirectory &&
+                    (isFileExisting ? (
                       <span className="ml-2 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                         <Check className="w-3 h-3" />
                         <span>Added</span>
@@ -425,8 +464,7 @@ export function GenericFileBrowser({
                         <Check className="w-3 h-3 text-primary" />
                         <span>Select</span>
                       </Button>
-                    )
-                  )}
+                    ))}
                 </li>
               );
             })}
@@ -455,17 +493,22 @@ export function GenericFileBrowser({
             )}
             {!isCurrentPathExisting && parentOfCurrentPath && (
               <div className="text-xs text-muted-foreground mt-0.5">
-                Already covered by parent folder: <span className="font-mono font-medium text-foreground">/{parentOfCurrentPath}</span>
+                Already covered by parent folder:{" "}
+                <span className="font-mono font-medium text-foreground">
+                  /{parentOfCurrentPath}
+                </span>
               </div>
             )}
           </div>
           <Button
             size="default"
             onClick={() => onFolderSelect(currentPath || "")}
-            disabled={(!currentPath && !allowSelectRoot) || isCurrentPathExisting}
+            disabled={
+              (!currentPath && !allowSelectRoot) || isCurrentPathExisting
+            }
             className={cn(
               "shrink-0 gap-2 font-semibold shadow px-4 text-sm",
-              isCurrentPathExisting && "opacity-60"
+              isCurrentPathExisting && "opacity-60",
             )}
           >
             {isCurrentPathExisting ? (
@@ -477,13 +520,11 @@ export function GenericFileBrowser({
               <>
                 <FolderCheck className="w-4 h-4" />
                 <span>
-                  {!currentPath && !allowSelectRoot ? (
-                    "Choose a Folder"
-                  ) : currentPath ? (
-                    `Select "${currentFolderName}"`
-                  ) : (
-                    "Select Root Folder"
-                  )}
+                  {!currentPath && !allowSelectRoot
+                    ? "Choose a Folder"
+                    : currentPath
+                      ? `Select "${currentFolderName}"`
+                      : "Select Root Folder"}
                 </span>
               </>
             )}

@@ -77,13 +77,16 @@ function App() {
           <Folder className="w-16 h-16 text-blue-500 mx-auto opacity-50" />
           <h2 className="text-xl font-semibold">Restore Folder Access</h2>
           <p className="text-muted-foreground text-sm">
-            For security reasons, your browser requires you to confirm access to your local folder after a refresh.
+            For security reasons, your browser requires you to confirm access to
+            your local folder after a refresh.
           </p>
           <div className="space-y-2 mt-4">
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={async () => {
-                const success = await syncManager.getAdapter().requestPermission(false);
+                const success = await syncManager
+                  .getAdapter()
+                  .requestPermission(false);
                 if (success) {
                   useAppStore.getState().setNeedsPermission(false);
                   syncManager.sync().catch(console.error);
@@ -119,7 +122,9 @@ function App() {
   }
 
   if (isDocumentBrowserOpen) {
-    return <DocumentList basePath="" onClose={() => setDocumentBrowserOpen(false)} />;
+    return (
+      <DocumentList basePath="" onClose={() => setDocumentBrowserOpen(false)} />
+    );
   }
 
   return (
@@ -180,7 +185,8 @@ function App() {
               <Folder className="w-16 h-16 text-blue-500 mb-4" />
               <h2 className="text-2xl font-semibold mb-2">Documents</h2>
               <p className="text-sm text-muted-foreground text-center max-w-md">
-                Browse and view offline documents, manuals, circuit diagrams, and building plans.
+                Browse and view offline documents, manuals, circuit diagrams,
+                and building plans.
               </p>
             </div>
           </div>

@@ -97,17 +97,17 @@ export function SetupScreen() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
         <div className="max-w-2xl w-full bg-background rounded-xl shadow-lg border p-8 space-y-6 flex flex-col h-[80vh]">
-          <div className="flex items-center justify-between shrink-0">
+          <div className="relative flex items-center justify-center shrink-0">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setStep(1)}
-              className="gap-1 -ml-2 text-muted-foreground hover:text-foreground"
+              className="absolute left-0 gap-1 text-muted-foreground hover:text-foreground"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Back</span>
             </Button>
-            <div className="text-center flex-1 pr-14">
+            <div className="text-center">
               <h1 className="text-2xl font-bold tracking-tight">
                 Select Configuration
               </h1>
@@ -118,7 +118,7 @@ export function SetupScreen() {
           </div>
 
           <div className="flex-1 overflow-hidden">
-            <GenericFileBrowser 
+            <GenericFileBrowser
               onFileSelect={(path) => selectConfigFile(path)}
               onPathChange={setBrowserPath}
               allowedExtensions={[".json"]}
@@ -127,7 +127,8 @@ export function SetupScreen() {
 
           <div className="border-t pt-4 space-y-3 mt-4 shrink-0">
             <h3 className="text-sm font-medium">
-              Or create a new configuration {browserPath ? `in /${browserPath}` : 'at root'}:
+              Or create a new configuration{" "}
+              {browserPath ? `in /${browserPath}` : "at root"}:
             </h3>
             <div className="flex gap-2">
               <Input
@@ -141,7 +142,9 @@ export function SetupScreen() {
                   const jsonName = name.endsWith(".json")
                     ? name
                     : name + ".json";
-                  const fullPath = browserPath ? `${browserPath}/${jsonName}` : jsonName;
+                  const fullPath = browserPath
+                    ? `${browserPath}/${jsonName}`
+                    : jsonName;
                   selectConfigFile(fullPath, true);
                 }}
               >
@@ -198,9 +201,13 @@ export function SetupScreen() {
           </div>
         ) : !isNative ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg text-sm mb-4">
-            <p className="font-semibold mb-1">Important: Select the Main Folder</p>
+            <p className="font-semibold mb-1">
+              Important: Select the Main Folder
+            </p>
             <p>
-              Please make sure to select the main, top-level folder of your server drive. If you select a sub-folder, the paths might not match and the app may not work correctly on other devices.
+              Please make sure to select the main, top-level folder of your
+              server drive. If you select a sub-folder, the paths might not
+              match and the app may not work correctly on other devices.
             </p>
           </div>
         ) : null}
