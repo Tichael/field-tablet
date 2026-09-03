@@ -27,6 +27,14 @@ export function applyTheme(theme: AppConfig["theme"]) {
     }
   };
 
+  const cleanupVars = () => {
+    html.style.removeProperty("--primary");
+    html.style.removeProperty("--color-primary");
+    html.style.removeProperty("--primary-foreground");
+    html.style.removeProperty("--color-primary-foreground");
+    html.classList.remove("dark");
+  };
+
   if (theme.darkMode === "system") {
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     applyDarkMode(mediaQuery.matches);
@@ -35,9 +43,14 @@ export function applyTheme(theme: AppConfig["theme"]) {
     mediaQuery.addEventListener("change", listener);
 
     // Return cleanup function
-    return () => mediaQuery.removeEventListener("change", listener);
+    return () => {
+      mediaQuery.removeEventListener("change", listener);
+      cleanupVars();
+    };
   } else {
     applyDarkMode(theme.darkMode === "dark");
-    return () => {}; // empty cleanup
+    return () => {
+      cleanupVars();
+    };
   }
 }

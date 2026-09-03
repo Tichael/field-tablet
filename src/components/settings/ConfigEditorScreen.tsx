@@ -21,8 +21,12 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useAppStore } from "../../store/app-store";
+import { syncManager } from "../../lib/sync/sync-manager";
 
 import { applyTheme } from "../../lib/theme";
+import { GenericFileBrowser } from "../documents/GenericFileBrowser";
+import { Folder, FolderPlus, Trash2, AlertCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ConfigEditorScreenProps {
   onClose: () => void;
@@ -31,8 +35,85 @@ interface ConfigEditorScreenProps {
 export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   const { config, saveConfig, activeConfigFile } = useConfigStore();
   const isSyncing = useAppStore((state) => state.isSyncing);
+  const isConfigured = useAppStore((state) => state.isConfigured);
 
   const [formData, setFormData] = useState<AppConfig>(config || DEFAULT_CONFIG);
+  const [isBrowserOpen, setBrowserOpen] = useState(false);
+  const [folderNotice, setFolderNotice] = useState<{
+    type: "info" | "warning";
+    message: string;
+  } | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [checkingConnection, setCheckingConnection] = useState(false);
+
+  const handleAddSyncFolder = (path: string) => {
+    const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
+    if (!cleanPath) {
+      setBrowserOpen(false);
+      return;
+    }
+
+    const currentFolders = formData.syncFolders || [];
+    const normalizedCurrent = currentFolders.map((f) =>
+      f.trim().replace(/^\/+|\/+$/g, ""),
+    );
+
+    // Check 1: Already exists in sync list
+    if (normalizedCurrent.includes(cleanPath)) {
+      setFolderNotice({
+        type: "warning",
+        message: `Folder "/${cleanPath}" is already configured to sync.`,
+      });
+      setBrowserOpen(false);
+      return;
+    }
+
+    // Check 2: Parent folder is already in sync list
+    const parentFolder = normalizedCurrent.find((f) =>
+      cleanPath.startsWith(`${f}/`),
+    );
+    if (parentFolder) {
+      const confirmed = window.confirm(
+        `Folder "/${cleanPath}" is inside "/${parentFolder}", which is already being synced. Do you still want to add it as a separate sync folder?`,
+      );
+      if (!confirmed) {
+        setBrowserOpen(false);
+        return;
+      }
+    }
+
+    // Check 3: If adding a parent of already synced subfolders, clean up redundant subfolders
+    const childFolders = normalizedCurrent.filter((f) =>
+      f.startsWith(`${cleanPath}/`),
+    );
+    let newFolders: string[];
+    if (childFolders.length > 0) {
+      newFolders = normalizedCurrent.filter(
+        (f) => !f.startsWith(`${cleanPath}/`),
+      );
+      newFolders.push(cleanPath);
+      setFolderNotice({
+        type: "info",
+        message: `Added "/${cleanPath}" and merged redundant subfolder(s): ${childFolders.map((c) => `/${c}`).join(", ")}.`,
+      });
+    } else {
+      newFolders = [...normalizedCurrent, cleanPath];
+      setFolderNotice(null);
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      syncFolders: newFolders,
+    }));
+    setBrowserOpen(false);
+  };
+
+  const handleRemoveSyncFolder = (path: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      syncFolders: (prev.syncFolders || []).filter((f) => f !== path),
+    }));
+  };
 
   const [saveAsName, setSaveAsName] = useState(
     activeConfigFile || "app-config.json",
@@ -45,17 +126,46 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     }
   }, [config]);
 
-  // Live preview effect
+  // Check network share connection on mount (unless unconfigured initial setup)
   useEffect(() => {
-    const cleanup = applyTheme(formData.theme);
+    if (!isConfigured) {
+      setIsConnected(true);
+      return;
+    }
+    let isMounted = true;
+    setCheckingConnection(true);
+    syncManager
+      .checkShareConnection()
+      .then((connected) => {
+        if (isMounted) {
+          setIsConnected(connected);
+          setCheckingConnection(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setIsConnected(false);
+          setCheckingConnection(false);
+        }
+      });
     return () => {
-      cleanup();
-      // On unmount, restore the original theme if we have one
+      isMounted = false;
+    };
+  }, [isConfigured]);
+
+  // Live preview effect: apply changes as user adjusts settings
+  useEffect(() => {
+    applyTheme(formData.theme);
+  }, [formData.theme]);
+
+  // On unmount, restore the original saved theme if the editor was closed without saving
+  useEffect(() => {
+    return () => {
       if (config) {
         applyTheme(config.theme);
       }
     };
-  }, [formData.theme, config]);
+  }, [config]);
 
   // Warn on browser navigate/close if there are unsaved changes
   useEffect(() => {
@@ -164,10 +274,24 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         </div>
       </div>
 
+      {isConfigured && isConnected === false && (
+        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in duration-150">
+          <AlertCircle className="w-5 h-5 shrink-0" />
+          <div className="text-sm">
+            <p className="font-semibold">Network Share Disconnected</p>
+            <p className="text-xs mt-0.5">
+              Configuration cannot be edited while offline to prevent conflicts.
+              Please reconnect to your network share to make and save changes.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="theme" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="theme">Theme & Layout</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
+          <TabsTrigger value="sync">Sync Folders</TabsTrigger>
         </TabsList>
 
         <TabsContent value="theme">
@@ -280,7 +404,115 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="sync">
+          <Card>
+            <CardHeader>
+              <CardTitle>Sync Folders</CardTitle>
+              <CardDescription>
+                Configure the folders that should be synchronized for offline
+                document viewing.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {folderNotice && (
+                <div
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
+                    folderNotice.type === "warning"
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{folderNotice.message}</span>
+                  </div>
+                  <button
+                    onClick={() => setFolderNotice(null)}
+                    className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Folders to Sync</Label>
+                {!formData.syncFolders || formData.syncFolders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    No sync folders added. Root files will be synced.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {formData.syncFolders.map((folder) => (
+                      <li
+                        key={folder}
+                        className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Folder className="w-4 h-4 text-blue-500 shrink-0" />
+                          <span className="font-mono text-sm truncate">
+                            /{folder}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveSyncFolder(folder)}
+                          className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
+                          title={`Remove /${folder}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full mt-2"
+                  onClick={() => setBrowserOpen(true)}
+                >
+                  <FolderPlus className="w-4 h-4 mr-2" /> Add Folder
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {isBrowserOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col overflow-hidden border">
+            <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
+              <div>
+                <h3 className="font-semibold text-lg">Select Folder to Sync</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Browse or create a folder to synchronize with this device.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setBrowserOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden p-3 sm:p-4">
+              <GenericFileBrowser
+                onFolderSelect={handleAddSyncFolder}
+                onFileSelect={() => {}} // No-op, we only care about folders
+                allowCreateFolder={true}
+                allowSelectRoot={false}
+                existingFolders={formData.syncFolders || []}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-6 space-y-4">
@@ -307,11 +539,24 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               className="flex-1"
               size="lg"
               onClick={handleSave}
-              disabled={isSaving || isSyncing || !saveAsName.trim()}
+              disabled={
+                isSaving ||
+                isSyncing ||
+                !saveAsName.trim() ||
+                (isConfigured && isConnected === false) ||
+                checkingConnection
+              }
+              title={
+                isConfigured && isConnected === false
+                  ? "Cannot save while disconnected from network share"
+                  : undefined
+              }
             >
               {isSaving || isSyncing
                 ? "Saving..."
-                : "Save & Apply Configuration"}
+                : checkingConnection
+                  ? "Checking Connection..."
+                  : "Save & Apply Configuration"}
             </Button>
           </div>
         </CardContent>

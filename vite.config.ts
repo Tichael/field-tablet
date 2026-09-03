@@ -11,6 +11,15 @@ export default defineConfig({
   server: {
     host: true,
   },
+  build: {
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      onwarn(warning: any, warn: any) {
+        if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") return;
+        warn(warning);
+      },
+    },
+  },
   plugins: [
     tailwindcss(),
     react(),
@@ -18,6 +27,10 @@ export default defineConfig({
       registerType: "autoUpdate",
       injectRegister: false,
       includeAssets: ["favicon.ico", "apple-touch-icon.png", "mask-icon.svg"],
+      workbox: {
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,mjs,woff2}"],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
+      },
       manifest: {
         name: "Field Tablet",
         short_name: "FieldTablet",

@@ -32,15 +32,36 @@ public class SyncWorker extends Worker {
             }
 
             SmbService smbService = new SmbService(getApplicationContext());
-            boolean success = smbService.syncFiles(host, share, user, pass, domain);
+            
+            String syncFoldersStr = secureStorage.getString("sync_folders");
+            String configFile = secureStorage.getString("config_file");
+            
+            java.util.List<String> syncFolders = new java.util.ArrayList<>();
+            if (syncFoldersStr != null && !syncFoldersStr.isEmpty()) {
+                try {
+                    org.json.JSONArray arr = new org.json.JSONArray(syncFoldersStr);
+                    for (int i = 0; i < arr.length(); i++) {
+                        syncFolders.add(arr.getString(i));
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to parse sync folders", e);
+                }
+            }
 
-            if (success) {
+            try {
+                smbService.syncFiles(host, share, user, pass, domain, syncFolders, configFile);
                 Log.i(TAG, "Background sync completed successfully.");
                 return Result.success();
-            } else {
-                Log.e(TAG, "Background sync failed.");
-                return Result.retry();
+            } catch (Exception e) {
+                if (e.getMessage() != null && e.getMessage().startsWith("MISSING_FOLDER:")) {
+                    Log.w(TAG, "Background sync encountered missing folder: " + e.getMessage());
+                    // Don't fail the worker completely so it keeps trying, but log it
+                    return Result.success();
+                }
+                throw e;
             }
+
+
         } catch (Exception e) {
             Log.e(TAG, "Error in background sync", e);
             return Result.failure();

@@ -11,6 +11,7 @@ export interface AppConfig {
     appTitle: string;
     logoBase64?: string;
   };
+  syncFolders?: string[];
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -56,7 +57,11 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
       // First try to load from IndexedDB cache
       const files = await get("app_config_files");
       if (files && Array.isArray(files)) {
-        const file = files.find((f) => f.name === activeConfigFile);
+        const file = files.find(
+          (f) =>
+            f.name === activeConfigFile ||
+            f.name === activeConfigFile.split("/").pop(),
+        );
         if (file) {
           try {
             const parsed = JSON.parse(file.content);
@@ -71,12 +76,15 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
       // If not in cache or parse failed, try to read from adapter directly if possible,
       // but syncManager is supposed to cache it. Let's sync and try again.
       if (syncManager.getAdapter().isAvailable()) {
-        const freshFiles = await syncManager.getAdapter().getFiles();
-        const file = freshFiles.find((f: any) => f.name === activeConfigFile);
-        if (file) {
-          const parsed = JSON.parse(file.content);
+        try {
+          const content = await syncManager
+            .getAdapter()
+            .readFileText(activeConfigFile);
+          const parsed = JSON.parse(content);
           set({ config: { ...DEFAULT_CONFIG, ...parsed }, isLoading: false });
           return;
+        } catch (e) {
+          console.error("Failed to load active config file directly", e);
         }
       }
 
@@ -92,6 +100,18 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
     const { activeConfigFile } = getStore();
     const filenameToSave = newFilename || activeConfigFile || "app-config.json";
 
+    // Configuration can only be edited when connected to the network share,
+    // except on initial setup when no share is configured yet.
+    const isConfigured = localStorage.getItem("isConfigured") === "true";
+    if (isConfigured) {
+      const isConnected = await syncManager.checkShareConnection();
+      if (!isConnected) {
+        throw new Error(
+          "Cannot save configuration: no connection to network share. Configuration editing requires an active connection.",
+        );
+      }
+    }
+
     try {
       const jsonStr = JSON.stringify(newConfig, null, 2);
       await syncManager.getAdapter().saveFile(filenameToSave, jsonStr);
@@ -104,7 +124,7 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
       set({ config: newConfig });
 
       // Trigger a sync
-      syncManager.sync(true);
+      syncManager.sync(true).catch(console.error);
     } catch (error: any) {
       console.error("Error saving config:", error);
       throw error;

@@ -1,0 +1,468 @@
+import { useState, useEffect, useRef, useCallback } from "react";
+import { syncManager } from "../../lib/sync/sync-manager";
+import {
+  X,
+  ExternalLink,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight,
+  FileQuestion,
+} from "lucide-react";
+import { Button } from "../ui/button";
+import { Capacitor } from "@capacitor/core";
+// @ts-ignore - plugin missing types or dynamic load
+import { FileOpener } from "@capacitor-community/file-opener";
+import { Document, Page, pdfjs } from "react-pdf";
+
+// Ensure worker is loaded for PDF.js locally for offline-first capabilities
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.min.mjs",
+  import.meta.url,
+).toString();
+
+interface DocumentViewerProps {
+  filePath: string;
+  onClose: () => void;
+}
+
+const getContentType = (path: string) => {
+  const ext = path.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "pdf":
+      return "application/pdf";
+    case "doc":
+      return "application/msword";
+    case "docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case "xls":
+      return "application/vnd.ms-excel";
+    case "xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    case "ppt":
+      return "application/vnd.ms-powerpoint";
+    case "pptx":
+      return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+    case "txt":
+      return "text/plain";
+    case "csv":
+      return "text/csv";
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "mp4":
+      return "video/mp4";
+    default:
+      return "";
+  }
+};
+
+export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState<number>(1);
+  const [scale, setScale] = useState<number>(1);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [baseDims, setBaseDims] = useState({ width: 0, height: 0 });
+  const scaleRef = useRef(scale);
+  const scrollPosRef = useRef({ left: 0, top: 0 });
+
+  const isPDF = filePath.toLowerCase().endsWith(".pdf");
+  const isImage = /\.(png|jpe?g|gif|webp)$/i.test(filePath);
+  const isVideo = /\.(mp4|webm|ogg)$/i.test(filePath);
+
+  const urlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    urlRef.current = url;
+  }, [url]);
+
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  const openExternal = useCallback(
+    async (fileUrl: string) => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const adapter = syncManager.getAdapter();
+          const nativePath = adapter.getNativeFilePath
+            ? await adapter.getNativeFilePath(filePath)
+            : fileUrl;
+          await FileOpener.open({
+            filePath: nativePath,
+            contentType: getContentType(filePath),
+          });
+        } else {
+          window.open(fileUrl, "_blank");
+        }
+      } catch (e) {
+        console.error("Failed to open externally", e);
+        setError("Could not open this file type.");
+      }
+    },
+    [filePath],
+  );
+
+  useEffect(() => {
+    let active = true;
+    const loadUrl = async () => {
+      try {
+        const adapter = syncManager.getAdapter();
+        const fileUrl = await adapter.getFileUrl(filePath);
+        if (!active) return;
+        setUrl(fileUrl);
+
+        // On native platform, try opening unsupported types automatically
+        if (Capacitor.isNativePlatform() && !isPDF && !isImage && !isVideo) {
+          openExternal(fileUrl);
+        }
+      } catch (e) {
+        if (!active) return;
+        console.error("Failed to load document URL", e);
+        setError("Failed to load document");
+      }
+    };
+
+    loadUrl();
+    return () => {
+      active = false;
+      // Clean up object URLs for PWA
+      if (urlRef.current && urlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(urlRef.current);
+      }
+    };
+  }, [filePath, isPDF, isImage, isVideo, openExternal]);
+
+  useEffect(() => {
+    setBaseDims({ width: 0, height: 0 });
+  }, [url]);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      if (entries[0] && entries[0].contentRect.width > 0) {
+        setBaseDims({
+          width: entries[0].contentRect.width,
+          height: entries[0].contentRect.height,
+        });
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [url, pageNumber, isPDF, isImage]);
+
+  // Handle multitouch and ctrl+scroll zooming
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let initialDist: number | null = null;
+    let initialScale = 1;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = -e.deltaY;
+        setScale((s) => Math.min(Math.max(0.25, s + delta * 0.005), 5));
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        initialDist = dist;
+        initialScale = scaleRef.current;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2 && initialDist !== null) {
+        e.preventDefault(); // Prevent native browser pinch zoom
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY,
+        );
+        const ratio = dist / initialDist;
+        setScale(Math.min(Math.max(0.25, initialScale * ratio), 5));
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length < 2) {
+        initialDist = null;
+      }
+    };
+
+    container.addEventListener("wheel", onWheel, { passive: false });
+    container.addEventListener("touchstart", onTouchStart, { passive: false });
+    container.addEventListener("touchmove", onTouchMove, { passive: false });
+    container.addEventListener("touchend", onTouchEnd);
+
+    return () => {
+      container.removeEventListener("wheel", onWheel);
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchmove", onTouchMove);
+      container.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [url]);
+
+  const handleZoomIn = () => setScale((s) => Math.min(s + 0.25, 5));
+  const handleZoomOut = () => setScale((s) => Math.max(s - 0.25, 0.25));
+  const handleZoomReset = () => setScale(1);
+
+  const changePage = (delta: number) => {
+    if (containerRef.current) {
+      scrollPosRef.current = {
+        left: containerRef.current.scrollLeft,
+        top: containerRef.current.scrollTop,
+      };
+    }
+    setPageNumber((p) => p + delta);
+  };
+
+  const renderContent = () => {
+    if (!url)
+      return <div className="animate-pulse p-4">Loading document...</div>;
+
+    if (isPDF) {
+      return (
+        <div
+          ref={containerRef}
+          className="overflow-auto h-full w-full bg-muted/20"
+        >
+          <div className="min-h-full min-w-full flex p-4 pb-24">
+            <div
+              style={{
+                width: baseDims.width ? baseDims.width * scale : "auto",
+                height: baseDims.height ? baseDims.height * scale : "auto",
+                margin: "auto",
+                position: "relative",
+              }}
+            >
+              <div
+                ref={contentRef}
+                style={{
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                  position: baseDims.width ? "absolute" : "relative",
+                  left: 0,
+                  top: 0,
+                }}
+              >
+                <Document
+                  file={url}
+                  onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                  onLoadError={(err) => setError(err.message)}
+                  className="shadow-xl bg-white"
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={1.5}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    onLoadSuccess={() => {
+                      setTimeout(() => {
+                        if (containerRef.current) {
+                          containerRef.current.scrollTop =
+                            scrollPosRef.current.top;
+                          containerRef.current.scrollLeft =
+                            scrollPosRef.current.left;
+                        }
+                      }, 10);
+                    }}
+                  />
+                </Document>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (isImage) {
+      return (
+        <div
+          ref={containerRef}
+          className="overflow-auto h-full w-full bg-muted/20"
+        >
+          <div className="min-h-full min-w-full flex p-4">
+            <div
+              style={{
+                width: baseDims.width ? baseDims.width * scale : "auto",
+                height: baseDims.height ? baseDims.height * scale : "auto",
+                margin: "auto",
+                position: "relative",
+              }}
+            >
+              <div
+                ref={contentRef}
+                style={{
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
+                  position: baseDims.width ? "absolute" : "relative",
+                  left: 0,
+                  top: 0,
+                }}
+              >
+                <img
+                  src={url}
+                  alt={filePath}
+                  className="shadow-lg"
+                  style={
+                    baseDims.width
+                      ? { width: baseDims.width, height: baseDims.height }
+                      : {
+                          maxWidth: "100%",
+                          maxHeight: "80vh",
+                          objectFit: "contain",
+                        }
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (isVideo) {
+      return (
+        <div className="flex justify-center items-center h-full w-full bg-black">
+          <video
+            src={url}
+            controls
+            className="max-w-full max-h-full"
+            autoPlay
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center h-full w-full p-8 text-center">
+        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4 text-muted-foreground">
+          <FileQuestion className="w-8 h-8" />
+        </div>
+        <h3 className="text-base font-semibold mb-1">
+          {filePath.split("/").pop()}
+        </h3>
+        <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+          This file type cannot be previewed directly in the tablet viewer.
+        </p>
+        <Button
+          onClick={() => url && openExternal(url)}
+          size="default"
+          className="gap-2"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Open Externally
+        </Button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <div className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-sm shrink-0">
+        <h2
+          className="text-lg font-semibold truncate flex-1 pr-4"
+          title={filePath}
+        >
+          {filePath.split("/").pop()}
+        </h2>
+
+        <div className="flex items-center gap-3">
+          {numPages && (
+            <div className="flex items-center bg-background border rounded-lg overflow-hidden shadow-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={pageNumber <= 1}
+                onClick={() => changePage(-1)}
+                className="h-8 px-2 rounded-none hover:bg-muted"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="px-2.5 py-1 text-xs font-mono font-medium min-w-[3.5rem] text-center border-x">
+                {pageNumber} / {numPages}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={pageNumber >= numPages}
+                onClick={() => changePage(1)}
+                className="h-8 px-2 rounded-none hover:bg-muted"
+                title="Next page"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+
+          {(isPDF || isImage) && (
+            <div className="flex items-center bg-background border rounded-lg overflow-hidden shadow-sm">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleZoomOut}
+                className="h-8 w-8 rounded-none hover:bg-muted"
+                title="Zoom out"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleZoomReset}
+                className="h-8 px-2.5 text-xs font-mono font-medium min-w-[3.5rem] rounded-none border-x hover:bg-muted"
+                title="Reset zoom"
+              >
+                {Math.round(scale * 100)}%
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={handleZoomIn}
+                className="h-8 w-8 rounded-none hover:bg-muted"
+                title="Zoom in"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="rounded-full border bg-background shadow-sm hover:bg-muted"
+            title="Close viewer"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden relative">
+        {error ? (
+          <div className="flex items-center justify-center h-full text-destructive p-4 text-center">
+            {error}
+          </div>
+        ) : (
+          renderContent()
+        )}
+      </div>
+    </div>
+  );
+}

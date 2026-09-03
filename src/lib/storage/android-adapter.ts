@@ -1,5 +1,6 @@
-import type { StorageAdapter } from "./adapter";
+import type { StorageAdapter, FileInfo } from "./adapter";
 import { SmbSync } from "./smb-sync-plugin";
+import { Capacitor } from "@capacitor/core";
 
 export class AndroidSmbAdapter implements StorageAdapter {
   id = "android-smb-sync";
@@ -8,8 +9,12 @@ export class AndroidSmbAdapter implements StorageAdapter {
     return true;
   }
 
-  async requestPermission(_forcePrompt?: boolean): Promise<boolean> {
-    return true; // Config is handled by SetupScreen directly on Android
+  async requestPermission(_forcePrompt = false): Promise<boolean> {
+    return true; // Android permissions handled by OS/Plugin
+  }
+
+  async verifyPermission(): Promise<boolean> {
+    return true;
   }
 
   async getFiles(
@@ -30,6 +35,50 @@ export class AndroidSmbAdapter implements StorageAdapter {
     } catch (e) {
       console.error("Failed to save file to native cache", e);
       throw e;
+    }
+  }
+
+  async createDirectory(path: string): Promise<void> {
+    try {
+      await SmbSync.createDirectory({ path });
+    } catch (e) {
+      console.error("Failed to create directory in native storage", e);
+      throw e;
+    }
+  }
+
+  async listRemoteFiles(path: string): Promise<FileInfo[]> {
+    const result = await SmbSync.listRemoteFiles({ path });
+    return result.files || [];
+  }
+
+  async listLocalFiles(path: string): Promise<FileInfo[]> {
+    const result = await SmbSync.listLocalFiles({ path });
+    return result.files || [];
+  }
+
+  async getFileUrl(path: string): Promise<string> {
+    const result = await SmbSync.getFileUrl({ path });
+    return Capacitor.convertFileSrc(result.url);
+  }
+
+  async getNativeFilePath(path: string): Promise<string> {
+    const result = await SmbSync.getFileUrl({ path });
+    return result.url;
+  }
+
+  async readFileText(path: string): Promise<string> {
+    const result = await SmbSync.readFileText({ path });
+    return result.content;
+  }
+
+  async checkConnection(): Promise<boolean> {
+    try {
+      const result = await SmbSync.checkConnection();
+      return Boolean(result && result.connected);
+    } catch (e) {
+      console.error("Failed to check SMB connection", e);
+      return false;
     }
   }
 }
