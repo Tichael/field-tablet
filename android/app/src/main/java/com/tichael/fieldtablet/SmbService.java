@@ -189,6 +189,10 @@ public class SmbService {
     }
 
     public void uploadFile(String host, String shareName, String username, String password, String domain, String path, String content) throws Exception {
+        uploadFileBytes(host, shareName, username, password, domain, path, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    public void uploadFileBytes(String host, String shareName, String username, String password, String domain, String path, byte[] data) throws Exception {
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
@@ -210,7 +214,7 @@ public class SmbService {
                         null)) {
                     
                     try (java.io.OutputStream os = smbFile.getOutputStream()) {
-                        os.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        os.write(data);
                     }
                 }
             }

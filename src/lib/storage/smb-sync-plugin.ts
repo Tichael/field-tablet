@@ -28,7 +28,8 @@ export interface SmbSyncPlugin {
   saveFile(options: {
     path: string;
     content: string;
-  }): Promise<{ success: boolean }>;
+    isBase64?: boolean;
+  }): Promise<{ success: boolean; pendingUpload?: boolean }>;
 
   createDirectory(options: { path: string }): Promise<{ success: boolean }>;
 

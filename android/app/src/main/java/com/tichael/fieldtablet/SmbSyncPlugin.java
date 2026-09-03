@@ -200,6 +200,7 @@ public class SmbSyncPlugin extends Plugin {
     public void saveFile(PluginCall call) {
         String path = call.getString("path");
         String content = call.getString("content");
+        boolean isBase64 = Boolean.TRUE.equals(call.getBoolean("isBase64", false));
         
         if (path == null || content == null) {
             call.reject("Path and content are required");
@@ -214,10 +215,18 @@ public class SmbSyncPlugin extends Plugin {
                     parent.mkdirs();
                 }
 
+                byte[] bytes;
+                if (isBase64) {
+                    bytes = android.util.Base64.decode(content, android.util.Base64.DEFAULT);
+                } else {
+                    bytes = content.getBytes(StandardCharsets.UTF_8);
+                }
+
                 FileOutputStream fos = new FileOutputStream(file);
-                fos.write(content.getBytes(StandardCharsets.UTF_8));
+                fos.write(bytes);
                 fos.close();
 
+                boolean pendingUpload = false;
                 SecureStorage storage = new SecureStorage(getContext());
                 String host = storage.getString("smb_host");
                 String share = storage.getString("smb_share");
@@ -226,15 +235,21 @@ public class SmbSyncPlugin extends Plugin {
                 String domain = storage.getString("smb_domain");
 
                 if (host != null && share != null && user != null && pass != null) {
-                    SmbService smbService = new SmbService(getContext());
-                    smbService.uploadFile(host, share, user, pass, domain, path, content);
+                    try {
+                        SmbService smbService = new SmbService(getContext());
+                        smbService.uploadFileBytes(host, share, user, pass, domain, path, bytes);
+                    } catch (Exception uploadEx) {
+                        Log.w(TAG, "Failed to upload file to SMB (device may be offline): " + uploadEx.getMessage());
+                        pendingUpload = true;
+                    }
                 }
                 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
+                ret.put("pendingUpload", pendingUpload);
                 call.resolve(ret);
             } catch (Exception e) {
-                Log.e(TAG, "Error saving file", e);
+                Log.e(TAG, "Error saving file locally", e);
                 call.reject("Error saving file: " + e.getMessage(), e);
             }
         }).start();

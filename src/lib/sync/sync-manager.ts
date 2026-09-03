@@ -87,9 +87,13 @@ export class SyncManager {
     try {
       useAppStore.getState().setSyncing(true);
       if (this.isNative && forceNative) {
-        const { useConfigStore } = await import("../../store/config-store");
+        const { useConfigStore, getFormFoldersList } =
+          await import("../../store/config-store");
         const configState = useConfigStore.getState();
-        const syncFolders = configState.config?.syncFolders || [];
+        const syncFolders = [
+          ...(configState.config?.syncFolders || []),
+          ...getFormFoldersList(configState.config),
+        ];
         const configFile = configState.activeConfigFile || "";
         const result = await SmbSync.forceSync({ syncFolders, configFile });
         if (
@@ -113,6 +117,7 @@ export class SyncManager {
       }
       await set(CACHED_FILES_KEY, files);
       useAppStore.getState().setLastSyncTime(Date.now());
+      useAppStore.getState().setPendingUploadsCount(0);
       useAppStore.getState().setError(null);
     } catch (e: any) {
       console.error("Sync failed", e);
@@ -133,16 +138,21 @@ export class SyncManager {
   startPeriodicSync() {
     if (this.isNative) {
       // For background sync, we must read the config store dynamically
-      import("../../store/config-store").then(({ useConfigStore }) => {
-        const configState = useConfigStore.getState();
-        const syncFolders = configState.config?.syncFolders || [];
-        const configFile = configState.activeConfigFile || "";
-        SmbSync.startBackgroundSync({
-          intervalMinutes: 15,
-          syncFolders,
-          configFile,
-        });
-      });
+      import("../../store/config-store").then(
+        ({ useConfigStore, getFormFoldersList }) => {
+          const configState = useConfigStore.getState();
+          const syncFolders = [
+            ...(configState.config?.syncFolders || []),
+            ...getFormFoldersList(configState.config),
+          ];
+          const configFile = configState.activeConfigFile || "";
+          SmbSync.startBackgroundSync({
+            intervalMinutes: 15,
+            syncFolders,
+            configFile,
+          });
+        },
+      );
     } else {
       if (this.syncTimer !== null) {
         clearInterval(this.syncTimer);

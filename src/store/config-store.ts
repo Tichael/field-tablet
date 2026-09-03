@@ -2,6 +2,39 @@ import { create } from "zustand";
 import { get } from "idb-keyval";
 import { syncManager } from "../lib/sync/sync-manager";
 
+export function detectDefaultPdfPageSize(): "a4" | "letter" {
+  if (typeof navigator !== "undefined" && navigator.language) {
+    const lang = navigator.language.toLowerCase();
+    if (
+      lang.endsWith("-us") ||
+      lang.endsWith("-ca") ||
+      lang.endsWith("-mx") ||
+      lang.endsWith("-ph") ||
+      lang.endsWith("-cl")
+    ) {
+      return "letter";
+    }
+  }
+  return "a4";
+}
+
+export interface FormFoldersConfig {
+  dailyReports?: string;
+  incidentLogs?: string;
+  equipmentChecks?: string;
+}
+
+export function getFormFoldersList(config?: AppConfig | null): string[] {
+  if (!config || !config.formFolders) return [];
+  if (Array.isArray(config.formFolders)) {
+    return (config.formFolders as string[]).filter(Boolean);
+  }
+  const { dailyReports, incidentLogs, equipmentChecks } = config.formFolders;
+  return [dailyReports, incidentLogs, equipmentChecks].filter(
+    (f): f is string => Boolean(f && f.trim()),
+  );
+}
+
 export interface AppConfig {
   theme: {
     primaryColor: string;
@@ -12,6 +45,8 @@ export interface AppConfig {
     logoBase64?: string;
   };
   syncFolders?: string[];
+  formFolders?: FormFoldersConfig;
+  pdfPageSize?: "a4" | "letter";
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -22,6 +57,8 @@ export const DEFAULT_CONFIG: AppConfig = {
   branding: {
     appTitle: "Field Tablet App",
   },
+  formFolders: {},
+  pdfPageSize: detectDefaultPdfPageSize(),
 };
 
 interface ConfigState {
@@ -36,12 +73,17 @@ interface ConfigState {
 
 export const useConfigStore = create<ConfigState>((set, getStore) => ({
   config: null,
-  activeConfigFile: localStorage.getItem("activeConfigFile"),
+  activeConfigFile:
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("activeConfigFile")
+      : null,
   isLoading: false,
   error: null,
 
   setActiveConfigFile: (filename: string) => {
-    localStorage.setItem("activeConfigFile", filename);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem("activeConfigFile", filename);
+    }
     set({ activeConfigFile: filename });
   },
 
@@ -102,7 +144,9 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
 
     // Configuration can only be edited when connected to the network share,
     // except on initial setup when no share is configured yet.
-    const isConfigured = localStorage.getItem("isConfigured") === "true";
+    const isConfigured =
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("isConfigured") === "true";
     if (isConfigured) {
       const isConnected = await syncManager.checkShareConnection();
       if (!isConnected) {
@@ -118,7 +162,9 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
 
       // Update local state
       if (filenameToSave !== activeConfigFile) {
-        localStorage.setItem("activeConfigFile", filenameToSave);
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem("activeConfigFile", filenameToSave);
+        }
         set({ activeConfigFile: filenameToSave });
       }
       set({ config: newConfig });
