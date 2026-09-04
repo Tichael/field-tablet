@@ -570,6 +570,29 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {folderNotice && (
+                <div
+                  className={cn(
+                    "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
+                    folderNotice.type === "warning"
+                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{folderNotice.message}</span>
+                  </div>
+                  <button
+                    onClick={() => setFolderNotice(null)}
+                    className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Folders for Forms</Label>
                 {getFormFoldersList(formData).length === 0 ? (

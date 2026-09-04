@@ -482,5 +482,83 @@ describe("FormService", () => {
       );
       expect(JSON.parse(readCloned).title).toBe("Subcontractor Daily Report");
     });
+
+    it("should catch options with empty labels in validateTemplate", () => {
+      const template = formService.createEmptyTemplate("Option Test", "Test");
+      template.sections[0].fields.push({
+        id: "choice_1",
+        type: "select",
+        label: "Priority",
+        options: [
+          { label: "High", value: "high" },
+          { label: "   ", value: "empty" },
+        ],
+      });
+      const result = formService.validateTemplate(template);
+      expect(result.valid).toBe(false);
+      expect(
+        result.errors.some((e) => e.includes("option 2 must have a label")),
+      ).toBe(true);
+    });
+
+    it("should keep original template intact when duplicating", async () => {
+      const original = await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "Reports/Daily",
+      });
+
+      await formService.duplicateTemplate(
+        original,
+        "Daily Copy",
+        "Reports/Daily_Copy",
+      );
+
+      // Verify original is still intact in Reports/Daily
+      const originalOnDisk = await formService.loadTemplate("Reports/Daily");
+      expect(originalOnDisk?.title).toBe(TEST_REPORT_TEMPLATE.title);
+      expect(originalOnDisk?.folderPath).toBe("Reports/Daily");
+
+      // Verify cloned is in Reports/Daily_Copy
+      const clonedOnDisk = await formService.loadTemplate("Reports/Daily_Copy");
+      expect(clonedOnDisk?.title).toBe("Daily Copy");
+      expect(clonedOnDisk?.folderPath).toBe("Reports/Daily_Copy");
+    });
+
+    it("should catch duplicate and empty option values in validateTemplate", () => {
+      const template = formService.createEmptyTemplate("Values Test", "Test");
+      template.sections[0].fields.push({
+        id: "status_field",
+        type: "select",
+        label: "Status",
+        options: [
+          { label: "Active", value: "active" },
+          { label: "Duplicate Active", value: "active" },
+          { label: "Blank Value", value: "   " },
+        ],
+      });
+      const result = formService.validateTemplate(template);
+      expect(result.valid).toBe(false);
+      expect(
+        result.errors.some((e) => e.includes("must have a value")),
+      ).toBe(true);
+      expect(
+        result.errors.some((e) => e.includes("Duplicate option value")),
+      ).toBe(true);
+    });
+
+    it("should catch number fields where min is greater than max", () => {
+      const template = formService.createEmptyTemplate("Range Test", "Test");
+      template.sections[0].fields.push({
+        id: "reading",
+        type: "number",
+        label: "Pressure Reading",
+        validation: { min: 100, max: 20 },
+      });
+      const result = formService.validateTemplate(template);
+      expect(result.valid).toBe(false);
+      expect(
+        result.errors.some((e) => e.includes("cannot be greater than max value")),
+      ).toBe(true);
+    });
   });
 });

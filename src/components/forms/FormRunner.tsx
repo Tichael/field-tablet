@@ -35,6 +35,7 @@ interface FormRunnerProps {
   initialSubmission?: FormSubmission;
   onClose: () => void;
   onViewPdf?: (filePath: string) => void;
+  isPreview?: boolean;
 }
 
 export function FormRunner({
@@ -42,6 +43,7 @@ export function FormRunner({
   initialSubmission,
   onClose,
   onViewPdf,
+  isPreview = false,
 }: FormRunnerProps) {
   const config = useConfigStore((state) => state.config);
 
@@ -191,6 +193,15 @@ export function FormRunner({
         }
         return;
       }
+    }
+
+    if (isPreview) {
+      setIsDirty(false);
+      setJustSaved(true);
+      setTimeout(() => {
+        setJustSaved(false);
+      }, 2500);
+      return;
     }
 
     if (!config) {
@@ -552,6 +563,34 @@ export function FormRunner({
     );
   }, [template.sections, activeSectionId]);
 
+  if (!activeSection) {
+    return (
+      <div className="flex flex-col h-screen bg-background text-foreground">
+        <header className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-xs">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="rounded-full"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-lg font-bold">{template.title || "Form"}</h1>
+          <div className="w-9" />
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+          <FileText className="w-12 h-12 mb-3 opacity-30" />
+          <p className="font-semibold text-base">
+            This form template has no sections.
+          </p>
+          <p className="text-xs mt-1">
+            Open this form in the Form Editor to add sections and fields.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       {/* Top Tablet Header */}
@@ -577,9 +616,14 @@ export function FormRunner({
                     Editing
                   </span>
                 )}
+                {isPreview && (
+                  <span className="text-[10px] uppercase tracking-wider font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 shrink-0">
+                    Preview
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {template.folderPath}
+                {template.folderPath || (isPreview ? "Previewing Template" : "")}
               </p>
             </div>
           </div>

@@ -189,14 +189,38 @@ export class FormService {
                   `Field "${field.label || field.id}" (${field.type}) must have at least one option.`,
                 );
               } else {
+                const optValues = new Set<string>();
                 field.options.forEach((opt, oIndex) => {
                   if (!opt.label || !opt.label.trim()) {
                     errors.push(
                       `Field "${field.label || field.id}" option ${oIndex + 1} must have a label.`,
                     );
                   }
+                  if (!opt.value || !opt.value.trim()) {
+                    errors.push(
+                      `Field "${field.label || field.id}" option ${oIndex + 1} must have a value.`,
+                    );
+                  } else {
+                    if (optValues.has(opt.value)) {
+                      errors.push(
+                        `Duplicate option value "${opt.value}" in field "${field.label || field.id}". Option values must be unique.`,
+                      );
+                    }
+                    optValues.add(opt.value);
+                  }
                 });
               }
+            }
+
+            if (
+              field.type === "number" &&
+              field.validation?.min !== undefined &&
+              field.validation?.max !== undefined &&
+              field.validation.min > field.validation.max
+            ) {
+              errors.push(
+                `Field "${field.label || field.id}" min value (${field.validation.min}) cannot be greater than max value (${field.validation.max}).`,
+              );
             }
           });
         }

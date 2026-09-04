@@ -6,6 +6,10 @@ import type {
   FormFieldType,
 } from "../../../types/form";
 import { formService } from "../../../lib/forms/form-service";
+import {
+  useConfigStore,
+  getFormFoldersList,
+} from "../../../store/config-store";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { FieldPalette } from "./FieldPalette";
@@ -370,11 +374,12 @@ export function FormEditor({
       if (!section) return prev;
 
       const sourceField = section.fields[fieldIndex];
-      const timestamp = Date.now();
+      const randomSuffix = Math.random().toString(36).slice(2, 6);
       const clonedField: FormField = {
         ...JSON.parse(JSON.stringify(sourceField)),
-        id: `${sourceField.id}_copy_${timestamp.toString().slice(-4)}`,
+        id: `${sourceField.id}_copy_${randomSuffix}`,
         label: `${sourceField.label} (Copy)`,
+        isIdentifier: false,
       };
 
       const updatedFields = [...section.fields];
@@ -391,6 +396,14 @@ export function FormEditor({
   };
 
   const handleDeleteField = (sectionId: string, fieldId: string) => {
+    const section = template.sections.find((s) => s.id === sectionId);
+    if (section && section.fields.length <= 1) {
+      const confirmed = window.confirm(
+        `Deleting this field will leave section "${section.title}" with no fields. Are you sure?`,
+      );
+      if (!confirmed) return;
+    }
+
     setTemplate((prev) => ({
       ...prev,
       sections: prev.sections.map((s) =>
@@ -446,6 +459,31 @@ export function FormEditor({
     targetFolder: string,
   ) => {
     const saved = await formService.saveTemplate(finalTemplate, targetFolder);
+
+    // Auto-register destination base folder into config if not already tracked
+    const currentConfig = useConfigStore.getState().config;
+    if (currentConfig) {
+      const currentFolders = getFormFoldersList(currentConfig);
+      const cleanTarget = targetFolder.trim().replace(/^\/+|\/+$/g, "");
+      const isCovered = currentFolders.some(
+        (f) => cleanTarget === f || cleanTarget.startsWith(`${f}/`),
+      );
+      if (!isCovered) {
+        const baseFolder = cleanTarget.split("/")[0] || cleanTarget;
+        const updatedFolders = Array.from(
+          new Set([...currentFolders, baseFolder]),
+        );
+        try {
+          await useConfigStore.getState().saveConfig({
+            ...currentConfig,
+            formFolders: updatedFolders,
+          });
+        } catch (err) {
+          console.warn("Could not auto-register form folder into config:", err);
+        }
+      }
+    }
+
     setTemplate(saved);
     setIsDirty(false);
     onSaved(saved);
@@ -490,7 +528,7 @@ export function FormEditor({
   );
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground select-none">
+    <div className="flex flex-col h-screen bg-background text-foreground">
       {/* 1. Header Toolbar */}
       <header className="flex items-center justify-between p-3 sm:p-4 border-b bg-muted/20 shadow-xs shrink-0">
         <div className="flex items-center gap-3 min-w-0">
@@ -1061,6 +1099,7 @@ export function FormEditor({
             <div className="flex-1 overflow-hidden">
               <FormRunner
                 template={template}
+                isPreview={true}
                 onClose={() => setViewMode("builder")}
                 onViewPdf={() => {}}
               />

@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { FormTemplate } from "../../../types/form";
 import {
   useConfigStore,
   getFormFoldersList,
 } from "../../../store/config-store";
+import { syncManager } from "../../../lib/sync/sync-manager";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
@@ -24,7 +25,7 @@ export function TemplateSaveDialog({
   onSave,
 }: TemplateSaveDialogProps) {
   const config = useConfigStore((state) => state.config);
-  const formFolders = getFormFoldersList(config);
+  const formFolders = useMemo(() => getFormFoldersList(config), [config]);
 
   const [title, setTitle] = useState(template.title);
   const [description, setDescription] = useState(template.description || "");
@@ -46,6 +47,8 @@ export function TemplateSaveDialog({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     setTitle(template.title);
     setDescription(template.description || "");
     setCategory(template.category || "");
@@ -69,7 +72,7 @@ export function TemplateSaveDialog({
       setSubfolderName(sanitizeFilenamePart(template.title) || "Custom Form");
     }
     setError(null);
-  }, [template, isOpen, formFolders]);
+  }, [isOpen, template, formFolders]);
 
   if (!isOpen) return null;
 
@@ -94,6 +97,32 @@ export function TemplateSaveDialog({
     setError(null);
 
     try {
+      // Check if target folder already has a form.json when saving to a new or different folder
+      const cleanTarget = targetFolder.trim().replace(/^\/+|\/+$/g, "");
+      const cleanOriginal = (template.folderPath || "")
+        .trim()
+        .replace(/^\/+|\/+$/g, "");
+
+      if (cleanTarget !== cleanOriginal) {
+        try {
+          const adapter = syncManager.getAdapter();
+          const existing = await adapter.readFileText(
+            `${cleanTarget}/form.json`,
+          );
+          if (existing) {
+            const confirmed = window.confirm(
+              `A form template already exists in "/${cleanTarget}". Do you want to overwrite it?`,
+            );
+            if (!confirmed) {
+              setIsSaving(false);
+              return;
+            }
+          }
+        } catch {
+          // File does not exist, safe to proceed
+        }
+      }
+
       const updatedTemplate: FormTemplate = {
         ...template,
         title: title.trim(),

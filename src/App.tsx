@@ -76,14 +76,15 @@ function App() {
   };
 
   const handleOpenCloneTemplate = (tmpl: FormTemplate) => {
-    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).slice(2, 6);
     const cloned: FormTemplate = {
       ...JSON.parse(JSON.stringify(tmpl)),
-      id: `${tmpl.id}_copy_${timestamp.toString().slice(-4)}`,
+      id: `${tmpl.id}_copy_${randomSuffix}`,
       title: `${tmpl.title} (Copy)`,
       version: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      folderPath: "",
     };
     setTemplateToEdit(cloned);
     setIsEditingTemplate(true);
