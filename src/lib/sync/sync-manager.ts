@@ -133,8 +133,11 @@ export class SyncManager {
       useAppStore.getState().setLastSyncTime(Date.now());
       if (remainingPending !== undefined) {
         useAppStore.getState().setPendingUploadsCount(remainingPending);
-      } else {
-        useAppStore.getState().setPendingUploadsCount(0);
+      } else if (this.adapter.getPendingUploadsCount) {
+        const count = await this.adapter
+          .getPendingUploadsCount()
+          .catch(() => 0);
+        useAppStore.getState().setPendingUploadsCount(count);
       }
       useAppStore.getState().setError(null);
     } catch (e: any) {

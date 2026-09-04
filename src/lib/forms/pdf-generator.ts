@@ -303,7 +303,7 @@ export async function generateFormSubmissionPdf({
       }
 
       // Format Textual / Option Values
-      let displayVal = "—";
+      let displayVal = "-";
       if (val !== undefined && val !== null && val !== "") {
         if (field.type === "checkbox") {
           displayVal = val === true || val === "true" ? "[X] Yes" : "[ ] No";
@@ -317,7 +317,7 @@ export async function generateFormSubmissionPdf({
                       String(v),
                   )
                   .join(", ")
-              : "—";
+              : "-";
         } else if (field.type === "select" || field.type === "radio") {
           const matchedOpt = field.options?.find((o) => o.value === val);
           displayVal = matchedOpt ? matchedOpt.label : String(val);
@@ -333,14 +333,20 @@ export async function generateFormSubmissionPdf({
       const labelText = field.required ? `${field.label} *` : field.label;
 
       if (field.type === "textarea") {
-        // Multi-line field
-        doc.text(labelText, margin, y + 4);
+        // Multi-line field: calculate dimensions and break page before printing label
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(15, 23, 42);
         const textLines = doc.splitTextToSize(displayVal, contentWidth - 4);
         const boxHeight = Math.max(12, textLines.length * 4.5 + 4);
 
-        checkPageBreak(boxHeight + 7);
+        checkPageBreak(boxHeight + 12);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(51, 65, 85);
+        doc.text(labelText, margin, y + 4);
+
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(15, 23, 42);
         doc.setFillColor(250, 250, 250);
         doc.setDrawColor(226, 232, 240);
         doc.roundedRect(margin, y + 6, contentWidth, boxHeight, 1, 1, "FD");
@@ -398,7 +404,7 @@ export async function generateFormSubmissionPdf({
     doc.setTextColor(148, 163, 184);
 
     doc.text(
-      `${config.branding?.appTitle || "Field Tablet App"} • ${template.title}`,
+      `${config.branding?.appTitle || "Field Tablet App"} | ${template.title}`,
       margin,
       pageHeight - 7,
     );

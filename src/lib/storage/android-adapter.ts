@@ -42,7 +42,9 @@ export class AndroidSmbAdapter implements StorageAdapter {
         isBase64: options?.isBase64 ?? false,
       });
       if (result && typeof result.pendingUploadsCount === "number") {
-        useAppStore.getState().setPendingUploadsCount(result.pendingUploadsCount);
+        useAppStore
+          .getState()
+          .setPendingUploadsCount(result.pendingUploadsCount);
       } else if (result && result.pendingUpload) {
         const currentCount = useAppStore.getState().pendingUploadsCount || 0;
         useAppStore.getState().setPendingUploadsCount(currentCount + 1);

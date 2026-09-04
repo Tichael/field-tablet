@@ -283,7 +283,11 @@ describe("FormService", () => {
       };
       const identifier = "Unit #402";
       const now = new Date(2026, 8, 4, 10, 0, 0);
-      const subId = formService.generateSubmissionId(template.title, identifier, now);
+      const subId = formService.generateSubmissionId(
+        template.title,
+        identifier,
+        now,
+      );
 
       const submission: FormSubmission = {
         id: subId,

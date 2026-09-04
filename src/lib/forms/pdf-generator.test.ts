@@ -263,5 +263,31 @@ describe("pdf-generator", () => {
       const pdfText = atob(result.base64);
       expect(pdfText).toContain("High-Vis Vest, Hard Hat");
     });
+
+    it("should use ASCII hyphen for empty fields and pipe delimiter in footer", async () => {
+      const emptySubmission: FormSubmission = {
+        id: "Daily_Report_2026-09-03_120000",
+        templateId: STARTER_DAILY_REPORT.id,
+        templateTitle: STARTER_DAILY_REPORT.title,
+        templateVersion: 1,
+        folderPath: "Reports/Daily Report",
+        createdAt: "2026-09-03T12:00:00.000Z",
+        updatedAt: "2026-09-03T12:00:00.000Z",
+        status: "completed",
+        values: {},
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: STARTER_DAILY_REPORT,
+        submission: emptySubmission,
+        config: sampleConfig,
+        exportDate: new Date(2026, 8, 3, 12, 0, 0),
+      });
+
+      const pdfText = atob(result.base64);
+      expect(pdfText).toContain("Field Inspection Pro | Daily Report");
+      expect(pdfText).not.toContain("•");
+    });
   });
 });

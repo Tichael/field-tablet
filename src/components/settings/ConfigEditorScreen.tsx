@@ -844,6 +844,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               value={saveAsName}
               onChange={(e) => setSaveAsName(e.target.value)}
               placeholder="app-config.json"
+              disabled={isConfigured && isConnected === false}
             />
           </div>
           <div className="flex gap-3">
@@ -880,6 +881,12 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   : "Save & Apply Configuration"}
             </Button>
           </div>
+          {isConfigured && isConnected === false && (
+            <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
+              Network share is disconnected. Connect to the network share to
+              save configuration changes.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

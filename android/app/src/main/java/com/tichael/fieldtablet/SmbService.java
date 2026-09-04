@@ -26,6 +26,7 @@ import java.util.ArrayList;
 
 public class SmbService {
     private static final String TAG = "SmbService";
+    private static final Object PENDING_LOCK = new Object();
     private Context context;
 
     public SmbService(Context context) {
@@ -85,54 +86,67 @@ public class SmbService {
         }
     }
 
-    public synchronized List<String> getPendingUploads() {
-        List<String> list = new ArrayList<>();
-        java.io.File file = new java.io.File(context.getFilesDir(), "pending_uploads.json");
-        if (!file.exists()) return list;
-        try (java.io.FileInputStream fis = new java.io.FileInputStream(file)) {
-            byte[] data = new byte[(int) file.length()];
-            fis.read(data);
-            String jsonStr = new String(data, java.nio.charset.StandardCharsets.UTF_8);
-            JSONArray arr = new JSONArray(jsonStr);
-            for (int i = 0; i < arr.length(); i++) {
-                String p = arr.getString(i);
-                if (!list.contains(p)) {
-                    list.add(p);
+    public List<String> getPendingUploads() {
+        synchronized (PENDING_LOCK) {
+            List<String> list = new ArrayList<>();
+            java.io.File file = new java.io.File(context.getFilesDir(), "pending_uploads.json");
+            if (!file.exists()) return list;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(file)) {
+                byte[] data = new byte[(int) file.length()];
+                int bytesRead = 0;
+                while (bytesRead < data.length) {
+                    int r = fis.read(data, bytesRead, data.length - bytesRead);
+                    if (r == -1) break;
+                    bytesRead += r;
                 }
+                String jsonStr = new String(data, 0, bytesRead, java.nio.charset.StandardCharsets.UTF_8);
+                JSONArray arr = new JSONArray(jsonStr);
+                for (int i = 0; i < arr.length(); i++) {
+                    String p = arr.getString(i);
+                    if (!list.contains(p)) {
+                        list.add(p);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error reading pending_uploads.json", e);
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error reading pending_uploads.json", e);
-        }
-        return list;
-    }
-
-    public synchronized void savePendingUploads(List<String> list) {
-        java.io.File file = new java.io.File(context.getFilesDir(), "pending_uploads.json");
-        try {
-            JSONArray arr = new JSONArray();
-            for (String p : list) {
-                arr.put(p);
-            }
-            try (java.io.FileOutputStream fos = new java.io.FileOutputStream(file)) {
-                fos.write(arr.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error writing pending_uploads.json", e);
+            return list;
         }
     }
 
-    public synchronized void recordPendingUpload(String path) {
-        List<String> list = getPendingUploads();
-        if (!list.contains(path)) {
-            list.add(path);
-            savePendingUploads(list);
+    public void savePendingUploads(List<String> list) {
+        synchronized (PENDING_LOCK) {
+            java.io.File file = new java.io.File(context.getFilesDir(), "pending_uploads.json");
+            try {
+                JSONArray arr = new JSONArray();
+                for (String p : list) {
+                    arr.put(p);
+                }
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(file)) {
+                    fos.write(arr.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error writing pending_uploads.json", e);
+            }
         }
     }
 
-    public synchronized void removePendingUpload(String path) {
-        List<String> list = getPendingUploads();
-        if (list.remove(path)) {
-            savePendingUploads(list);
+    public void recordPendingUpload(String path) {
+        synchronized (PENDING_LOCK) {
+            List<String> list = getPendingUploads();
+            if (!list.contains(path)) {
+                list.add(path);
+                savePendingUploads(list);
+            }
+        }
+    }
+
+    public void removePendingUpload(String path) {
+        synchronized (PENDING_LOCK) {
+            List<String> list = getPendingUploads();
+            if (list.remove(path)) {
+                savePendingUploads(list);
+            }
         }
     }
 
@@ -141,29 +155,39 @@ public class SmbService {
         if (pending.isEmpty()) return 0;
 
         Log.i(TAG, "Flushing " + pending.size() + " pending upload(s)...");
-        List<String> stillPending = new ArrayList<>();
+        List<String> successfulUploads = new ArrayList<>();
 
         for (String path : pending) {
             java.io.File localFile = new java.io.File(context.getFilesDir(), path);
             if (!localFile.exists()) {
                 // Local file was removed, drop from pending
+                successfulUploads.add(path);
                 continue;
             }
             try {
-                java.io.FileInputStream fis = new java.io.FileInputStream(localFile);
                 byte[] bytes = new byte[(int) localFile.length()];
-                fis.read(bytes);
-                fis.close();
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(localFile)) {
+                    int bytesRead = 0;
+                    while (bytesRead < bytes.length) {
+                        int r = fis.read(bytes, bytesRead, bytes.length - bytesRead);
+                        if (r == -1) break;
+                        bytesRead += r;
+                    }
+                }
                 uploadFileBytes(host, shareName, username, password, domain, path, bytes);
                 Log.i(TAG, "Successfully uploaded pending file: " + path);
+                successfulUploads.add(path);
             } catch (Exception e) {
                 Log.w(TAG, "Failed to flush pending file " + path + ": " + e.getMessage());
-                stillPending.add(path);
             }
         }
 
-        savePendingUploads(stillPending);
-        return stillPending.size();
+        synchronized (PENDING_LOCK) {
+            List<String> current = getPendingUploads();
+            current.removeAll(successfulUploads);
+            savePendingUploads(current);
+            return current.size();
+        }
     }
 
     public void syncFiles(String host, String shareName, String username, String password, String domain, List<String> syncFolders, String configFile) throws Exception {
@@ -380,6 +404,12 @@ public class SmbService {
     }
 
     private void downloadFile(DiskShare share, String smbPath, String localRelativePath) throws Exception {
+        // If this file has pending local changes that have not yet uploaded, do NOT overwrite it
+        if (getPendingUploads().contains(localRelativePath)) {
+            Log.i(TAG, "Skipping download of " + localRelativePath + " because it has pending local changes.");
+            return;
+        }
+
         java.io.File localFile = new java.io.File(context.getFilesDir(), localRelativePath);
         
         java.io.File parent = localFile.getParentFile();

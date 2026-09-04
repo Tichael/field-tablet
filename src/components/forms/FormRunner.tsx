@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import type {
   FormTemplate,
   FormSubmission,
@@ -88,9 +88,9 @@ export function FormRunner({
     string | undefined
   >(initialSubmission?.id);
 
-  const [currentPdfExports, setCurrentPdfExports] = useState<
-    PdfExportRecord[]
-  >(initialSubmission?.pdfExports || []);
+  const [currentPdfExports, setCurrentPdfExports] = useState<PdfExportRecord[]>(
+    initialSubmission?.pdfExports || [],
+  );
 
   const [activeSectionId, setActiveSectionId] = useState<string>(
     template.sections[0]?.id || "",
@@ -104,6 +104,18 @@ export function FormRunner({
 
   // Track if user has modified anything
   const [isDirty, setIsDirty] = useState(false);
+
+  // Prevent accidental data loss on browser refresh / navigation when dirty
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
 
   const handleFieldChange = (fieldId: string, val: any) => {
     setValues((prev) => ({
@@ -390,7 +402,10 @@ export function FormRunner({
 
       case "radio":
         return (
-          <div id={field.id} className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <div
+            id={field.id}
+            className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1"
+          >
             {field.options?.map((opt) => {
               const isSelected = val === opt.value;
               return (
