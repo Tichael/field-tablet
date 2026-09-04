@@ -1,6 +1,6 @@
 import { syncManager } from "../sync/sync-manager";
 import type { FormTemplate, FormSubmission } from "../../types/form";
-import type { AppConfig } from "../../store/config-store";
+import type { AppConfig, FormFoldersConfig } from "../../store/config-store";
 import {
   generateFormSubmissionPdf,
   sanitizeFilenamePart,
@@ -313,15 +313,40 @@ export class FormService {
   }
 
   /**
-   * Seed starter templates into a designated folder (e.g. "Reports" or "Forms").
+   * Seed starter templates into designated folders or a common folder.
    */
-  async seedStarterTemplates(targetFormFolder: string): Promise<void> {
+  async seedStarterTemplates(
+    targetFormFolder: string,
+    formFoldersConfig?: FormFoldersConfig,
+  ): Promise<void> {
     const adapter = syncManager.getAdapter();
     const cleanFolder = targetFormFolder.trim().replace(/^\/+|\/+$/g, "");
-    if (!cleanFolder) return;
 
     for (const starter of ALL_STARTER_TEMPLATES) {
-      const formFolder = `${cleanFolder}/${starter.title}`;
+      let designatedFolder = "";
+      if (formFoldersConfig) {
+        if (starter.id === "daily-report" && formFoldersConfig.dailyReports) {
+          designatedFolder = formFoldersConfig.dailyReports;
+        } else if (
+          starter.id === "incident-log" &&
+          formFoldersConfig.incidentLogs
+        ) {
+          designatedFolder = formFoldersConfig.incidentLogs;
+        } else if (
+          starter.id === "equipment-check" &&
+          formFoldersConfig.equipmentChecks
+        ) {
+          designatedFolder = formFoldersConfig.equipmentChecks;
+        }
+      }
+
+      const formFolder = designatedFolder
+        ? designatedFolder.trim().replace(/^\/+|\/+$/g, "")
+        : cleanFolder
+          ? `${cleanFolder}/${starter.title}`
+          : starter.title;
+
+      if (!formFolder) continue;
       const templatePath = `${formFolder}/form.json`;
 
       try {
@@ -335,7 +360,7 @@ export class FormService {
           const customTemplate: FormTemplate = {
             ...starter,
             folderPath: formFolder,
-            category: cleanFolder,
+            category: cleanFolder || formFolder,
           };
           await adapter.saveFile(
             templatePath,

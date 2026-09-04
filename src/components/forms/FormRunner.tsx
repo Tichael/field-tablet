@@ -1,5 +1,10 @@
 import { useState, useMemo } from "react";
-import type { FormTemplate, FormSubmission, FormField } from "../../types/form";
+import type {
+  FormTemplate,
+  FormSubmission,
+  FormField,
+  PdfExportRecord,
+} from "../../types/form";
 import { useConfigStore } from "../../store/config-store";
 import { formService } from "../../lib/forms/form-service";
 import { Button } from "../ui/button";
@@ -47,8 +52,14 @@ export function FormRunner({
     }
     const defaults: Record<string, any> = {};
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
-    const nowDateTimeStr = now.toISOString().slice(0, 16);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const todayStr = `${year}-${month}-${day}`;
+    const nowDateTimeStr = `${year}-${month}-${day}T${hours}:${minutes}`;
+
     for (const section of template.sections) {
       for (const field of section.fields) {
         if (
@@ -77,6 +88,10 @@ export function FormRunner({
     string | undefined
   >(initialSubmission?.id);
 
+  const [currentPdfExports, setCurrentPdfExports] = useState<
+    PdfExportRecord[]
+  >(initialSubmission?.pdfExports || []);
+
   const [activeSectionId, setActiveSectionId] = useState<string>(
     template.sections[0]?.id || "",
   );
@@ -101,13 +116,13 @@ export function FormRunner({
     setValidationErrors((prev) => prev.filter((id) => id !== fieldId));
   };
 
-  // Validate required fields
+  // Validate required fields and constraints
   const validateForm = (): { valid: boolean; missing: string[] } => {
     const missing: string[] = [];
     for (const section of template.sections) {
       for (const field of section.fields) {
+        const val = values[field.id];
         if (field.required) {
-          const val = values[field.id];
           if (field.type === "checkbox") {
             if (val !== true && val !== "true") {
               missing.push(field.id);
@@ -122,6 +137,26 @@ export function FormRunner({
             (typeof val === "string" && val.trim() === "")
           ) {
             missing.push(field.id);
+          }
+        }
+
+        // Numeric min/max range validation
+        if (
+          field.type === "number" &&
+          val !== undefined &&
+          val !== null &&
+          val !== ""
+        ) {
+          const num = Number(val);
+          if (
+            Number.isNaN(num) ||
+            (field.validation?.min !== undefined &&
+              num < field.validation.min) ||
+            (field.validation?.max !== undefined && num > field.validation.max)
+          ) {
+            if (!missing.includes(field.id)) {
+              missing.push(field.id);
+            }
           }
         }
       }
@@ -182,7 +217,7 @@ export function FormRunner({
         updatedAt: new Date().toISOString(),
         status,
         values,
-        pdfExports: initialSubmission?.pdfExports || [],
+        pdfExports: currentPdfExports,
       };
 
       const result = await formService.saveSubmissionAndExportPdf(
@@ -191,6 +226,7 @@ export function FormRunner({
         config,
       );
 
+      setCurrentPdfExports(result.submission.pdfExports || []);
       setLastExportedPdfPath(result.pdfPath);
       setIsDirty(false);
       setJustSaved(true);
@@ -239,6 +275,7 @@ export function FormRunner({
       case "text":
         return (
           <Input
+            id={field.id}
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
             placeholder={field.placeholder}
@@ -252,8 +289,11 @@ export function FormRunner({
       case "number":
         return (
           <Input
+            id={field.id}
             type="number"
             inputMode="numeric"
+            min={field.validation?.min}
+            max={field.validation?.max}
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
             placeholder={field.placeholder}
@@ -267,6 +307,7 @@ export function FormRunner({
       case "date":
         return (
           <Input
+            id={field.id}
             type="date"
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
@@ -280,6 +321,7 @@ export function FormRunner({
       case "time":
         return (
           <Input
+            id={field.id}
             type="time"
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
@@ -293,6 +335,7 @@ export function FormRunner({
       case "datetime":
         return (
           <Input
+            id={field.id}
             type="datetime-local"
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
@@ -306,6 +349,7 @@ export function FormRunner({
       case "textarea":
         return (
           <Textarea
+            id={field.id}
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
             placeholder={field.placeholder}
@@ -324,6 +368,7 @@ export function FormRunner({
             onValueChange={(selected) => handleFieldChange(field.id, selected)}
           >
             <SelectTrigger
+              id={field.id}
               className={cn(
                 "h-11 text-base w-full",
                 hasError && "border-destructive ring-destructive/20",
@@ -345,7 +390,7 @@ export function FormRunner({
 
       case "radio":
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <div id={field.id} className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
             {field.options?.map((opt) => {
               const isSelected = val === opt.value;
               return (
@@ -383,12 +428,14 @@ export function FormRunner({
         return (
           <button
             type="button"
+            id={field.id}
             onClick={() => handleFieldChange(field.id, !val)}
             className={cn(
               "flex items-center gap-3 p-3.5 rounded-xl border w-full text-left transition-all active:scale-[0.99]",
               val
                 ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-950 dark:text-emerald-300"
                 : "bg-background border-input hover:bg-muted/50",
+              hasError && "border-destructive ring-1 ring-destructive/20",
             )}
           >
             <div
@@ -410,7 +457,14 @@ export function FormRunner({
       case "checkbox-group": {
         const currentSelected: string[] = Array.isArray(val) ? val : [];
         return (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+          <div
+            id={field.id}
+            className={cn(
+              "grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1",
+              hasError &&
+                "p-1.5 rounded-xl border border-destructive ring-1 ring-destructive/20",
+            )}
+          >
             {field.options?.map((opt) => {
               const isChecked = currentSelected.includes(opt.value);
               return (
@@ -451,6 +505,7 @@ export function FormRunner({
       case "signature":
         return (
           <div
+            id={field.id}
             className={cn(
               hasError &&
                 "p-1 rounded-xl border border-destructive ring-1 ring-destructive/20",
@@ -466,6 +521,7 @@ export function FormRunner({
       default:
         return (
           <Input
+            id={field.id}
             value={val ?? ""}
             onChange={(e) => handleFieldChange(field.id, e.target.value)}
             className="h-11 text-base"
@@ -646,7 +702,13 @@ export function FormRunner({
                       </Label>
                       {hasError && (
                         <span className="text-xs text-destructive font-medium">
-                          Required
+                          {field.type === "number" &&
+                          field.validation &&
+                          values[field.id] !== undefined &&
+                          values[field.id] !== null &&
+                          values[field.id] !== ""
+                            ? "Invalid range"
+                            : "Required"}
                         </span>
                       )}
                     </div>

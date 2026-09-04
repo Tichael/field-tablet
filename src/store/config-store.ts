@@ -27,11 +27,21 @@ export interface FormFoldersConfig {
 export function getFormFoldersList(config?: AppConfig | null): string[] {
   if (!config || !config.formFolders) return [];
   if (Array.isArray(config.formFolders)) {
-    return (config.formFolders as string[]).filter(Boolean);
+    return Array.from(
+      new Set(
+        (config.formFolders as string[])
+          .map((f) => f?.trim())
+          .filter((f): f is string => Boolean(f)),
+      ),
+    );
   }
   const { dailyReports, incidentLogs, equipmentChecks } = config.formFolders;
-  return [dailyReports, incidentLogs, equipmentChecks].filter(
-    (f): f is string => Boolean(f && f.trim()),
+  return Array.from(
+    new Set(
+      [dailyReports, incidentLogs, equipmentChecks]
+        .map((f) => f?.trim())
+        .filter((f): f is string => Boolean(f)),
+    ),
   );
 }
 

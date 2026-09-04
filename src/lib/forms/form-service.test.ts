@@ -4,7 +4,7 @@ import { syncManager } from "../sync/sync-manager";
 import type { StorageAdapter, FileInfo } from "../storage/adapter";
 import { STARTER_DAILY_REPORT } from "./starter-templates";
 import type { FormSubmission } from "../../types/form";
-import type { AppConfig } from "../../store/config-store";
+import { getFormFoldersList, type AppConfig } from "../../store/config-store";
 
 // In-memory mock storage adapter for isolated unit testing
 class MockStorageAdapter implements StorageAdapter {
@@ -316,6 +316,54 @@ describe("FormService", () => {
       expect(found).toBeDefined();
       expect(found?.pdfExports.length).toBeGreaterThanOrEqual(1);
       expect(found?.pdfExports[0].filename).toBe(save.filename);
+    });
+
+    it("should seed starter templates into custom formFoldersConfig paths", async () => {
+      const customFolders = {
+        dailyReports: "Operations/Daily",
+        incidentLogs: "Safety/Incidents",
+        equipmentChecks: "Fleet/Inspections",
+      };
+
+      await formService.seedStarterTemplates("", customFolders);
+
+      // Verify each template was written to its configured folder path
+      const dailyJson = await mockAdapter.readFileText(
+        "Operations/Daily/form.json",
+      );
+      const dailyParsed = JSON.parse(dailyJson);
+      expect(dailyParsed.id).toBe("daily-report");
+      expect(dailyParsed.folderPath).toBe("Operations/Daily");
+
+      const incidentJson = await mockAdapter.readFileText(
+        "Safety/Incidents/form.json",
+      );
+      const incidentParsed = JSON.parse(incidentJson);
+      expect(incidentParsed.id).toBe("incident-log");
+      expect(incidentParsed.folderPath).toBe("Safety/Incidents");
+
+      const equipJson = await mockAdapter.readFileText(
+        "Fleet/Inspections/form.json",
+      );
+      const equipParsed = JSON.parse(equipJson);
+      expect(equipParsed.id).toBe("equipment-check");
+      expect(equipParsed.folderPath).toBe("Fleet/Inspections");
+    });
+
+    it("should deduplicate folder names in getFormFoldersList", () => {
+      const configWithDups: AppConfig = {
+        theme: { primaryColor: "#000", darkMode: "system" },
+        branding: { appTitle: "Test" },
+        formFolders: {
+          dailyReports: "SharedForms",
+          incidentLogs: "SharedForms",
+          equipmentChecks: "SharedForms/Checks",
+        },
+      };
+
+      const list = getFormFoldersList(configWithDups);
+      expect(list).toEqual(["SharedForms", "SharedForms/Checks"]);
+      expect(list.length).toBe(2);
     });
   });
 });

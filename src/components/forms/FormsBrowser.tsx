@@ -101,11 +101,10 @@ export function FormsBrowser({
   };
 
   const handleSeedStarters = async () => {
-    const targetFolder = selectedFolder || formFolders[0];
-    if (!targetFolder) return;
+    const targetFolder = selectedFolder || formFolders[0] || "";
     setLoading(true);
     try {
-      await formService.seedStarterTemplates(targetFolder);
+      await formService.seedStarterTemplates(targetFolder, formFoldersConfig);
       await loadForms();
     } catch (e) {
       console.error("Failed to seed starter forms:", e);

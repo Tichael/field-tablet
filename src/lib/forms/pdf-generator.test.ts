@@ -213,5 +213,55 @@ describe("pdf-generator", () => {
       const header = atob(result.base64.slice(0, 30));
       expect(header.startsWith("%PDF")).toBe(true);
     });
+
+    it("should map checkbox-group values to human-readable option labels in PDF output", async () => {
+      const templateWithCheckboxGroup = {
+        ...STARTER_DAILY_REPORT,
+        sections: [
+          {
+            id: "ppe_section",
+            title: "Safety Equipment",
+            fields: [
+              {
+                id: "ppe_used",
+                type: "checkbox-group" as const,
+                label: "PPE Used Onsite",
+                options: [
+                  { label: "High-Vis Vest", value: "vest" },
+                  { label: "Steel-Toe Boots", value: "boots" },
+                  { label: "Hard Hat", value: "hardhat" },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      const submission: FormSubmission = {
+        id: "Daily_Report_2026-09-03_090000",
+        templateId: templateWithCheckboxGroup.id,
+        templateTitle: templateWithCheckboxGroup.title,
+        templateVersion: 1,
+        folderPath: "Reports/Daily Report",
+        createdAt: "2026-09-03T09:00:00.000Z",
+        updatedAt: "2026-09-03T09:00:00.000Z",
+        status: "completed",
+        values: {
+          ppe_used: ["vest", "hardhat"],
+        },
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: templateWithCheckboxGroup,
+        submission,
+        config: sampleConfig,
+        exportDate: new Date(2026, 8, 3, 9, 0, 0),
+      });
+
+      expect(result.filename).toBe("Daily_Report_2026-09-03_090000.pdf");
+      const pdfText = atob(result.base64);
+      expect(pdfText).toContain("High-Vis Vest, Hard Hat");
+    });
   });
 });

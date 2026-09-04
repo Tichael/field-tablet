@@ -397,15 +397,19 @@ public class SmbSyncPlugin extends Plugin {
                 String domain = storage.getString("smb_domain");
 
                 if (host != null && share != null && user != null && pass != null) {
-                    SmbService smbService = new SmbService(getContext());
-                    smbService.createDirectory(host, share, user, pass, domain, path);
+                    try {
+                        SmbService smbService = new SmbService(getContext());
+                        smbService.createDirectory(host, share, user, pass, domain, path);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Failed to create directory on remote SMB (offline?), local directory created: " + e.getMessage());
+                    }
                 }
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
                 call.resolve(ret);
             } catch (Exception e) {
-                Log.e(TAG, "Error creating directory", e);
+                Log.e(TAG, "Error creating local directory", e);
                 call.reject("Error creating directory: " + e.getMessage(), e);
             }
         }).start();

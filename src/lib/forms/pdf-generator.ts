@@ -308,7 +308,16 @@ export async function generateFormSubmissionPdf({
         if (field.type === "checkbox") {
           displayVal = val === true || val === "true" ? "[X] Yes" : "[ ] No";
         } else if (field.type === "checkbox-group" && Array.isArray(val)) {
-          displayVal = val.length > 0 ? val.join(", ") : "—";
+          displayVal =
+            val.length > 0
+              ? val
+                  .map(
+                    (v) =>
+                      field.options?.find((o) => o.value === v)?.label ||
+                      String(v),
+                  )
+                  .join(", ")
+              : "—";
         } else if (field.type === "select" || field.type === "radio") {
           const matchedOpt = field.options?.find((o) => o.value === val);
           displayVal = matchedOpt ? matchedOpt.label : String(val);
