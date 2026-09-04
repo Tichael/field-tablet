@@ -21,7 +21,12 @@ export interface SmbSyncPlugin {
   forceSync(options?: {
     syncFolders?: string[];
     configFile?: string;
-  }): Promise<{ success: boolean; error?: string; folder?: string }>;
+  }): Promise<{
+    success: boolean;
+    error?: string;
+    folder?: string;
+    pendingUploadsCount?: number;
+  }>;
 
   getFiles(): Promise<{ files: { name: string; content: string }[] }>;
 
@@ -29,7 +34,13 @@ export interface SmbSyncPlugin {
     path: string;
     content: string;
     isBase64?: boolean;
-  }): Promise<{ success: boolean; pendingUpload?: boolean }>;
+  }): Promise<{
+    success: boolean;
+    pendingUpload?: boolean;
+    pendingUploadsCount?: number;
+  }>;
+
+  getPendingUploadsCount(): Promise<{ count: number }>;
 
   createDirectory(options: { path: string }): Promise<{ success: boolean }>;
 

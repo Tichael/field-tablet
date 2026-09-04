@@ -19,7 +19,27 @@ export function SignaturePad({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
+  const emittedValueRef = useRef<string | null>(value ?? null);
   const [hasDrawn, setHasDrawn] = useState(Boolean(value));
+
+  // Helper to load an image URL onto canvas
+  const drawImageUrl = useCallback((dataUrl: string) => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rect = container.getBoundingClientRect();
+    const img = new Image();
+    img.onload = () => {
+      ctx.clearRect(0, 0, rect.width, rect.height);
+      ctx.drawImage(img, 0, 0, rect.width, rect.height);
+      setHasDrawn(true);
+    };
+    img.src = dataUrl;
+  }, []);
 
   // Initialize and size canvas with high DPI
   const setupCanvas = useCallback(() => {
@@ -28,6 +48,8 @@ export function SignaturePad({
     if (!canvas || !container) return;
 
     const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
     const dpr = window.devicePixelRatio || 1;
 
     canvas.width = rect.width * dpr;
@@ -44,25 +66,48 @@ export function SignaturePad({
     ctx.lineJoin = "round";
     ctx.strokeStyle = "#0f172a"; // Crisp dark ink
 
-    // If existing value is present, render it
-    if (value && value.startsWith("data:image")) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.clearRect(0, 0, rect.width, rect.height);
-        ctx.drawImage(img, 0, 0, rect.width, rect.height);
-        setHasDrawn(true);
-      };
-      img.src = value;
+    // Render current value onto newly sized canvas
+    const currentVal = emittedValueRef.current || value;
+    if (currentVal && currentVal.startsWith("data:image")) {
+      drawImageUrl(currentVal);
     }
-  }, [value]);
+  }, [value, drawImageUrl]);
 
   useEffect(() => {
     setupCanvas();
 
-    const handleResize = () => setupCanvas();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const container = containerRef.current;
+    if (!container) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      setupCanvas();
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [setupCanvas]);
+
+  // Handle external value changes (e.g. form reset or initial submission load)
+  useEffect(() => {
+    if (value === emittedValueRef.current) {
+      return;
+    }
+    emittedValueRef.current = value ?? null;
+    if (value && value.startsWith("data:image")) {
+      drawImageUrl(value);
+    } else if (!value) {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (canvas && container) {
+        const ctx = canvas.getContext("2d");
+        const rect = container.getBoundingClientRect();
+        if (ctx) ctx.clearRect(0, 0, rect.width, rect.height);
+      }
+      setHasDrawn(false);
+    }
+  }, [value, drawImageUrl]);
 
   const getCoordinates = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -86,8 +131,16 @@ export function SignaturePad({
     canvas.setPointerCapture(e.pointerId);
 
     const { x, y } = getCoordinates(e);
+
+    // Render a small dot on pointer down so single taps / dots are recorded
+    ctx.fillStyle = "#0f172a";
+    ctx.beginPath();
+    ctx.arc(x, y, 1.25, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.beginPath();
     ctx.moveTo(x, y);
+    setHasDrawn(true);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -118,6 +171,7 @@ export function SignaturePad({
 
     // Export PNG data URL
     const dataUrl = canvas.toDataURL("image/png");
+    emittedValueRef.current = dataUrl;
     onChange(dataUrl);
   };
 
@@ -133,6 +187,7 @@ export function SignaturePad({
     const rect = container.getBoundingClientRect();
     ctx.clearRect(0, 0, rect.width, rect.height);
     setHasDrawn(false);
+    emittedValueRef.current = null;
     onChange(null);
   };
 

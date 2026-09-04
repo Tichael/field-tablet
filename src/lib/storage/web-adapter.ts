@@ -48,6 +48,10 @@ export class WebStorageAdapter implements StorageAdapter {
     return this.verifyPermission();
   }
 
+  async getPendingUploadsCount(): Promise<number> {
+    return 0;
+  }
+
   async getFiles(
     _subpath: string = "",
   ): Promise<{ name: string; content: string }[]> {

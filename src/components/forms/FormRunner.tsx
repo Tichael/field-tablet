@@ -20,6 +20,8 @@ import {
   Loader2,
   Save,
   CheckCircle2,
+  FileText,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +36,7 @@ export function FormRunner({
   template,
   initialSubmission,
   onClose,
+  onViewPdf,
 }: FormRunnerProps) {
   const config = useConfigStore((state) => state.config);
 
@@ -43,9 +46,26 @@ export function FormRunner({
       return { ...initialSubmission.values };
     }
     const defaults: Record<string, any> = {};
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const nowDateTimeStr = now.toISOString().slice(0, 16);
     for (const section of template.sections) {
       for (const field of section.fields) {
-        if (field.defaultValue !== undefined) {
+        if (
+          field.type === "date" &&
+          (field.defaultValue === "today" ||
+            field.id === "work_date" ||
+            field.id === "date")
+        ) {
+          defaults[field.id] = todayStr;
+        } else if (
+          field.type === "datetime" &&
+          (field.defaultValue === "now" ||
+            field.id === "incident_datetime" ||
+            field.id === "datetime")
+        ) {
+          defaults[field.id] = nowDateTimeStr;
+        } else if (field.defaultValue !== undefined) {
           defaults[field.id] = field.defaultValue;
         }
       }
@@ -53,16 +73,18 @@ export function FormRunner({
     return defaults;
   });
 
-  const [submissionId] = useState<string>(() => {
-    if (initialSubmission?.id) return initialSubmission.id;
-    return formService.generateSubmissionId(template.title);
-  });
+  const [savedSubmissionId, setSavedSubmissionId] = useState<
+    string | undefined
+  >(initialSubmission?.id);
 
   const [activeSectionId, setActiveSectionId] = useState<string>(
     template.sections[0]?.id || "",
   );
   const [isSaving, setIsSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [lastExportedPdfPath, setLastExportedPdfPath] = useState<string | null>(
+    null,
+  );
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Track if user has modified anything
@@ -80,31 +102,41 @@ export function FormRunner({
   };
 
   // Validate required fields
-  const validateForm = (): boolean => {
+  const validateForm = (): { valid: boolean; missing: string[] } => {
     const missing: string[] = [];
     for (const section of template.sections) {
       for (const field of section.fields) {
         if (field.required) {
           const val = values[field.id];
-          if (val === undefined || val === null || val === "") {
+          if (field.type === "checkbox") {
+            if (val !== true && val !== "true") {
+              missing.push(field.id);
+            }
+          } else if (field.type === "checkbox-group") {
+            if (!Array.isArray(val) || val.length === 0) {
+              missing.push(field.id);
+            }
+          } else if (
+            val === undefined ||
+            val === null ||
+            (typeof val === "string" && val.trim() === "")
+          ) {
             missing.push(field.id);
           }
         }
       }
     }
     setValidationErrors(missing);
-    return missing.length === 0;
+    return { valid: missing.length === 0, missing };
   };
 
   const handleSave = async (status: "completed" | "draft" = "completed") => {
     if (status === "completed") {
-      const valid = validateForm();
+      const { valid, missing } = validateForm();
       if (!valid) {
-        // Scroll to first error or switch to section containing error
+        // Synchronously switch to first section containing an error
         for (const section of template.sections) {
-          const errorField = section.fields.find((f) =>
-            validationErrors.includes(f.id),
-          );
+          const errorField = section.fields.find((f) => missing.includes(f.id));
           if (errorField) {
             setActiveSectionId(section.id);
             break;
@@ -121,8 +153,27 @@ export function FormRunner({
 
     setIsSaving(true);
     try {
+      let resolvedId = savedSubmissionId;
+      if (!resolvedId) {
+        let identifierValue: string | undefined;
+        for (const section of template.sections) {
+          for (const f of section.fields) {
+            if (f.isIdentifier && values[f.id]) {
+              identifierValue = String(values[f.id]);
+              break;
+            }
+          }
+          if (identifierValue) break;
+        }
+        resolvedId = formService.generateSubmissionId(
+          template.title,
+          identifierValue,
+        );
+        setSavedSubmissionId(resolvedId);
+      }
+
       const submissionToSave: FormSubmission = {
-        id: submissionId,
+        id: resolvedId,
         templateId: template.id,
         templateTitle: template.title,
         templateVersion: template.version || 1,
@@ -134,17 +185,18 @@ export function FormRunner({
         pdfExports: initialSubmission?.pdfExports || [],
       };
 
-      await formService.saveSubmissionAndExportPdf(
+      const result = await formService.saveSubmissionAndExportPdf(
         template,
         submissionToSave,
         config,
       );
 
+      setLastExportedPdfPath(result.pdfPath);
       setIsDirty(false);
       setJustSaved(true);
       setTimeout(() => {
         setJustSaved(false);
-      }, 2500);
+      }, 3500);
     } catch (e) {
       console.error("Failed to save form submission:", e);
       alert("An error occurred while saving the form and exporting the PDF.");
@@ -355,6 +407,47 @@ export function FormRunner({
           </button>
         );
 
+      case "checkbox-group": {
+        const currentSelected: string[] = Array.isArray(val) ? val : [];
+        return (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+            {field.options?.map((opt) => {
+              const isChecked = currentSelected.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    const next = isChecked
+                      ? currentSelected.filter((v) => v !== opt.value)
+                      : [...currentSelected, opt.value];
+                    handleFieldChange(field.id, next);
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl border text-left text-sm font-medium transition-all active:scale-[0.99]",
+                    isChecked
+                      ? "bg-primary/10 border-primary text-foreground shadow-xs"
+                      : "bg-background hover:bg-muted/60 border-input",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                      isChecked
+                        ? "bg-primary border-primary text-primary-foreground"
+                        : "border-muted-foreground",
+                    )}
+                  >
+                    {isChecked && <Check className="w-3 h-3" />}
+                  </div>
+                  <span>{opt.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        );
+      }
+
       case "signature":
         return (
           <div
@@ -421,6 +514,17 @@ export function FormRunner({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {lastExportedPdfPath && onViewPdf && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onViewPdf(lastExportedPdfPath)}
+                className="text-xs gap-1.5 font-medium border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+              >
+                <FileText className="w-3.5 h-3.5 text-red-500" />
+                <span>View PDF</span>
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -562,7 +666,7 @@ export function FormRunner({
         </div>
 
         {/* Section Navigation Buttons */}
-        {template.sections.length > 1 && (
+        {template.sections.length > 1 ? (
           <div className="flex items-center justify-between pt-2">
             {template.sections.findIndex((s) => s.id === activeSection.id) >
             0 ? (
@@ -596,29 +700,78 @@ export function FormRunner({
                 Next Section
               </Button>
             ) : (
-              <Button
-                onClick={() => handleSave("completed")}
-                disabled={isSaving}
-                className="font-semibold shadow-xs min-w-[100px]"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : justSaved ? (
-                  <>
-                    <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
-                    <span>Saved!</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-1.5" />
-                    <span>Save</span>
-                  </>
+              <div className="flex items-center gap-2">
+                {lastExportedPdfPath && onViewPdf && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onViewPdf(lastExportedPdfPath)}
+                    className="gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+                  >
+                    <FileText className="w-4 h-4 text-red-500" />
+                    <span>View PDF</span>
+                  </Button>
                 )}
+                <Button
+                  onClick={() => handleSave("completed")}
+                  disabled={isSaving}
+                  className="font-semibold shadow-xs min-w-[100px]"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : justSaved ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
+                      <span>Saved!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-1.5" />
+                      <span>Save</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-end gap-2 pt-2">
+            {lastExportedPdfPath && onViewPdf && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onViewPdf(lastExportedPdfPath)}
+                className="gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
+              >
+                <FileText className="w-4 h-4 text-red-500" />
+                <span>View PDF</span>
               </Button>
             )}
+            <Button
+              onClick={() => handleSave("completed")}
+              disabled={isSaving}
+              className="font-semibold shadow-xs min-w-[120px]"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : justSaved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1.5" />
+                  <span>Save Form</span>
+                </>
+              )}
+            </Button>
           </div>
         )}
       </main>

@@ -30,6 +30,13 @@ describe("pdf-generator", () => {
       );
       expect(sanitizeFilenamePart("___Test___Title___")).toBe("Test_Title");
     });
+
+    it("should strip URL-breaking characters such as # and %", () => {
+      expect(sanitizeFilenamePart("Truck #42 (100% inspected)")).toBe(
+        "Truck_42_100_inspected",
+      );
+      expect(sanitizeFilenamePart("..file.name..")).toBe("file.name");
+    });
   });
 
   describe("formatDateTime", () => {
@@ -43,24 +50,24 @@ describe("pdf-generator", () => {
   });
 
   describe("generateDatedPdfFilename", () => {
-    it("should generate dated filename without UUID", () => {
-      const testDate = new Date(2026, 8, 3, 14, 30);
+    it("should generate dated filename with second precision without UUID", () => {
+      const testDate = new Date(2026, 8, 3, 14, 30, 15);
       const filename = generateDatedPdfFilename(
         "Daily Report",
         undefined,
         testDate,
       );
-      expect(filename).toBe("Daily_Report_2026-09-03_1430.pdf");
+      expect(filename).toBe("Daily_Report_2026-09-03_143015.pdf");
     });
 
-    it("should include key identifier when provided", () => {
-      const testDate = new Date(2026, 8, 3, 16, 45);
+    it("should include sanitized key identifier when provided", () => {
+      const testDate = new Date(2026, 8, 3, 16, 45, 0);
       const filename = generateDatedPdfFilename(
         "Equipment Check",
         "Truck #42",
         testDate,
       );
-      expect(filename).toBe("Equipment_Check_Truck_#42_2026-09-03_1645.pdf");
+      expect(filename).toBe("Equipment_Check_Truck_42_2026-09-03_164500.pdf");
     });
   });
 
@@ -81,7 +88,7 @@ describe("pdf-generator", () => {
 
     it("should generate a valid vector PDF in A4 format with signature and fields", async () => {
       const submission: FormSubmission = {
-        id: "Daily_Report_2026-09-03_0800",
+        id: "Daily_Report_2026-09-03_080000",
         templateId: STARTER_DAILY_REPORT.id,
         templateTitle: STARTER_DAILY_REPORT.title,
         templateVersion: 1,
@@ -98,7 +105,7 @@ describe("pdf-generator", () => {
           crew_size: 5,
           work_completed:
             "Completed transformer inspection and thermography scan.",
-          delays_issues: "None",
+          delays_issues: "None.",
           safety_incident_occurred: false,
           signature: transparentPng,
         },
@@ -109,11 +116,11 @@ describe("pdf-generator", () => {
         template: STARTER_DAILY_REPORT,
         submission,
         config: sampleConfig,
-        exportDate: new Date(2026, 8, 3, 8, 0),
+        exportDate: new Date(2026, 8, 3, 8, 0, 0),
       });
 
       expect(result.filename).toBe(
-        "Daily_Report_Sarah_Connor_2026-09-03_0800.pdf",
+        "Daily_Report_Sarah_Connor_2026-09-03_080000.pdf",
       );
       expect(result.base64).toBeDefined();
       expect(result.base64.length).toBeGreaterThan(1000);
@@ -130,7 +137,7 @@ describe("pdf-generator", () => {
       };
 
       const submission: FormSubmission = {
-        id: "Equipment_Check_2026-09-03_1030",
+        id: "Equipment_Check_2026-09-03_103000",
         templateId: STARTER_EQUIPMENT_CHECK.id,
         templateTitle: STARTER_EQUIPMENT_CHECK.title,
         templateVersion: 1,
@@ -160,11 +167,11 @@ describe("pdf-generator", () => {
         template: STARTER_EQUIPMENT_CHECK,
         submission,
         config: letterConfig,
-        exportDate: new Date(2026, 8, 3, 10, 30),
+        exportDate: new Date(2026, 8, 3, 10, 30, 0),
       });
 
       expect(result.filename).toBe(
-        "Equipment_Check_CAT-Gen-300_2026-09-03_1030.pdf",
+        "Equipment_Check_CAT-Gen-300_2026-09-03_103000.pdf",
       );
       const header = atob(result.base64.slice(0, 30));
       expect(header.startsWith("%PDF")).toBe(true);
@@ -172,7 +179,7 @@ describe("pdf-generator", () => {
 
     it("should handle Incident Log form with radio and textarea fields", async () => {
       const submission: FormSubmission = {
-        id: "Incident_Log_2026-09-03_1400",
+        id: "Incident_Log_2026-09-03_140000",
         templateId: STARTER_INCIDENT_LOG.id,
         templateTitle: STARTER_INCIDENT_LOG.title,
         templateVersion: 1,
@@ -197,11 +204,11 @@ describe("pdf-generator", () => {
         template: STARTER_INCIDENT_LOG,
         submission,
         config: sampleConfig,
-        exportDate: new Date(2026, 8, 3, 14, 0),
+        exportDate: new Date(2026, 8, 3, 14, 0, 0),
       });
 
       expect(result.filename).toBe(
-        "Incident_Log_Workshop_Bay_2_2026-09-03_1400.pdf",
+        "Incident_Log_Workshop_Bay_2_2026-09-03_140000.pdf",
       );
       const header = atob(result.base64.slice(0, 30));
       expect(header.startsWith("%PDF")).toBe(true);

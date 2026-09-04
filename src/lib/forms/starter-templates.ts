@@ -21,7 +21,7 @@ export const STARTER_DAILY_REPORT: FormTemplate = {
           type: "date",
           label: "Date",
           required: true,
-          defaultValue: new Date().toISOString().split("T")[0],
+          defaultValue: "today",
         },
         {
           id: "shift",
@@ -140,7 +140,7 @@ export const STARTER_INCIDENT_LOG: FormTemplate = {
           type: "datetime",
           label: "Incident Date & Time",
           required: true,
-          defaultValue: new Date().toISOString().slice(0, 16),
+          defaultValue: "now",
         },
         {
           id: "incident_type",

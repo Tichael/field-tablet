@@ -233,6 +233,8 @@ describe("FormService", () => {
       expect(parsedJson1.pdfExports[0].path).toBe(save1.pdfPath);
 
       // 2. Later Update to the same submission (e.g. afternoon addition)
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+
       const updatedSubmission: FormSubmission = {
         ...parsedJson1,
         values: {
@@ -247,7 +249,8 @@ describe("FormService", () => {
         testConfig,
       );
 
-      // Verify second PDF file exists
+      // Verify second PDF file exists and has distinct path
+      expect(save2.pdfPath).not.toBe(save1.pdfPath);
       const savedPdf2 = mockAdapter.getRawFile(save2.pdfPath);
       expect(savedPdf2).toBeDefined();
       expect(savedPdf2?.isBase64).toBe(true);
@@ -271,6 +274,48 @@ describe("FormService", () => {
 
       const pdfList = await formService.listPdfExports("Reports/Daily Report");
       expect(pdfList.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("should link identifier-based submission with its PDF in listSubmissions", async () => {
+      const template = {
+        ...STARTER_DAILY_REPORT,
+        folderPath: "Reports/Daily Report",
+      };
+      const identifier = "Unit #402";
+      const now = new Date(2026, 8, 4, 10, 0, 0);
+      const subId = formService.generateSubmissionId(template.title, identifier, now);
+
+      const submission: FormSubmission = {
+        id: subId,
+        templateId: template.id,
+        templateTitle: template.title,
+        templateVersion: 1,
+        folderPath: template.folderPath,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        status: "completed",
+        values: {
+          work_date: "2026-09-04",
+          supervisor_name: "Unit #402",
+        },
+        pdfExports: [],
+      };
+
+      const save = await formService.saveSubmissionAndExportPdf(
+        template,
+        submission,
+        testConfig,
+      );
+
+      expect(subId).toContain("Unit_402");
+      expect(save.filename).toContain("Unit_402");
+      expect(save.filename.endsWith(".pdf")).toBe(true);
+
+      const listed = await formService.listSubmissions("Reports/Daily Report");
+      const found = listed.find((s) => s.id === subId);
+      expect(found).toBeDefined();
+      expect(found?.pdfExports.length).toBeGreaterThanOrEqual(1);
+      expect(found?.pdfExports[0].filename).toBe(save.filename);
     });
   });
 });

@@ -43,16 +43,17 @@ export function formatDateTime(date: Date) {
 export function sanitizeFilenamePart(text: string): string {
   return text
     .trim()
-    .replace(/[/\\:*?"<>|]/g, "")
+    .replace(/[/\\:*?"<>|#%&`'$;{}@^~!=+()[\]]/g, "")
     .replace(/\s+/g, "_")
     .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "");
+    .replace(/^_+|_+$/g, "")
+    .replace(/^\.+|\.+$/g, "");
 }
 
 /**
  * Generates a clean, dated PDF filename without cryptic UUIDs.
- * Example: Daily_Report_2026-09-03_1430.pdf
- * Or with identifier: Equipment_Check_Unit-402_2026-09-03_1430.pdf
+ * Example: Daily_Report_2026-09-03_143000.pdf
+ * Or with identifier: Equipment_Check_Unit-402_2026-09-03_143000.pdf
  */
 export function generateDatedPdfFilename(
   formTitle: string,
@@ -60,16 +61,16 @@ export function generateDatedPdfFilename(
   date: Date = new Date(),
 ): string {
   const cleanTitle = sanitizeFilenamePart(formTitle) || "Form";
-  const { dateStr, timeStr } = formatDateTime(date);
+  const { dateStr, timeFullStr } = formatDateTime(date);
 
   if (identifierValue && identifierValue.trim()) {
     const cleanId = sanitizeFilenamePart(identifierValue);
     if (cleanId) {
-      return `${cleanTitle}_${cleanId}_${dateStr}_${timeStr}.pdf`;
+      return `${cleanTitle}_${cleanId}_${dateStr}_${timeFullStr}.pdf`;
     }
   }
 
-  return `${cleanTitle}_${dateStr}_${timeStr}.pdf`;
+  return `${cleanTitle}_${dateStr}_${timeFullStr}.pdf`;
 }
 
 /**
@@ -337,21 +338,35 @@ export async function generateFormSubmissionPdf({
         doc.text(textLines, margin + 3, y + 11);
         y += boxHeight + 9;
       } else {
-        // Single-line field (Label on left, value on right or inline)
-        checkPageBreak(7);
-        doc.text(labelText, margin, y + 4);
+        // Single-line field (Label on left, value on right or stacked)
+        const rawLabelWidth = doc.getTextWidth(labelText) + 4;
+        const isStacked = rawLabelWidth > 75;
 
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(15, 23, 42);
-        const labelWidth = Math.min(75, doc.getTextWidth(labelText) + 6);
-        const valueX = margin + Math.max(50, labelWidth);
-        const valueWidth = contentWidth - (valueX - margin);
-        const valLines = doc.splitTextToSize(displayVal, valueWidth);
+        if (isStacked) {
+          const valLines = doc.splitTextToSize(displayVal, contentWidth);
+          const rowHeight = 5 + valLines.length * 4.5;
+          checkPageBreak(rowHeight + 4);
 
-        doc.text(valLines, valueX, y + 4);
+          doc.text(labelText, margin, y + 4);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(15, 23, 42);
+          doc.text(valLines, margin, y + 9);
+          y += rowHeight + 3;
+        } else {
+          const labelWidth = Math.max(45, rawLabelWidth);
+          const valueX = margin + labelWidth + 4;
+          const valueWidth = contentWidth - (valueX - margin);
+          const valLines = doc.splitTextToSize(displayVal, valueWidth);
+          const rowHeight = Math.max(6, valLines.length * 4.5);
 
-        const rowHeight = Math.max(6, valLines.length * 4.5);
-        y += rowHeight + 2;
+          checkPageBreak(rowHeight + 4);
+          doc.text(labelText, margin, y + 4);
+
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(15, 23, 42);
+          doc.text(valLines, valueX, y + 4);
+          y += rowHeight + 2;
+        }
 
         // Subtle divider line
         doc.setDrawColor(241, 245, 249);

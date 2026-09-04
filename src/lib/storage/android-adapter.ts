@@ -41,13 +41,24 @@ export class AndroidSmbAdapter implements StorageAdapter {
         content,
         isBase64: options?.isBase64 ?? false,
       });
-      if (result && result.pendingUpload) {
+      if (result && typeof result.pendingUploadsCount === "number") {
+        useAppStore.getState().setPendingUploadsCount(result.pendingUploadsCount);
+      } else if (result && result.pendingUpload) {
         const currentCount = useAppStore.getState().pendingUploadsCount || 0;
         useAppStore.getState().setPendingUploadsCount(currentCount + 1);
       }
     } catch (e) {
       console.error("Failed to save file to native cache", e);
       throw e;
+    }
+  }
+
+  async getPendingUploadsCount(): Promise<number> {
+    try {
+      const result = await SmbSync.getPendingUploadsCount();
+      return result.count || 0;
+    } catch {
+      return 0;
     }
   }
 

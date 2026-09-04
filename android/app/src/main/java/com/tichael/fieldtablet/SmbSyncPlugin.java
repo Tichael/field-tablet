@@ -148,8 +148,10 @@ public class SmbSyncPlugin extends Plugin {
 
                 SmbService smbService = new SmbService(getContext());
                 smbService.syncFiles(host, share, user, pass, domain, syncFolders, configFile);
+                int pendingCount = smbService.getPendingUploads().size();
                 JSObject ret = new JSObject();
                 ret.put("success", true);
+                ret.put("pendingUploadsCount", pendingCount);
                 call.resolve(ret);
             } catch (Exception e) {
                 if (e.getMessage() != null && e.getMessage().startsWith("MISSING_FOLDER:")) {
@@ -234,25 +236,45 @@ public class SmbSyncPlugin extends Plugin {
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
 
+                SmbService smbService = new SmbService(getContext());
                 if (host != null && share != null && user != null && pass != null) {
                     try {
-                        SmbService smbService = new SmbService(getContext());
                         smbService.uploadFileBytes(host, share, user, pass, domain, path, bytes);
+                        smbService.removePendingUpload(path);
                     } catch (Exception uploadEx) {
                         Log.w(TAG, "Failed to upload file to SMB (device may be offline): " + uploadEx.getMessage());
                         pendingUpload = true;
+                        smbService.recordPendingUpload(path);
                     }
+                } else {
+                    pendingUpload = true;
+                    smbService.recordPendingUpload(path);
                 }
                 
+                int pendingCount = smbService.getPendingUploads().size();
                 JSObject ret = new JSObject();
                 ret.put("success", true);
                 ret.put("pendingUpload", pendingUpload);
+                ret.put("pendingUploadsCount", pendingCount);
                 call.resolve(ret);
             } catch (Exception e) {
                 Log.e(TAG, "Error saving file locally", e);
                 call.reject("Error saving file: " + e.getMessage(), e);
             }
         }).start();
+    }
+
+    @PluginMethod
+    public void getPendingUploadsCount(PluginCall call) {
+        try {
+            SmbService smbService = new SmbService(getContext());
+            int count = smbService.getPendingUploads().size();
+            JSObject ret = new JSObject();
+            ret.put("count", count);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Error getting pending count: " + e.getMessage(), e);
+        }
     }
 
     @PluginMethod

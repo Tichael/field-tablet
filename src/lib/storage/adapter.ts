@@ -26,4 +26,5 @@ export interface StorageAdapter {
   readFileText(path: string): Promise<string>;
   verifyPermission(): Promise<boolean>;
   checkConnection?(): Promise<boolean>;
+  getPendingUploadsCount?(): Promise<number>;
 }

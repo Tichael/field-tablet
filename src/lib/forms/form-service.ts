@@ -350,17 +350,22 @@ export class FormService {
 
   /**
    * Generate a clean human-readable submission ID.
-   * Example: Daily_Report_2026-09-03_0730
+   * Example: Daily_Report_2026-09-03_073000
+   * Or with identifier: Equipment_Check_Unit-402_2026-09-03_073000
    */
-  generateSubmissionId(formTitle: string, identifierValue?: string): string {
+  generateSubmissionId(
+    formTitle: string,
+    identifierValue?: string,
+    date: Date = new Date(),
+  ): string {
     const cleanTitle = sanitizeFilenamePart(formTitle) || "Form";
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, "0");
-    const day = String(now.getDate()).padStart(2, "0");
-    const hours = String(now.getHours()).padStart(2, "0");
-    const minutes = String(now.getMinutes()).padStart(2, "0");
-    const timestamp = `${year}-${month}-${day}_${hours}${minutes}`;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const timestamp = `${year}-${month}-${day}_${hours}${minutes}${seconds}`;
 
     if (identifierValue && identifierValue.trim()) {
       const cleanId = sanitizeFilenamePart(identifierValue);

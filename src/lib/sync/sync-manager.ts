@@ -39,6 +39,16 @@ export class SyncManager {
         }
       }
 
+      // Check and restore any pending uploads count from adapter
+      if (this.adapter.getPendingUploadsCount) {
+        this.adapter
+          .getPendingUploadsCount()
+          .then((count) => {
+            useAppStore.getState().setPendingUploadsCount(count);
+          })
+          .catch(() => {});
+      }
+
       // We have permission, sync.
       this.sync(true).catch((e) => console.error("Initial sync failed", e));
       this.startPeriodicSync();
@@ -86,6 +96,7 @@ export class SyncManager {
   async sync(forceNative = false) {
     try {
       useAppStore.getState().setSyncing(true);
+      let remainingPending: number | undefined;
       if (this.isNative && forceNative) {
         const { useConfigStore, getFormFoldersList } =
           await import("../../store/config-store");
@@ -103,6 +114,9 @@ export class SyncManager {
         ) {
           throw new Error(`MISSING_FOLDER:${result.folder}`);
         }
+        if (result && typeof result.pendingUploadsCount === "number") {
+          remainingPending = result.pendingUploadsCount;
+        }
       }
       const files = await this.adapter.getFiles();
       const { useConfigStore } = await import("../../store/config-store");
@@ -117,7 +131,11 @@ export class SyncManager {
       }
       await set(CACHED_FILES_KEY, files);
       useAppStore.getState().setLastSyncTime(Date.now());
-      useAppStore.getState().setPendingUploadsCount(0);
+      if (remainingPending !== undefined) {
+        useAppStore.getState().setPendingUploadsCount(remainingPending);
+      } else {
+        useAppStore.getState().setPendingUploadsCount(0);
+      }
       useAppStore.getState().setError(null);
     } catch (e: any) {
       console.error("Sync failed", e);
