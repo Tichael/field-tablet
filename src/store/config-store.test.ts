@@ -24,11 +24,38 @@ describe("config-store getFormFoldersList", () => {
     ]);
   });
 
-  it("should support legacy string array for backward compatibility", () => {
+  it("should extract customFolders along with starter form folders", () => {
+    const config: AppConfig = {
+      theme: { primaryColor: "#000", darkMode: "system" },
+      branding: { appTitle: "Test" },
+      formFolders: {
+        dailyReports: "Reports/Daily Reports",
+        customFolders: ["Custom/Safety Audit", "Custom/HVAC"],
+      },
+    };
+    expect(getFormFoldersList(config)).toEqual([
+      "Reports/Daily Reports",
+      "Custom/Safety Audit",
+      "Custom/HVAC",
+    ]);
+  });
+
+  it("should support string array formFolders", () => {
     const config = {
       formFolders: ["Reports", "Inspections"],
     } as unknown as AppConfig;
     expect(getFormFoldersList(config)).toEqual(["Reports", "Inspections"]);
+  });
+
+  it("should support object with folders array", () => {
+    const config: AppConfig = {
+      theme: { primaryColor: "#000", darkMode: "system" },
+      branding: { appTitle: "Test" },
+      formFolders: {
+        folders: ["Forms/Field", "Forms/Safety"],
+      },
+    };
+    expect(getFormFoldersList(config)).toEqual(["Forms/Field", "Forms/Safety"]);
   });
 });
 

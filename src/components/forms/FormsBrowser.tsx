@@ -11,9 +11,9 @@ import {
   Clock,
   ExternalLink,
   Edit3,
-  Sparkles,
   Loader2,
   Calendar,
+  Copy,
 } from "lucide-react";
 import { formatDateTime } from "../../lib/forms/pdf-generator";
 import { cn } from "@/lib/utils";
@@ -24,6 +24,9 @@ interface FormsBrowserProps {
   onViewPdf: (filePath: string) => void;
   initialFolder?: string;
   initialForm?: FormTemplate;
+  onCreateForm?: () => void;
+  onEditTemplate?: (template: FormTemplate) => void;
+  onCloneTemplate?: (template: FormTemplate) => void;
 }
 
 export function FormsBrowser({
@@ -32,6 +35,9 @@ export function FormsBrowser({
   onViewPdf,
   initialFolder,
   initialForm,
+  onCreateForm,
+  onEditTemplate,
+  onCloneTemplate,
 }: FormsBrowserProps) {
   const formFoldersConfig = useConfigStore(
     (state) => state.config?.formFolders,
@@ -98,19 +104,6 @@ export function FormsBrowser({
   const handleOpenHistory = (form: FormTemplate) => {
     setSelectedFormForHistory(form);
     loadSubmissions(form);
-  };
-
-  const handleSeedStarters = async () => {
-    const targetFolder = selectedFolder || formFolders[0] || "";
-    setLoading(true);
-    try {
-      await formService.seedStarterTemplates(targetFolder, formFoldersConfig);
-      await loadForms();
-    } catch (e) {
-      console.error("Failed to seed starter forms:", e);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // 1. If viewing submissions history for a form
@@ -296,29 +289,42 @@ export function FormsBrowser({
           </div>
         </div>
 
-        {formFolders.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            <Button
-              variant={selectedFolder === "" ? "secondary" : "ghost"}
-              size="xs"
-              onClick={() => setSelectedFolder("")}
-              className="text-xs"
-            >
-              All Folders
-            </Button>
-            {formFolders.map((f) => (
+        <div className="flex items-center gap-2">
+          {formFolders.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto">
               <Button
-                key={f}
-                variant={selectedFolder === f ? "secondary" : "ghost"}
+                variant={selectedFolder === "" ? "secondary" : "ghost"}
                 size="xs"
-                onClick={() => setSelectedFolder(f)}
+                onClick={() => setSelectedFolder("")}
                 className="text-xs"
               >
-                /{f}
+                All Folders
               </Button>
-            ))}
-          </div>
-        )}
+              {formFolders.map((f) => (
+                <Button
+                  key={f}
+                  variant={selectedFolder === f ? "secondary" : "ghost"}
+                  size="xs"
+                  onClick={() => setSelectedFolder(f)}
+                  className="text-xs"
+                >
+                  /{f}
+                </Button>
+              ))}
+            </div>
+          )}
+
+          {onCreateForm && (
+            <Button
+              size="sm"
+              onClick={onCreateForm}
+              className="text-xs gap-1.5 font-semibold shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create Form</span>
+            </Button>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6 max-w-5xl w-full mx-auto space-y-6">
@@ -339,14 +345,13 @@ export function FormsBrowser({
               </p>
             </div>
 
-            {formFolders.length > 0 && (
-              <Button onClick={handleSeedStarters} className="gap-2 mt-2">
-                <Sparkles className="w-4 h-4" />
-                <span>
-                  Add Starter Forms (Daily Report, Incident Log, Equipment
-                  Check)
-                </span>
-              </Button>
+            {onCreateForm && (
+              <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
+                <Button onClick={onCreateForm} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  <span>Create New Form Template</span>
+                </Button>
+              </div>
             )}
           </div>
         ) : (
@@ -385,7 +390,7 @@ export function FormsBrowser({
                   </div>
                 </div>
 
-                <div className="pt-4 mt-4 border-t flex items-center gap-2">
+                <div className="pt-4 mt-4 border-t flex items-center gap-1.5">
                   <Button
                     onClick={() => onSelectForm(form)}
                     className="flex-1 text-xs font-semibold gap-1.5 shadow-xs"
@@ -402,6 +407,28 @@ export function FormsBrowser({
                   >
                     <FileText className="w-3.5 h-3.5" /> History
                   </Button>
+                  {onEditTemplate && (
+                    <Button
+                      variant="outline"
+                      onClick={() => onEditTemplate(form)}
+                      size="sm"
+                      className="text-xs px-2"
+                      title="Edit Template (WYSIWYG Editor)"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-primary" />
+                    </Button>
+                  )}
+                  {onCloneTemplate && (
+                    <Button
+                      variant="outline"
+                      onClick={() => onCloneTemplate(form)}
+                      size="sm"
+                      className="text-xs px-2"
+                      title="Duplicate / Clone as New Form"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}

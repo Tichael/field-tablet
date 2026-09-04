@@ -2,9 +2,61 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { formService } from "./form-service";
 import { syncManager } from "../sync/sync-manager";
 import type { StorageAdapter, FileInfo } from "../storage/adapter";
-import { STARTER_DAILY_REPORT } from "./starter-templates";
-import type { FormSubmission } from "../../types/form";
+import type { FormTemplate, FormSubmission } from "../../types/form";
 import { getFormFoldersList, type AppConfig } from "../../store/config-store";
+
+const TEST_REPORT_TEMPLATE: FormTemplate = {
+  id: "test-daily-report",
+  title: "Daily Report",
+  description: "Shift progress and crew work activities.",
+  version: 1,
+  folderPath: "Reports/Daily Report",
+  createdAt: "2026-09-03T00:00:00.000Z",
+  updatedAt: "2026-09-03T00:00:00.000Z",
+  sections: [
+    {
+      id: "sec-info",
+      title: "Shift Information",
+      fields: [
+        {
+          id: "work_date",
+          label: "Work Date",
+          type: "date",
+          required: true,
+        },
+        {
+          id: "shift",
+          label: "Shift",
+          type: "select",
+          options: [
+            { label: "Day Shift", value: "day" },
+            { label: "Night Shift", value: "night" },
+          ],
+          required: true,
+        },
+        {
+          id: "supervisor_name",
+          label: "Supervisor / Foreperson",
+          type: "text",
+          required: true,
+          isIdentifier: true,
+        },
+      ],
+    },
+    {
+      id: "sec-activities",
+      title: "Work Activities",
+      fields: [
+        {
+          id: "work_completed",
+          label: "Summary of Work Completed",
+          type: "textarea",
+          required: true,
+        },
+      ],
+    },
+  ],
+};
 
 // In-memory mock storage adapter for isolated unit testing
 class MockStorageAdapter implements StorageAdapter {
@@ -125,55 +177,48 @@ describe("FormService", () => {
     });
   });
 
-  describe("Form Discovery & Seeding", () => {
-    it("should seed starter templates into a form folder", async () => {
-      await formService.seedStarterTemplates("Reports");
-
-      const dailyReportJson = await mockAdapter.readFileText(
-        "Reports/Daily Report/form.json",
-      );
-      expect(dailyReportJson).toBeDefined();
-      const parsed = JSON.parse(dailyReportJson);
-      expect(parsed.title).toBe("Daily Report");
-      expect(parsed.folderPath).toBe("Reports/Daily Report");
-    });
-
-    it("should discover seeded forms across configured form folders", async () => {
-      await formService.seedStarterTemplates("Reports");
-      await formService.seedStarterTemplates("Inspections");
+  describe("Form Discovery & Template Loading", () => {
+    it("should discover user-created forms across configured form folders", async () => {
+      await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "Reports/Daily Report",
+      });
+      await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        id: "equipment-check",
+        title: "Equipment Check",
+        folderPath: "Inspections/Equipment Check",
+      });
 
       const discovered = await formService.discoverForms([
         "Reports",
         "Inspections",
       ]);
-      expect(discovered.length).toBeGreaterThanOrEqual(3);
+      expect(discovered.length).toBe(2);
 
       const titles = discovered.map((d) => d.title);
       expect(titles).toContain("Daily Report");
-      expect(titles).toContain("Incident Log");
       expect(titles).toContain("Equipment Check");
     });
 
-    it("should get or create template and discover direct form folders", async () => {
+    it("should discover direct form folders and load template", async () => {
       // Create template directly in folder "Daily Reports"
-      const template = await formService.getOrCreateTemplate(
-        "dailyReports",
-        "Daily Reports",
-      );
-      expect(template.title).toBe("Daily Report");
-      expect(template.folderPath).toBe("Daily Reports");
-
-      // Verify form.json was persisted
-      const savedJson = await mockAdapter.readFileText(
-        "Daily Reports/form.json",
-      );
-      expect(JSON.parse(savedJson).title).toBe("Daily Report");
+      await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "Daily Reports",
+      });
 
       // Verify discoverForms finds direct form folder
       const discovered = await formService.discoverForms(["Daily Reports"]);
       expect(discovered.length).toBe(1);
       expect(discovered[0].title).toBe("Daily Report");
       expect(discovered[0].folderPath).toBe("Daily Reports");
+
+      // Verify loadTemplate loads it directly
+      const loaded = await formService.loadTemplate("Daily Reports");
+      expect(loaded).toBeDefined();
+      expect(loaded?.title).toBe("Daily Report");
+      expect(loaded?.folderPath).toBe("Daily Reports");
     });
   });
 
@@ -186,7 +231,7 @@ describe("FormService", () => {
 
     it("should save submission JSON and export a dated PDF without overwriting older versions", async () => {
       const template = {
-        ...STARTER_DAILY_REPORT,
+        ...TEST_REPORT_TEMPLATE,
         folderPath: "Reports/Daily Report",
       };
       const subId = "Daily_Report_2026-09-03_0800";
@@ -278,7 +323,7 @@ describe("FormService", () => {
 
     it("should link identifier-based submission with its PDF in listSubmissions", async () => {
       const template = {
-        ...STARTER_DAILY_REPORT,
+        ...TEST_REPORT_TEMPLATE,
         folderPath: "Reports/Daily Report",
       };
       const identifier = "Unit #402";
@@ -322,38 +367,6 @@ describe("FormService", () => {
       expect(found?.pdfExports[0].filename).toBe(save.filename);
     });
 
-    it("should seed starter templates into custom formFoldersConfig paths", async () => {
-      const customFolders = {
-        dailyReports: "Operations/Daily",
-        incidentLogs: "Safety/Incidents",
-        equipmentChecks: "Fleet/Inspections",
-      };
-
-      await formService.seedStarterTemplates("", customFolders);
-
-      // Verify each template was written to its configured folder path
-      const dailyJson = await mockAdapter.readFileText(
-        "Operations/Daily/form.json",
-      );
-      const dailyParsed = JSON.parse(dailyJson);
-      expect(dailyParsed.id).toBe("daily-report");
-      expect(dailyParsed.folderPath).toBe("Operations/Daily");
-
-      const incidentJson = await mockAdapter.readFileText(
-        "Safety/Incidents/form.json",
-      );
-      const incidentParsed = JSON.parse(incidentJson);
-      expect(incidentParsed.id).toBe("incident-log");
-      expect(incidentParsed.folderPath).toBe("Safety/Incidents");
-
-      const equipJson = await mockAdapter.readFileText(
-        "Fleet/Inspections/form.json",
-      );
-      const equipParsed = JSON.parse(equipJson);
-      expect(equipParsed.id).toBe("equipment-check");
-      expect(equipParsed.folderPath).toBe("Fleet/Inspections");
-    });
-
     it("should deduplicate folder names in getFormFoldersList", () => {
       const configWithDups: AppConfig = {
         theme: { primaryColor: "#000", darkMode: "system" },
@@ -368,6 +381,106 @@ describe("FormService", () => {
       const list = getFormFoldersList(configWithDups);
       expect(list).toEqual(["SharedForms", "SharedForms/Checks"]);
       expect(list.length).toBe(2);
+    });
+
+    it("should create a valid empty template with defaults", () => {
+      const empty = formService.createEmptyTemplate(
+        "HVAC Audit",
+        "Custom/HVAC",
+      );
+      expect(empty.title).toBe("HVAC Audit");
+      expect(empty.folderPath).toBe("Custom/HVAC");
+      expect(empty.sections.length).toBe(1);
+      expect(empty.sections[0].fields.length).toBe(2);
+      expect(empty.version).toBe(1);
+
+      const validation = formService.validateTemplate(empty);
+      expect(validation.valid).toBe(true);
+      expect(validation.errors).toHaveLength(0);
+    });
+
+    it("should validate invalid templates properly", () => {
+      const invalid: any = {
+        title: "",
+        sections: [
+          {
+            title: "",
+            fields: [
+              { id: "dup", label: "", type: "text" },
+              { id: "dup", label: "Duplicate", type: "select", options: [] },
+            ],
+          },
+        ],
+      };
+
+      const result = formService.validateTemplate(invalid);
+      expect(result.valid).toBe(false);
+      expect(result.errors.some((e) => e.includes("title is required"))).toBe(
+        true,
+      );
+      expect(result.errors.some((e) => e.includes("must have a label"))).toBe(
+        true,
+      );
+      expect(result.errors.some((e) => e.includes("Duplicate field ID"))).toBe(
+        true,
+      );
+      expect(
+        result.errors.some((e) => e.includes("must have at least one option")),
+      ).toBe(true);
+    });
+
+    it("should save and auto-version custom templates", async () => {
+      const template = formService.createEmptyTemplate(
+        "Safety Checklist",
+        "Safety/Checklist",
+      );
+
+      // First save (v1)
+      const saved1 = await formService.saveTemplate(template);
+      expect(saved1.version).toBe(1);
+      expect(saved1.folderPath).toBe("Safety/Checklist");
+
+      // Verify file written
+      const read1 = await mockAdapter.readFileText(
+        "Safety/Checklist/form.json",
+      );
+      expect(JSON.parse(read1).version).toBe(1);
+
+      // Second save / update (v2)
+      const saved2 = await formService.saveTemplate({
+        ...saved1,
+        title: "Safety Checklist Updated",
+      });
+      expect(saved2.version).toBe(2);
+      expect(saved2.title).toBe("Safety Checklist Updated");
+
+      const read2 = await mockAdapter.readFileText(
+        "Safety/Checklist/form.json",
+      );
+      expect(JSON.parse(read2).version).toBe(2);
+    });
+
+    it("should duplicate templates with fresh IDs and reset version", async () => {
+      const original = await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "Operations/Daily",
+      });
+
+      const cloned = await formService.duplicateTemplate(
+        original,
+        "Subcontractor Daily Report",
+        "Operations/Subcontractor Daily",
+      );
+
+      expect(cloned.title).toBe("Subcontractor Daily Report");
+      expect(cloned.folderPath).toBe("Operations/Subcontractor Daily");
+      expect(cloned.version).toBe(1);
+      expect(cloned.sections.length).toBe(original.sections.length);
+
+      const readCloned = await mockAdapter.readFileText(
+        "Operations/Subcontractor Daily/form.json",
+      );
+      expect(JSON.parse(readCloned).title).toBe("Subcontractor Daily Report");
     });
   });
 });

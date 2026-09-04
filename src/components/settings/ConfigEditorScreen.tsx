@@ -5,7 +5,7 @@ import {
   DEFAULT_CONFIG,
   getFormFoldersList,
 } from "../../store/config-store";
-import type { AppConfig, FormFoldersConfig } from "../../store/config-store";
+import type { AppConfig } from "../../store/config-store";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -29,13 +29,7 @@ import { syncManager } from "../../lib/sync/sync-manager";
 
 import { applyTheme } from "../../lib/theme";
 import { GenericFileBrowser } from "../documents/GenericFileBrowser";
-import {
-  Folder,
-  FolderPlus,
-  Trash2,
-  AlertCircle,
-  FileText,
-} from "lucide-react";
+import { Folder, FolderPlus, Trash2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ConfigEditorScreenProps {
@@ -50,9 +44,6 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   const [formData, setFormData] = useState<AppConfig>(config || DEFAULT_CONFIG);
   const [isBrowserOpen, setBrowserOpen] = useState(false);
   const [browserMode, setBrowserMode] = useState<"sync" | "form">("sync");
-  const [formTypeForFolder, setFormTypeForFolder] = useState<
-    keyof FormFoldersConfig | null
-  >(null);
   const [folderNotice, setFolderNotice] = useState<{
     type: "info" | "warning";
     message: string;
@@ -131,40 +122,34 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
   const handleAddFormFolder = (path: string) => {
     const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
-    if (!cleanPath || !formTypeForFolder) {
+    if (!cleanPath) {
       setBrowserOpen(false);
-      setFormTypeForFolder(null);
       return;
     }
 
-    setFormData((prev) => {
-      const current =
-        typeof prev.formFolders === "object" && !Array.isArray(prev.formFolders)
-          ? { ...prev.formFolders }
-          : {};
-      current[formTypeForFolder] = cleanPath;
-      return {
-        ...prev,
-        formFolders: current,
-      };
-    });
+    const currentList = getFormFoldersList(formData);
+    if (currentList.includes(cleanPath)) {
+      setFolderNotice({
+        type: "info",
+        message: `Folder "/${cleanPath}" is already added as a form folder.`,
+      });
+      setBrowserOpen(false);
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      formFolders: [...getFormFoldersList(prev), cleanPath],
+    }));
     setFolderNotice(null);
     setBrowserOpen(false);
-    setFormTypeForFolder(null);
   };
 
-  const handleClearFormFolder = (type: keyof FormFoldersConfig) => {
-    setFormData((prev) => {
-      const current =
-        typeof prev.formFolders === "object" && !Array.isArray(prev.formFolders)
-          ? { ...prev.formFolders }
-          : {};
-      delete current[type];
-      return {
-        ...prev,
-        formFolders: current,
-      };
-    });
+  const handleRemoveFormFolder = (folderToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      formFolders: getFormFoldersList(prev).filter((f) => f !== folderToRemove),
+    }));
   };
 
   const [saveAsName, setSaveAsName] = useState(
@@ -579,202 +564,57 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
             <CardHeader>
               <CardTitle>Form Folders</CardTitle>
               <CardDescription>
-                Configure dedicated folders for each of the three field form
-                types. Templates, filled submissions, and dated PDF exports are
-                stored inside each configured folder.
+                Configure folders where form templates, filled submissions, and
+                dated PDF exports are stored. Forms created in these folders
+                will appear on your dashboard.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Daily Reports Folder */}
-              <div className="p-4 border rounded-xl bg-card space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-semibold text-base flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span>Daily Reports Folder</span>
-                    </h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Shift progress, crew personnel, work activities, and
-                      supervisor sign-offs.
-                    </p>
-                  </div>
-                  {formData.formFolders?.dailyReports ? (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setBrowserMode("form");
-                          setFormTypeForFolder("dailyReports");
-                          setBrowserOpen(true);
-                        }}
-                        className="text-xs"
+              <div className="space-y-2">
+                <Label>Folders for Forms</Label>
+                {getFormFoldersList(formData).length === 0 ? (
+                  <p className="text-sm text-muted-foreground italic">
+                    No form folders added yet. Add a folder to organize and
+                    store user forms.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {getFormFoldersList(formData).map((folder) => (
+                      <li
+                        key={folder}
+                        className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20"
                       >
-                        Change
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleClearFormFolder("dailyReports")}
-                        className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setBrowserMode("form");
-                        setFormTypeForFolder("dailyReports");
-                        setBrowserOpen(true);
-                      }}
-                      className="text-xs shrink-0"
-                    >
-                      <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
-                      Select Folder
-                    </Button>
-                  )}
-                </div>
-                <div className="text-xs font-mono p-2.5 rounded-lg bg-muted/30 border">
-                  {formData.formFolders?.dailyReports ? (
-                    <span className="font-semibold text-foreground">
-                      /{formData.formFolders.dailyReports}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground italic">
-                      Not configured (form cannot be filled until configured)
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Incident Logs Folder */}
-              <div className="p-4 border rounded-xl bg-card space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-semibold text-base flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span>Incident Logs Folder</span>
-                    </h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Immediate reporting of safety, equipment, near-miss, and
-                      environmental incidents.
-                    </p>
-                  </div>
-                  {formData.formFolders?.incidentLogs ? (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setBrowserMode("form");
-                          setFormTypeForFolder("incidentLogs");
-                          setBrowserOpen(true);
-                        }}
-                        className="text-xs"
-                      >
-                        Change
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleClearFormFolder("incidentLogs")}
-                        className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setBrowserMode("form");
-                        setFormTypeForFolder("incidentLogs");
-                        setBrowserOpen(true);
-                      }}
-                      className="text-xs shrink-0"
-                    >
-                      <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
-                      Select Folder
-                    </Button>
-                  )}
-                </div>
-                <div className="text-xs font-mono p-2.5 rounded-lg bg-muted/30 border">
-                  {formData.formFolders?.incidentLogs ? (
-                    <span className="font-semibold text-foreground">
-                      /{formData.formFolders.incidentLogs}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground italic">
-                      Not configured (form cannot be filled until configured)
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Equipment Checks Folder */}
-              <div className="p-4 border rounded-xl bg-card space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div>
-                    <h4 className="font-semibold text-base flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-emerald-500 shrink-0" />
-                      <span>Equipment Checks Folder</span>
-                    </h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Pre-operational machinery checklist, fluids, mechanical
-                      checks, and certification.
-                    </p>
-                  </div>
-                  {formData.formFolders?.equipmentChecks ? (
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setBrowserMode("form");
-                          setFormTypeForFolder("equipmentChecks");
-                          setBrowserOpen(true);
-                        }}
-                        className="text-xs"
-                      >
-                        Change
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleClearFormFolder("equipmentChecks")}
-                        className="text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setBrowserMode("form");
-                        setFormTypeForFolder("equipmentChecks");
-                        setBrowserOpen(true);
-                      }}
-                      className="text-xs shrink-0"
-                    >
-                      <FolderPlus className="w-3.5 h-3.5 mr-1.5" />
-                      Select Folder
-                    </Button>
-                  )}
-                </div>
-                <div className="text-xs font-mono p-2.5 rounded-lg bg-muted/30 border">
-                  {formData.formFolders?.equipmentChecks ? (
-                    <span className="font-semibold text-foreground">
-                      /{formData.formFolders.equipmentChecks}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground italic">
-                      Not configured (form cannot be filled until configured)
-                    </span>
-                  )}
-                </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Folder className="w-4 h-4 text-primary shrink-0" />
+                          <span className="font-mono text-sm truncate">
+                            /{folder}
+                          </span>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveFormFolder(folder)}
+                          className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
+                          title={`Remove /${folder}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setBrowserMode("form");
+                    setBrowserOpen(true);
+                  }}
+                  className="gap-2 text-xs"
+                >
+                  <FolderPlus className="w-4 h-4" />
+                  <span>Add Form Folder</span>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -788,13 +628,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               <div>
                 <h3 className="font-semibold text-lg">
                   {browserMode === "form"
-                    ? formTypeForFolder === "dailyReports"
-                      ? "Select Folder for Daily Reports"
-                      : formTypeForFolder === "incidentLogs"
-                        ? "Select Folder for Incident Logs"
-                        : formTypeForFolder === "equipmentChecks"
-                          ? "Select Folder for Equipment Checks"
-                          : "Select Form Folder"
+                    ? "Select Form Folder"
                     : "Select Folder to Sync"}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
@@ -808,7 +642,6 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                 size="sm"
                 onClick={() => {
                   setBrowserOpen(false);
-                  setFormTypeForFolder(null);
                 }}
               >
                 Cancel

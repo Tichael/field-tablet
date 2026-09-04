@@ -5,13 +5,107 @@ import {
   sanitizeFilenamePart,
   formatDateTime,
 } from "./pdf-generator";
-import {
-  STARTER_DAILY_REPORT,
-  STARTER_INCIDENT_LOG,
-  STARTER_EQUIPMENT_CHECK,
-} from "./starter-templates";
-import type { FormSubmission } from "../../types/form";
+import type { FormSubmission, FormTemplate } from "../../types/form";
 import type { AppConfig } from "../../store/config-store";
+
+const TEST_REPORT_TEMPLATE: FormTemplate = {
+  id: "daily-report",
+  title: "Daily Report",
+  version: 1,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+  folderPath: "Reports/Daily Report",
+  sections: [
+    {
+      id: "general",
+      title: "General Information",
+      fields: [
+        { id: "work_date", type: "date", label: "Date" },
+        {
+          id: "shift",
+          type: "select",
+          label: "Shift",
+          options: [{ label: "Day Shift", value: "day" }],
+        },
+        {
+          id: "supervisor_name",
+          type: "text",
+          label: "Supervisor",
+          isIdentifier: true,
+        },
+        { id: "site_location", type: "text", label: "Location" },
+        { id: "weather_conditions", type: "text", label: "Weather" },
+        { id: "crew_size", type: "number", label: "Crew Size" },
+        { id: "work_completed", type: "textarea", label: "Work Completed" },
+        { id: "delays_issues", type: "textarea", label: "Delays" },
+        { id: "safety_incident_occurred", type: "checkbox", label: "Incident" },
+        { id: "signature", type: "signature", label: "Signature" },
+      ],
+    },
+  ],
+};
+
+const TEST_EQUIPMENT_TEMPLATE: FormTemplate = {
+  id: "equipment-check",
+  title: "Equipment Check",
+  version: 1,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+  folderPath: "Inspections/Equipment Check",
+  sections: [
+    {
+      id: "equipment_info",
+      title: "Equipment Information",
+      fields: [
+        {
+          id: "equipment_id",
+          type: "text",
+          label: "Equipment ID",
+          isIdentifier: true,
+        },
+        { id: "serial_number", type: "text", label: "Serial Number" },
+        { id: "hour_meter", type: "number", label: "Hour Meter" },
+        { id: "inspector_name", type: "text", label: "Inspector" },
+        { id: "fluids_check", type: "select", label: "Fluids" },
+        { id: "hydraulics_check", type: "select", label: "Hydraulics" },
+        { id: "tires_tracks_check", type: "select", label: "Tires" },
+        { id: "safety_guards_check", type: "checkbox", label: "Guards" },
+        { id: "emergency_stop_check", type: "checkbox", label: "E-Stop" },
+        { id: "overall_status", type: "select", label: "Status" },
+        { id: "inspector_comments", type: "textarea", label: "Comments" },
+        { id: "signature", type: "signature", label: "Signature" },
+      ],
+    },
+  ],
+};
+
+const TEST_INCIDENT_TEMPLATE: FormTemplate = {
+  id: "incident-log",
+  title: "Incident Log",
+  version: 1,
+  createdAt: "2026-09-01T00:00:00.000Z",
+  updatedAt: "2026-09-01T00:00:00.000Z",
+  folderPath: "Reports/Incident Log",
+  sections: [
+    {
+      id: "incident_details",
+      title: "Incident Details",
+      fields: [
+        { id: "incident_datetime", type: "datetime", label: "Date & Time" },
+        { id: "incident_type", type: "radio", label: "Type" },
+        { id: "severity", type: "radio", label: "Severity" },
+        { id: "location", type: "text", label: "Location", isIdentifier: true },
+        { id: "description", type: "textarea", label: "Description" },
+        {
+          id: "immediate_actions",
+          type: "textarea",
+          label: "Immediate Actions",
+        },
+        { id: "reporter_name", type: "text", label: "Reporter" },
+      ],
+    },
+  ],
+};
 
 describe("pdf-generator", () => {
   describe("sanitizeFilenamePart", () => {
@@ -89,8 +183,8 @@ describe("pdf-generator", () => {
     it("should generate a valid vector PDF in A4 format with signature and fields", async () => {
       const submission: FormSubmission = {
         id: "Daily_Report_2026-09-03_080000",
-        templateId: STARTER_DAILY_REPORT.id,
-        templateTitle: STARTER_DAILY_REPORT.title,
+        templateId: TEST_REPORT_TEMPLATE.id,
+        templateTitle: TEST_REPORT_TEMPLATE.title,
         templateVersion: 1,
         folderPath: "Reports/Daily Report",
         createdAt: "2026-09-03T08:00:00.000Z",
@@ -113,7 +207,7 @@ describe("pdf-generator", () => {
       };
 
       const result = await generateFormSubmissionPdf({
-        template: STARTER_DAILY_REPORT,
+        template: TEST_REPORT_TEMPLATE,
         submission,
         config: sampleConfig,
         exportDate: new Date(2026, 8, 3, 8, 0, 0),
@@ -138,8 +232,8 @@ describe("pdf-generator", () => {
 
       const submission: FormSubmission = {
         id: "Equipment_Check_2026-09-03_103000",
-        templateId: STARTER_EQUIPMENT_CHECK.id,
-        templateTitle: STARTER_EQUIPMENT_CHECK.title,
+        templateId: TEST_EQUIPMENT_TEMPLATE.id,
+        templateTitle: TEST_EQUIPMENT_TEMPLATE.title,
         templateVersion: 1,
         folderPath: "Inspections/Equipment Check",
         createdAt: "2026-09-03T10:30:00.000Z",
@@ -164,7 +258,7 @@ describe("pdf-generator", () => {
       };
 
       const result = await generateFormSubmissionPdf({
-        template: STARTER_EQUIPMENT_CHECK,
+        template: TEST_EQUIPMENT_TEMPLATE,
         submission,
         config: letterConfig,
         exportDate: new Date(2026, 8, 3, 10, 30, 0),
@@ -180,8 +274,8 @@ describe("pdf-generator", () => {
     it("should handle Incident Log form with radio and textarea fields", async () => {
       const submission: FormSubmission = {
         id: "Incident_Log_2026-09-03_140000",
-        templateId: STARTER_INCIDENT_LOG.id,
-        templateTitle: STARTER_INCIDENT_LOG.title,
+        templateId: TEST_INCIDENT_TEMPLATE.id,
+        templateTitle: TEST_INCIDENT_TEMPLATE.title,
         templateVersion: 1,
         folderPath: "Reports/Incident Log",
         createdAt: "2026-09-03T14:00:00.000Z",
@@ -201,7 +295,7 @@ describe("pdf-generator", () => {
       };
 
       const result = await generateFormSubmissionPdf({
-        template: STARTER_INCIDENT_LOG,
+        template: TEST_INCIDENT_TEMPLATE,
         submission,
         config: sampleConfig,
         exportDate: new Date(2026, 8, 3, 14, 0, 0),
@@ -216,7 +310,7 @@ describe("pdf-generator", () => {
 
     it("should map checkbox-group values to human-readable option labels in PDF output", async () => {
       const templateWithCheckboxGroup = {
-        ...STARTER_DAILY_REPORT,
+        ...TEST_REPORT_TEMPLATE,
         sections: [
           {
             id: "ppe_section",
@@ -267,8 +361,8 @@ describe("pdf-generator", () => {
     it("should use ASCII hyphen for empty fields and pipe delimiter in footer", async () => {
       const emptySubmission: FormSubmission = {
         id: "Daily_Report_2026-09-03_120000",
-        templateId: STARTER_DAILY_REPORT.id,
-        templateTitle: STARTER_DAILY_REPORT.title,
+        templateId: TEST_REPORT_TEMPLATE.id,
+        templateTitle: TEST_REPORT_TEMPLATE.title,
         templateVersion: 1,
         folderPath: "Reports/Daily Report",
         createdAt: "2026-09-03T12:00:00.000Z",
@@ -279,7 +373,7 @@ describe("pdf-generator", () => {
       };
 
       const result = await generateFormSubmissionPdf({
-        template: STARTER_DAILY_REPORT,
+        template: TEST_REPORT_TEMPLATE,
         submission: emptySubmission,
         config: sampleConfig,
         exportDate: new Date(2026, 8, 3, 12, 0, 0),

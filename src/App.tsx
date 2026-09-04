@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import "./App.css";
 import { syncManager } from "./lib/sync/sync-manager";
 import { useAppStore } from "./store/app-store";
-import { DEFAULT_CONFIG, useConfigStore } from "./store/config-store";
+import {
+  DEFAULT_CONFIG,
+  useConfigStore,
+  getFormFoldersList,
+} from "./store/config-store";
 import { SetupScreen } from "./components/setup/SetupScreen";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
 import { Button } from "./components/ui/button";
@@ -13,6 +17,7 @@ import {
   ClipboardList,
   Plus,
   FolderPlus,
+  Loader2,
 } from "lucide-react";
 import { applyTheme } from "./lib/theme";
 import { DocumentList } from "./components/documents/DocumentList";
@@ -20,9 +25,9 @@ import { DocumentViewer } from "./components/documents/DocumentViewer";
 import { SyncIndicator } from "./components/ui/SyncIndicator";
 import { FormRunner } from "./components/forms/FormRunner";
 import { FormsBrowser } from "./components/forms/FormsBrowser";
+import { FormEditor } from "./components/forms/editor/FormEditor";
 import type { FormTemplate, FormSubmission } from "./types/form";
 import { formService } from "./lib/forms/form-service";
-import { cn } from "@/lib/utils";
 
 function App() {
   const isConfigured = useAppStore((state) => state.isConfigured);
@@ -36,6 +41,8 @@ function App() {
   const [isDocumentBrowserOpen, setDocumentBrowserOpen] = useState(false);
 
   // Forms state
+  const [dashboardForms, setDashboardForms] = useState<FormTemplate[]>([]);
+  const [isLoadingForms, setIsLoadingForms] = useState(false);
   const [activeFormTemplate, setActiveFormTemplate] =
     useState<FormTemplate | null>(null);
   const [activeSubmission, setActiveSubmission] = useState<
@@ -50,33 +57,62 @@ function App() {
   >(undefined);
   const [viewingPdfPath, setViewingPdfPath] = useState<string | null>(null);
 
-  const handleOpenFormRunner = async (
-    formType: "dailyReports" | "incidentLogs" | "equipmentChecks",
-    folder: string,
-  ) => {
-    try {
-      const template = await formService.getOrCreateTemplate(formType, folder);
-      setActiveFormTemplate(template);
-      setActiveSubmission(undefined);
-    } catch (e) {
-      console.error("Failed to load form template:", e);
-      alert("Failed to load form template.");
-    }
+  // Form Editor state
+  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
+  const [templateToEdit, setTemplateToEdit] = useState<FormTemplate | null>(
+    null,
+  );
+
+  const handleOpenCreateForm = () => {
+    setTemplateToEdit(null);
+    setIsEditingTemplate(true);
+    setFormsBrowserOpen(false);
   };
 
-  const handleOpenFormHistory = async (
-    formType: "dailyReports" | "incidentLogs" | "equipmentChecks",
-    folder: string,
-  ) => {
-    try {
-      const template = await formService.getOrCreateTemplate(formType, folder);
-      setFormsBrowserInitialForm(template);
-      setFormsBrowserFolder(folder);
-      setFormsBrowserOpen(true);
-    } catch (e) {
-      console.error("Failed to open form history:", e);
-    }
+  const handleOpenEditTemplate = (tmpl: FormTemplate) => {
+    setTemplateToEdit(tmpl);
+    setIsEditingTemplate(true);
+    setFormsBrowserOpen(false);
   };
+
+  const handleOpenCloneTemplate = (tmpl: FormTemplate) => {
+    const timestamp = Date.now();
+    const cloned: FormTemplate = {
+      ...JSON.parse(JSON.stringify(tmpl)),
+      id: `${tmpl.id}_copy_${timestamp.toString().slice(-4)}`,
+      title: `${tmpl.title} (Copy)`,
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setTemplateToEdit(cloned);
+    setIsEditingTemplate(true);
+    setFormsBrowserOpen(false);
+  };
+
+  const loadDashboardForms = useCallback(async () => {
+    if (!config) return;
+    const folders = getFormFoldersList(config);
+    if (folders.length === 0) {
+      setDashboardForms([]);
+      return;
+    }
+    setIsLoadingForms(true);
+    try {
+      const discovered = await formService.discoverForms(folders);
+      setDashboardForms(discovered);
+    } catch (e) {
+      console.error("Failed to load dashboard forms:", e);
+    } finally {
+      setIsLoadingForms(false);
+    }
+  }, [config]);
+
+  useEffect(() => {
+    if (isConfigured && !isSettingsOpen) {
+      loadDashboardForms();
+    }
+  }, [isConfigured, isSettingsOpen, loadDashboardForms]);
 
   useEffect(() => {
     if (!isConfigured) {
@@ -185,6 +221,24 @@ function App() {
     );
   }
 
+  if (isEditingTemplate) {
+    return (
+      <FormEditor
+        initialTemplate={templateToEdit}
+        onClose={() => {
+          setIsEditingTemplate(false);
+          setTemplateToEdit(null);
+          loadDashboardForms();
+        }}
+        onSaved={(_saved) => {
+          setIsEditingTemplate(false);
+          setTemplateToEdit(null);
+          loadDashboardForms();
+        }}
+      />
+    );
+  }
+
   if (activeFormTemplate) {
     return (
       <FormRunner
@@ -193,6 +247,7 @@ function App() {
         onClose={() => {
           setActiveFormTemplate(null);
           setActiveSubmission(undefined);
+          loadDashboardForms();
         }}
         onViewPdf={(path) => setViewingPdfPath(path)}
       />
@@ -206,7 +261,9 @@ function App() {
         initialForm={formsBrowserInitialForm}
         onClose={() => {
           setFormsBrowserOpen(false);
+          setFormsBrowserFolder(undefined);
           setFormsBrowserInitialForm(undefined);
+          loadDashboardForms();
         }}
         onSelectForm={(tmpl, sub) => {
           setFormsBrowserOpen(false);
@@ -215,6 +272,9 @@ function App() {
           setActiveSubmission(sub);
         }}
         onViewPdf={(path) => setViewingPdfPath(path)}
+        onCreateForm={handleOpenCreateForm}
+        onEditTemplate={handleOpenEditTemplate}
+        onCloneTemplate={handleOpenCloneTemplate}
       />
     );
   }
@@ -271,6 +331,14 @@ function App() {
 
                 <div className="flex items-center gap-2">
                   <Button
+                    size="sm"
+                    onClick={handleOpenCreateForm}
+                    className="text-xs gap-1.5 font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Form</span>
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => {
@@ -285,54 +353,103 @@ function App() {
                 </div>
               </div>
 
-              {/* Three Form Type Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* 1. Daily Report Card */}
-                <div
-                  className={cn(
-                    "border rounded-xl p-5 flex flex-col justify-between bg-card shadow-xs transition-all",
-                    config.formFolders?.dailyReports
-                      ? "hover:border-foreground/40 hover:bg-muted/20"
-                      : "border-dashed opacity-85",
-                  )}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-wider font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded">
-                        Report
-                      </span>
-                      {config.formFolders?.dailyReports ? (
-                        <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">
-                          /{config.formFolders.dailyReports}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                          Folder required
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="font-bold text-base text-foreground">
-                      Daily Report
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      Shift progress, crew personnel, work activities, and
-                      supervisor signature.
+              {/* Dynamic User Forms */}
+              {getFormFoldersList(config).length === 0 ? (
+                <div className="border border-dashed rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-muted/10">
+                  <FolderPlus className="w-10 h-10 text-muted-foreground/60" />
+                  <div>
+                    <h4 className="font-semibold text-sm">
+                      No Form Folders Configured
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                      Configure folders in Settings to store and organize your
+                      custom forms and submissions.
                     </p>
                   </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="text-xs gap-1.5 mt-2"
+                    onClick={() => setSettingsOpen(true)}
+                  >
+                    <FolderPlus className="w-3.5 h-3.5" />
+                    <span>Configure Form Folders</span>
+                  </Button>
+                </div>
+              ) : isLoadingForms ? (
+                <div className="border rounded-xl p-12 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/5">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Loading forms...</span>
+                </div>
+              ) : dashboardForms.length === 0 ? (
+                <div className="border border-dashed rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-muted/10">
+                  <ClipboardList className="w-10 h-10 text-muted-foreground/60" />
+                  <div>
+                    <h4 className="font-semibold text-sm">
+                      No Forms Created Yet
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                      Create your first custom form template using the Form
+                      Editor to start collecting field data.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    className="text-xs gap-1.5 mt-2"
+                    onClick={handleOpenCreateForm}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create New Form</span>
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {dashboardForms.map((form) => (
+                    <div
+                      key={form.folderPath || form.id}
+                      className="border rounded-xl p-5 flex flex-col justify-between bg-card shadow-xs hover:border-foreground/40 hover:bg-muted/20 transition-all"
+                    >
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] uppercase tracking-wider font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
+                            v{form.version || 1}
+                          </span>
+                          {form.folderPath && (
+                            <span
+                              className="text-[10px] text-muted-foreground font-mono truncate max-w-[130px]"
+                              title={`/${form.folderPath}`}
+                            >
+                              /{form.folderPath}
+                            </span>
+                          )}
+                        </div>
 
-                  <div className="pt-4 mt-3 border-t">
-                    {config.formFolders?.dailyReports ? (
-                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-base text-foreground">
+                          {form.title}
+                        </h3>
+                        {form.description ? (
+                          <p className="text-xs text-muted-foreground line-clamp-2">
+                            {form.description}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">
+                            {form.sections.reduce(
+                              (acc, s) => acc + s.fields.length,
+                              0,
+                            )}{" "}
+                            fields
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="pt-4 mt-3 border-t flex items-center gap-2">
                         <Button
                           size="sm"
                           className="flex-1 text-xs gap-1 font-semibold"
-                          onClick={() =>
-                            handleOpenFormRunner(
-                              "dailyReports",
-                              config.formFolders!.dailyReports!,
-                            )
-                          }
+                          onClick={() => {
+                            setActiveFormTemplate(form);
+                            setActiveSubmission(undefined);
+                          }}
                         >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Fill Form</span>
@@ -341,189 +458,20 @@ function App() {
                           variant="outline"
                           size="sm"
                           className="text-xs"
-                          onClick={() =>
-                            handleOpenFormHistory(
-                              "dailyReports",
-                              config.formFolders!.dailyReports!,
-                            )
-                          }
+                          onClick={() => {
+                            setFormsBrowserInitialForm(form);
+                            setFormsBrowserFolder(form.folderPath);
+                            setFormsBrowserOpen(true);
+                          }}
                           title="View Previous Submissions & PDFs"
                         >
                           <FileText className="w-3.5 h-3.5" />
                         </Button>
                       </div>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full text-xs gap-1.5"
-                        onClick={() => setSettingsOpen(true)}
-                      >
-                        <FolderPlus className="w-3.5 h-3.5" />
-                        <span>Configure Folder</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                {/* 2. Incident Log Card */}
-                <div
-                  className={cn(
-                    "border rounded-xl p-5 flex flex-col justify-between bg-card shadow-xs transition-all",
-                    config.formFolders?.incidentLogs
-                      ? "hover:border-foreground/40 hover:bg-muted/20"
-                      : "border-dashed opacity-85",
-                  )}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-wider font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded">
-                        Safety
-                      </span>
-                      {config.formFolders?.incidentLogs ? (
-                        <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">
-                          /{config.formFolders.incidentLogs}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                          Folder required
-                        </span>
-                      )}
                     </div>
-
-                    <h3 className="font-bold text-base text-foreground">
-                      Incident Log
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      Immediate documentation of safety, equipment, near-miss,
-                      or environmental incidents.
-                    </p>
-                  </div>
-
-                  <div className="pt-4 mt-3 border-t">
-                    {config.formFolders?.incidentLogs ? (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 text-xs gap-1 font-semibold"
-                          onClick={() =>
-                            handleOpenFormRunner(
-                              "incidentLogs",
-                              config.formFolders!.incidentLogs!,
-                            )
-                          }
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Fill Form</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          onClick={() =>
-                            handleOpenFormHistory(
-                              "incidentLogs",
-                              config.formFolders!.incidentLogs!,
-                            )
-                          }
-                          title="View Previous Submissions & PDFs"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full text-xs gap-1.5"
-                        onClick={() => setSettingsOpen(true)}
-                      >
-                        <FolderPlus className="w-3.5 h-3.5" />
-                        <span>Configure Folder</span>
-                      </Button>
-                    )}
-                  </div>
+                  ))}
                 </div>
-
-                {/* 3. Equipment Check Card */}
-                <div
-                  className={cn(
-                    "border rounded-xl p-5 flex flex-col justify-between bg-card shadow-xs transition-all",
-                    config.formFolders?.equipmentChecks
-                      ? "hover:border-foreground/40 hover:bg-muted/20"
-                      : "border-dashed opacity-85",
-                  )}
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase tracking-wider font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">
-                        Inspection
-                      </span>
-                      {config.formFolders?.equipmentChecks ? (
-                        <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[120px]">
-                          /{config.formFolders.equipmentChecks}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                          Folder required
-                        </span>
-                      )}
-                    </div>
-
-                    <h3 className="font-bold text-base text-foreground">
-                      Equipment Check
-                    </h3>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      Pre-operational machinery checklist, fluid levels,
-                      mechanical checks, and certification.
-                    </p>
-                  </div>
-
-                  <div className="pt-4 mt-3 border-t">
-                    {config.formFolders?.equipmentChecks ? (
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 text-xs gap-1 font-semibold"
-                          onClick={() =>
-                            handleOpenFormRunner(
-                              "equipmentChecks",
-                              config.formFolders!.equipmentChecks!,
-                            )
-                          }
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Fill Form</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          onClick={() =>
-                            handleOpenFormHistory(
-                              "equipmentChecks",
-                              config.formFolders!.equipmentChecks!,
-                            )
-                          }
-                          title="View Previous Submissions & PDFs"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full text-xs gap-1.5"
-                        onClick={() => setSettingsOpen(true)}
-                      >
-                        <FolderPlus className="w-3.5 h-3.5" />
-                        <span>Configure Folder</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Bottom row: Large document button */}

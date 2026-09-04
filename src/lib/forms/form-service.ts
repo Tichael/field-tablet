@@ -1,16 +1,10 @@
 import { syncManager } from "../sync/sync-manager";
 import type { FormTemplate, FormSubmission } from "../../types/form";
-import type { AppConfig, FormFoldersConfig } from "../../store/config-store";
+import type { AppConfig } from "../../store/config-store";
 import {
   generateFormSubmissionPdf,
   sanitizeFilenamePart,
 } from "./pdf-generator";
-import {
-  ALL_STARTER_TEMPLATES,
-  STARTER_DAILY_REPORT,
-  STARTER_INCIDENT_LOG,
-  STARTER_EQUIPMENT_CHECK,
-} from "./starter-templates";
 
 export class FormService {
   /**
@@ -74,52 +68,6 @@ export class FormService {
   }
 
   /**
-   * Get or initialize the template for a specific form type in its configured folder.
-   * Ensures form.json is written to disk so it can always be discovered and updated.
-   */
-  async getOrCreateTemplate(
-    formType: "dailyReports" | "incidentLogs" | "equipmentChecks",
-    folderPath: string,
-  ): Promise<FormTemplate> {
-    const adapter = syncManager.getAdapter();
-    const cleanFolder = folderPath.trim().replace(/^\/+|\/+$/g, "");
-    const templateFilePath = `${cleanFolder}/form.json`;
-
-    try {
-      const content = await adapter.readFileText(templateFilePath);
-      const template = JSON.parse(content) as FormTemplate;
-      template.folderPath = cleanFolder;
-      return template;
-    } catch {
-      // Template doesn't exist yet in this folder; seed it from the starter template
-      const starter =
-        formType === "dailyReports"
-          ? STARTER_DAILY_REPORT
-          : formType === "incidentLogs"
-            ? STARTER_INCIDENT_LOG
-            : STARTER_EQUIPMENT_CHECK;
-
-      const template: FormTemplate = {
-        ...starter,
-        folderPath: cleanFolder,
-      };
-
-      try {
-        await adapter.createDirectory(cleanFolder);
-        await adapter.createDirectory(`${cleanFolder}/Filled Forms`);
-        await adapter.saveFile(
-          templateFilePath,
-          JSON.stringify(template, null, 2),
-        );
-      } catch (e) {
-        console.warn(`Could not persist template to ${templateFilePath}:`, e);
-      }
-
-      return template;
-    }
-  }
-
-  /**
    * Load a single form template from a folder path (e.g. "Reports/Daily Report").
    */
   async loadTemplate(folderPath: string): Promise<FormTemplate | null> {
@@ -139,8 +87,230 @@ export class FormService {
   }
 
   /**
-   * Save or update a form submission and export an immutable, dated PDF snapshot.
+   * Creates a blank new form template with sensible defaults.
    */
+  createEmptyTemplate(
+    title: string = "New Form",
+    folderPath: string = "",
+  ): FormTemplate {
+    const now = new Date().toISOString();
+    const cleanTitle = title.trim() || "New Form";
+    const slug = sanitizeFilenamePart(cleanTitle).toLowerCase() || "new-form";
+
+    return {
+      id: slug,
+      title: cleanTitle,
+      description: "",
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      folderPath: folderPath.trim().replace(/^\/+|\/+$/g, ""),
+      category: "",
+      sections: [
+        {
+          id: "section_1",
+          title: "General Information",
+          description: "",
+          fields: [
+            {
+              id: "title",
+              type: "text",
+              label: "Title / Name",
+              placeholder: "Enter title or name...",
+              required: true,
+              isIdentifier: true,
+            },
+            {
+              id: "date",
+              type: "date",
+              label: "Date",
+              required: true,
+              defaultValue: "today",
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  /**
+   * Validates a form template schema.
+   */
+  validateTemplate(template: FormTemplate): {
+    valid: boolean;
+    errors: string[];
+  } {
+    const errors: string[] = [];
+
+    if (!template.title || !template.title.trim()) {
+      errors.push("Form title is required.");
+    }
+
+    if (!template.sections || template.sections.length === 0) {
+      errors.push("Form must contain at least one section.");
+    } else {
+      const fieldIdSet = new Set<string>();
+
+      template.sections.forEach((section, sIndex) => {
+        if (!section.title || !section.title.trim()) {
+          errors.push(`Section ${sIndex + 1} must have a title.`);
+        }
+
+        if (!section.fields || section.fields.length === 0) {
+          errors.push(
+            `Section "${section.title || sIndex + 1}" must have at least one field.`,
+          );
+        } else {
+          section.fields.forEach((field, fIndex) => {
+            const fieldLocation = `Section "${section.title || sIndex + 1}", Field ${fIndex + 1}`;
+
+            if (!field.label || !field.label.trim()) {
+              errors.push(`${fieldLocation} must have a label.`);
+            }
+
+            if (!field.id || !field.id.trim()) {
+              errors.push(`${fieldLocation} must have an ID.`);
+            } else {
+              if (fieldIdSet.has(field.id)) {
+                errors.push(
+                  `Duplicate field ID "${field.id}" found in ${fieldLocation}. Field IDs must be unique across the form.`,
+                );
+              }
+              fieldIdSet.add(field.id);
+            }
+
+            if (
+              field.type === "select" ||
+              field.type === "radio" ||
+              field.type === "checkbox-group"
+            ) {
+              if (!field.options || field.options.length === 0) {
+                errors.push(
+                  `Field "${field.label || field.id}" (${field.type}) must have at least one option.`,
+                );
+              } else {
+                field.options.forEach((opt, oIndex) => {
+                  if (!opt.label || !opt.label.trim()) {
+                    errors.push(
+                      `Field "${field.label || field.id}" option ${oIndex + 1} must have a label.`,
+                    );
+                  }
+                });
+              }
+            }
+          });
+        }
+      });
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+    };
+  }
+
+  /**
+   * Saves or updates a form template (form.json) into its designated folder.
+   * Ensures the folder and its "Filled Forms" directory exist.
+   * If updating an existing template, increments the version number.
+   */
+  async saveTemplate(
+    template: FormTemplate,
+    targetFolderPath?: string,
+  ): Promise<FormTemplate> {
+    const adapter = syncManager.getAdapter();
+    const destinationFolder = (targetFolderPath || template.folderPath || "")
+      .trim()
+      .replace(/^\/+|\/+$/g, "");
+
+    if (!destinationFolder) {
+      throw new Error("Folder destination is required to save form template.");
+    }
+
+    const validation = this.validateTemplate(template);
+    if (!validation.valid) {
+      throw new Error(
+        `Template validation failed:\n${validation.errors.join("\n")}`,
+      );
+    }
+
+    const templateFilePath = `${destinationFolder}/form.json`;
+    const filledFormsDir = `${destinationFolder}/Filled Forms`;
+
+    await adapter.createDirectory(destinationFolder);
+    await adapter.createDirectory(filledFormsDir);
+
+    const now = new Date().toISOString();
+    let version = template.version || 1;
+    let createdAt = template.createdAt || now;
+
+    // Check if form.json already exists in this folder
+    try {
+      const existingContent = await adapter.readFileText(templateFilePath);
+      const existing = JSON.parse(existingContent) as FormTemplate;
+      if (existing) {
+        createdAt = existing.createdAt || createdAt;
+        // If updating existing, increment version
+        version = Math.max((existing.version || 1) + 1, version + 1);
+      }
+    } catch {
+      // New template in this folder, keep version as 1
+      version = template.version || 1;
+    }
+
+    const cleanTitle = template.title.trim();
+    const slug =
+      template.id ||
+      sanitizeFilenamePart(cleanTitle).toLowerCase() ||
+      "custom-form";
+
+    const savedTemplate: FormTemplate = {
+      ...template,
+      id: slug,
+      title: cleanTitle,
+      version,
+      createdAt,
+      updatedAt: now,
+      folderPath: destinationFolder,
+    };
+
+    await adapter.saveFile(
+      templateFilePath,
+      JSON.stringify(savedTemplate, null, 2),
+    );
+
+    return savedTemplate;
+  }
+
+  /**
+   * Duplicates an existing form template to a new title and folder.
+   */
+  async duplicateTemplate(
+    source: FormTemplate,
+    newTitle: string,
+    newFolderPath: string,
+  ): Promise<FormTemplate> {
+    const cleanTitle = newTitle.trim();
+    const cleanFolder = newFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    const slug =
+      sanitizeFilenamePart(cleanTitle).toLowerCase() || "cloned-form";
+    const now = new Date().toISOString();
+
+    const clonedSections = JSON.parse(JSON.stringify(source.sections));
+
+    const clonedTemplate: FormTemplate = {
+      ...source,
+      id: slug,
+      title: cleanTitle,
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+      folderPath: cleanFolder,
+      sections: clonedSections,
+    };
+
+    return this.saveTemplate(clonedTemplate, cleanFolder);
+  }
   async saveSubmissionAndExportPdf(
     template: FormTemplate,
     submission: FormSubmission,
@@ -309,67 +479,6 @@ export class FormService {
         .sort((a, b) => b.name.localeCompare(a.name));
     } catch {
       return [];
-    }
-  }
-
-  /**
-   * Seed starter templates into designated folders or a common folder.
-   */
-  async seedStarterTemplates(
-    targetFormFolder: string,
-    formFoldersConfig?: FormFoldersConfig,
-  ): Promise<void> {
-    const adapter = syncManager.getAdapter();
-    const cleanFolder = targetFormFolder.trim().replace(/^\/+|\/+$/g, "");
-
-    for (const starter of ALL_STARTER_TEMPLATES) {
-      let designatedFolder = "";
-      if (formFoldersConfig) {
-        if (starter.id === "daily-report" && formFoldersConfig.dailyReports) {
-          designatedFolder = formFoldersConfig.dailyReports;
-        } else if (
-          starter.id === "incident-log" &&
-          formFoldersConfig.incidentLogs
-        ) {
-          designatedFolder = formFoldersConfig.incidentLogs;
-        } else if (
-          starter.id === "equipment-check" &&
-          formFoldersConfig.equipmentChecks
-        ) {
-          designatedFolder = formFoldersConfig.equipmentChecks;
-        }
-      }
-
-      const formFolder = designatedFolder
-        ? designatedFolder.trim().replace(/^\/+|\/+$/g, "")
-        : cleanFolder
-          ? `${cleanFolder}/${starter.title}`
-          : starter.title;
-
-      if (!formFolder) continue;
-      const templatePath = `${formFolder}/form.json`;
-
-      try {
-        // Check if form.json already exists
-        await adapter.readFileText(templatePath);
-      } catch {
-        // Doesn't exist yet, create it
-        try {
-          await adapter.createDirectory(formFolder);
-          await adapter.createDirectory(`${formFolder}/Filled Forms`);
-          const customTemplate: FormTemplate = {
-            ...starter,
-            folderPath: formFolder,
-            category: cleanFolder || formFolder,
-          };
-          await adapter.saveFile(
-            templatePath,
-            JSON.stringify(customTemplate, null, 2),
-          );
-        } catch (e) {
-          console.error(`Failed to seed starter template ${starter.title}:`, e);
-        }
-      }
     }
   }
 
