@@ -1,5 +1,5 @@
 import { get, set } from "idb-keyval";
-import type { StorageAdapter, FileInfo } from "./adapter";
+import type { StorageAdapter, FileInfo, SaveFileOptions } from "./adapter";
 
 const DIRECTORY_HANDLE_KEY = "app_config_directory_handle";
 
@@ -48,6 +48,10 @@ export class WebStorageAdapter implements StorageAdapter {
     return this.verifyPermission();
   }
 
+  async getPendingUploadsCount(): Promise<number> {
+    return 0;
+  }
+
   async getFiles(
     _subpath: string = "",
   ): Promise<{ name: string; content: string }[]> {
@@ -68,7 +72,11 @@ export class WebStorageAdapter implements StorageAdapter {
     return files;
   }
 
-  async saveFile(path: string, content: string): Promise<void> {
+  async saveFile(
+    path: string,
+    content: string,
+    options?: SaveFileOptions,
+  ): Promise<void> {
     const parts = path.split("/").filter((p) => p);
     const fileName = parts.pop();
     if (!fileName) throw new Error("Invalid file path");
@@ -81,7 +89,17 @@ export class WebStorageAdapter implements StorageAdapter {
       create: true,
     });
     const writable = await fileHandle.createWritable();
-    await writable.write(content);
+    if (options?.isBase64) {
+      const binaryString = atob(content);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      await writable.write(bytes);
+    } else {
+      await writable.write(content);
+    }
     await writable.close();
   }
 

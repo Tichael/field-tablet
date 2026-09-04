@@ -39,6 +39,16 @@ export class SyncManager {
         }
       }
 
+      // Check and restore any pending uploads count from adapter
+      if (this.adapter.getPendingUploadsCount) {
+        this.adapter
+          .getPendingUploadsCount()
+          .then((count) => {
+            useAppStore.getState().setPendingUploadsCount(count);
+          })
+          .catch(() => {});
+      }
+
       // We have permission, sync.
       this.sync(true).catch((e) => console.error("Initial sync failed", e));
       this.startPeriodicSync();
@@ -86,10 +96,15 @@ export class SyncManager {
   async sync(forceNative = false) {
     try {
       useAppStore.getState().setSyncing(true);
+      let remainingPending: number | undefined;
       if (this.isNative && forceNative) {
-        const { useConfigStore } = await import("../../store/config-store");
+        const { useConfigStore, getFormFoldersList } =
+          await import("../../store/config-store");
         const configState = useConfigStore.getState();
-        const syncFolders = configState.config?.syncFolders || [];
+        const syncFolders = [
+          ...(configState.config?.syncFolders || []),
+          ...getFormFoldersList(configState.config),
+        ];
         const configFile = configState.activeConfigFile || "";
         const result = await SmbSync.forceSync({ syncFolders, configFile });
         if (
@@ -98,6 +113,9 @@ export class SyncManager {
           result.error === "MISSING_FOLDER"
         ) {
           throw new Error(`MISSING_FOLDER:${result.folder}`);
+        }
+        if (result && typeof result.pendingUploadsCount === "number") {
+          remainingPending = result.pendingUploadsCount;
         }
       }
       const files = await this.adapter.getFiles();
@@ -113,6 +131,14 @@ export class SyncManager {
       }
       await set(CACHED_FILES_KEY, files);
       useAppStore.getState().setLastSyncTime(Date.now());
+      if (remainingPending !== undefined) {
+        useAppStore.getState().setPendingUploadsCount(remainingPending);
+      } else if (this.adapter.getPendingUploadsCount) {
+        const count = await this.adapter
+          .getPendingUploadsCount()
+          .catch(() => 0);
+        useAppStore.getState().setPendingUploadsCount(count);
+      }
       useAppStore.getState().setError(null);
     } catch (e: any) {
       console.error("Sync failed", e);
@@ -133,16 +159,21 @@ export class SyncManager {
   startPeriodicSync() {
     if (this.isNative) {
       // For background sync, we must read the config store dynamically
-      import("../../store/config-store").then(({ useConfigStore }) => {
-        const configState = useConfigStore.getState();
-        const syncFolders = configState.config?.syncFolders || [];
-        const configFile = configState.activeConfigFile || "";
-        SmbSync.startBackgroundSync({
-          intervalMinutes: 15,
-          syncFolders,
-          configFile,
-        });
-      });
+      import("../../store/config-store").then(
+        ({ useConfigStore, getFormFoldersList }) => {
+          const configState = useConfigStore.getState();
+          const syncFolders = [
+            ...(configState.config?.syncFolders || []),
+            ...getFormFoldersList(configState.config),
+          ];
+          const configFile = configState.activeConfigFile || "";
+          SmbSync.startBackgroundSync({
+            intervalMinutes: 15,
+            syncFolders,
+            configFile,
+          });
+        },
+      );
     } else {
       if (this.syncTimer !== null) {
         clearInterval(this.syncTimer);

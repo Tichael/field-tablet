@@ -26,6 +26,7 @@ import java.util.ArrayList;
 
 public class SmbService {
     private static final String TAG = "SmbService";
+    private static final Object PENDING_LOCK = new Object();
     private Context context;
 
     public SmbService(Context context) {
@@ -85,7 +86,118 @@ public class SmbService {
         }
     }
 
+    public List<String> getPendingUploads() {
+        synchronized (PENDING_LOCK) {
+            List<String> list = new ArrayList<>();
+            java.io.File file = new java.io.File(context.getFilesDir(), "pending_uploads.json");
+            if (!file.exists()) return list;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(file)) {
+                byte[] data = new byte[(int) file.length()];
+                int bytesRead = 0;
+                while (bytesRead < data.length) {
+                    int r = fis.read(data, bytesRead, data.length - bytesRead);
+                    if (r == -1) break;
+                    bytesRead += r;
+                }
+                String jsonStr = new String(data, 0, bytesRead, java.nio.charset.StandardCharsets.UTF_8);
+                JSONArray arr = new JSONArray(jsonStr);
+                for (int i = 0; i < arr.length(); i++) {
+                    String p = arr.getString(i);
+                    if (!list.contains(p)) {
+                        list.add(p);
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error reading pending_uploads.json", e);
+            }
+            return list;
+        }
+    }
+
+    public void savePendingUploads(List<String> list) {
+        synchronized (PENDING_LOCK) {
+            java.io.File file = new java.io.File(context.getFilesDir(), "pending_uploads.json");
+            try {
+                JSONArray arr = new JSONArray();
+                for (String p : list) {
+                    arr.put(p);
+                }
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(file)) {
+                    fos.write(arr.toString(2).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error writing pending_uploads.json", e);
+            }
+        }
+    }
+
+    public void recordPendingUpload(String path) {
+        synchronized (PENDING_LOCK) {
+            List<String> list = getPendingUploads();
+            if (!list.contains(path)) {
+                list.add(path);
+                savePendingUploads(list);
+            }
+        }
+    }
+
+    public void removePendingUpload(String path) {
+        synchronized (PENDING_LOCK) {
+            List<String> list = getPendingUploads();
+            if (list.remove(path)) {
+                savePendingUploads(list);
+            }
+        }
+    }
+
+    public int flushPendingUploads(String host, String shareName, String username, String password, String domain) {
+        List<String> pending = getPendingUploads();
+        if (pending.isEmpty()) return 0;
+
+        Log.i(TAG, "Flushing " + pending.size() + " pending upload(s)...");
+        List<String> successfulUploads = new ArrayList<>();
+
+        for (String path : pending) {
+            java.io.File localFile = new java.io.File(context.getFilesDir(), path);
+            if (!localFile.exists()) {
+                // Local file was removed, drop from pending
+                successfulUploads.add(path);
+                continue;
+            }
+            try {
+                byte[] bytes = new byte[(int) localFile.length()];
+                try (java.io.FileInputStream fis = new java.io.FileInputStream(localFile)) {
+                    int bytesRead = 0;
+                    while (bytesRead < bytes.length) {
+                        int r = fis.read(bytes, bytesRead, bytes.length - bytesRead);
+                        if (r == -1) break;
+                        bytesRead += r;
+                    }
+                }
+                uploadFileBytes(host, shareName, username, password, domain, path, bytes);
+                Log.i(TAG, "Successfully uploaded pending file: " + path);
+                successfulUploads.add(path);
+            } catch (Exception e) {
+                Log.w(TAG, "Failed to flush pending file " + path + ": " + e.getMessage());
+            }
+        }
+
+        synchronized (PENDING_LOCK) {
+            List<String> current = getPendingUploads();
+            current.removeAll(successfulUploads);
+            savePendingUploads(current);
+            return current.size();
+        }
+    }
+
     public void syncFiles(String host, String shareName, String username, String password, String domain, List<String> syncFolders, String configFile) throws Exception {
+        // Flush any offline uploads first before pulling remote changes
+        try {
+            flushPendingUploads(host, shareName, username, password, domain);
+        } catch (Exception e) {
+            Log.w(TAG, "Could not flush pending uploads during sync: " + e.getMessage());
+        }
+
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
@@ -93,7 +205,15 @@ public class SmbService {
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
                 
-                List<String> effectiveSyncFolders = syncFolders;
+                List<String> effectiveSyncFolders = new ArrayList<>();
+                if (syncFolders != null) {
+                    for (String f : syncFolders) {
+                        if (f != null && !f.trim().isEmpty() && !effectiveSyncFolders.contains(f.trim())) {
+                            effectiveSyncFolders.add(f.trim());
+                        }
+                    }
+                }
+
                 if (configFile != null && !configFile.isEmpty()) {
                     try {
                         downloadFile(share, configFile, configFile);
@@ -113,9 +233,33 @@ public class SmbService {
                             JSONObject configJson = new JSONObject(content);
                             if (configJson.has("syncFolders")) {
                                 JSONArray arr = configJson.getJSONArray("syncFolders");
-                                effectiveSyncFolders = new ArrayList<>();
                                 for (int i = 0; i < arr.length(); i++) {
-                                    effectiveSyncFolders.add(arr.getString(i));
+                                    String f = arr.getString(i).trim();
+                                    if (!f.isEmpty() && !effectiveSyncFolders.contains(f)) {
+                                        effectiveSyncFolders.add(f);
+                                    }
+                                }
+                            }
+                            if (configJson.has("formFolders")) {
+                                Object ffObj = configJson.get("formFolders");
+                                if (ffObj instanceof JSONObject) {
+                                    JSONObject ffJson = (JSONObject) ffObj;
+                                    java.util.Iterator<String> keys = ffJson.keys();
+                                    while (keys.hasNext()) {
+                                        String key = keys.next();
+                                        String folder = ffJson.optString(key, "").trim();
+                                        if (!folder.isEmpty() && !effectiveSyncFolders.contains(folder)) {
+                                            effectiveSyncFolders.add(folder);
+                                        }
+                                    }
+                                } else if (ffObj instanceof JSONArray) {
+                                    JSONArray ffArr = (JSONArray) ffObj;
+                                    for (int i = 0; i < ffArr.length(); i++) {
+                                        String folder = ffArr.getString(i).trim();
+                                        if (!folder.isEmpty() && !effectiveSyncFolders.contains(folder)) {
+                                            effectiveSyncFolders.add(folder);
+                                        }
+                                    }
                                 }
                             }
                         } catch (Exception e) {
@@ -127,19 +271,14 @@ public class SmbService {
                     syncRootConfig(share);
                 }
 
-                List<String> missingFolders = new ArrayList<>();
                 if (effectiveSyncFolders != null) {
                     for (String folder : effectiveSyncFolders) {
                         try {
                             syncDirectory(share, folder, folder);
                         } catch (Exception e) {
-                            Log.e(TAG, "Missing or failed to sync folder: " + folder, e);
-                            missingFolders.add(folder);
+                            Log.w(TAG, "Could not sync folder: " + folder + ", skipping", e);
                         }
                     }
-                }
-                if (!missingFolders.isEmpty()) {
-                    throw new Exception("MISSING_FOLDER:" + String.join(",", missingFolders));
                 }
             }
         } finally {
@@ -162,9 +301,16 @@ public class SmbService {
             files = share.list(smbPath.replace("/", "\\"));
         } catch (SMBApiException e) {
             if (e.getStatusCode() == 0xC0000034) {
-                throw new Exception("MISSING_FOLDER:" + smbPath);
+                try {
+                    ensureDirectoriesExist(share, smbPath.replace("/", "\\"));
+                    files = share.list(smbPath.replace("/", "\\"));
+                } catch (Exception createEx) {
+                    Log.w(TAG, "Remote folder does not exist on share and could not be created: " + smbPath);
+                    return;
+                }
+            } else {
+                throw e;
             }
-            throw e;
         }
 
         java.io.File localDir = new java.io.File(context.getFilesDir(), localSubPath);
@@ -189,6 +335,10 @@ public class SmbService {
     }
 
     public void uploadFile(String host, String shareName, String username, String password, String domain, String path, String content) throws Exception {
+        uploadFileBytes(host, shareName, username, password, domain, path, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    public void uploadFileBytes(String host, String shareName, String username, String password, String domain, String path, byte[] data) throws Exception {
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
@@ -210,7 +360,7 @@ public class SmbService {
                         null)) {
                     
                     try (java.io.OutputStream os = smbFile.getOutputStream()) {
-                        os.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        os.write(data);
                     }
                 }
             }
@@ -254,6 +404,12 @@ public class SmbService {
     }
 
     private void downloadFile(DiskShare share, String smbPath, String localRelativePath) throws Exception {
+        // If this file has pending local changes that have not yet uploaded, do NOT overwrite it
+        if (getPendingUploads().contains(localRelativePath)) {
+            Log.i(TAG, "Skipping download of " + localRelativePath + " because it has pending local changes.");
+            return;
+        }
+
         java.io.File localFile = new java.io.File(context.getFilesDir(), localRelativePath);
         
         java.io.File parent = localFile.getParentFile();
