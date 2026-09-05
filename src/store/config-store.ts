@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { get } from "idb-keyval";
 import { syncManager } from "../lib/sync/sync-manager";
+import { syncLanguageWithConfig, detectDefaultAppLanguage } from "../i18n";
+import type { SupportedLanguage } from "../i18n";
+
+export { detectDefaultAppLanguage };
 
 export function detectDefaultPdfPageSize(): "a4" | "letter" {
   if (typeof navigator !== "undefined" && navigator.language) {
@@ -84,22 +88,46 @@ export interface AppConfig {
   formFolders?: FormFoldersConfig;
   pdfPageSize?: "a4" | "letter";
   media?: MediaConfig;
+  language?: SupportedLanguage;
 }
 
-export const DEFAULT_CONFIG: AppConfig = {
-  theme: {
-    primaryColor: "#0f172a",
-    darkMode: "system",
-  },
-  branding: {
-    appTitle: "Field Tablet App",
-  },
-  formFolders: [],
-  pdfPageSize: detectDefaultPdfPageSize(),
-  media: {
-    photoQuality: "2mp",
-  },
-};
+export function detectDefaultAppTitle(lang?: SupportedLanguage): string {
+  const language = lang || detectDefaultAppLanguage();
+  return language.startsWith("fr") ? "Tablette de terrain" : "Field Tablet";
+}
+
+export function isDefaultAppTitle(title?: string | null): boolean {
+  if (!title || !title.trim()) return true;
+  const trimmed = title.trim();
+  return (
+    trimmed === "Field Tablet" ||
+    trimmed === "Tablette de terrain" ||
+    trimmed === "Field Tablet App" ||
+    trimmed === "Application Tablette Terrain" ||
+    trimmed === "Application tablette de terrain"
+  );
+}
+
+export function getDefaultConfig(lang?: SupportedLanguage): AppConfig {
+  const language = lang || detectDefaultAppLanguage();
+  return {
+    theme: {
+      primaryColor: "#0f172a",
+      darkMode: "system",
+    },
+    branding: {
+      appTitle: detectDefaultAppTitle(language),
+    },
+    formFolders: [],
+    pdfPageSize: detectDefaultPdfPageSize(),
+    media: {
+      photoQuality: "2mp",
+    },
+    language,
+  };
+}
+
+export const DEFAULT_CONFIG: AppConfig = getDefaultConfig();
 
 interface ConfigState {
   config: AppConfig | null;
@@ -147,7 +175,17 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
         if (file) {
           try {
             const parsed = JSON.parse(file.content);
-            set({ config: { ...DEFAULT_CONFIG, ...parsed }, isLoading: false });
+            const baseDefault = getDefaultConfig(parsed.language);
+            const loaded = {
+              ...baseDefault,
+              ...parsed,
+              branding: {
+                ...baseDefault.branding,
+                ...(parsed.branding || {}),
+              },
+            };
+            set({ config: loaded, isLoading: false });
+            syncLanguageWithConfig(loaded.language).catch(console.error);
             return;
           } catch (e) {
             console.error("Failed to parse config from cache", e);
@@ -163,7 +201,17 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
             .getAdapter()
             .readFileText(activeConfigFile);
           const parsed = JSON.parse(content);
-          set({ config: { ...DEFAULT_CONFIG, ...parsed }, isLoading: false });
+          const baseDefault = getDefaultConfig(parsed.language);
+          const loaded = {
+            ...baseDefault,
+            ...parsed,
+            branding: {
+              ...baseDefault.branding,
+              ...(parsed.branding || {}),
+            },
+          };
+          set({ config: loaded, isLoading: false });
+          syncLanguageWithConfig(loaded.language).catch(console.error);
           return;
         } catch (e) {
           console.error("Failed to load active config file directly", e);
@@ -171,10 +219,14 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
       }
 
       // If file is not found, fallback to default config
-      set({ config: DEFAULT_CONFIG, isLoading: false });
+      const fallbackConfig = getDefaultConfig();
+      set({ config: fallbackConfig, isLoading: false });
+      syncLanguageWithConfig(fallbackConfig.language).catch(console.error);
     } catch (error: any) {
       console.error("Error loading config:", error);
-      set({ error: error.message, isLoading: false, config: DEFAULT_CONFIG });
+      const fallbackConfig = getDefaultConfig();
+      set({ error: error.message, isLoading: false, config: fallbackConfig });
+      syncLanguageWithConfig(fallbackConfig.language).catch(console.error);
     }
   },
 
@@ -208,6 +260,7 @@ export const useConfigStore = create<ConfigState>((set, getStore) => ({
         set({ activeConfigFile: filenameToSave });
       }
       set({ config: newConfig });
+      syncLanguageWithConfig(newConfig.language).catch(console.error);
 
       // Trigger a sync
       syncManager.sync(true).catch(console.error);

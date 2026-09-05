@@ -8,6 +8,7 @@ import type {
 import { formService } from "../../../lib/forms/form-service";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
+import { useTranslation } from "react-i18next";
 import { FieldPalette } from "./FieldPalette";
 import { FieldInspector } from "./FieldInspector";
 import { TemplateSaveDialog } from "./TemplateSaveDialog";
@@ -54,6 +55,7 @@ export function FormEditor({
   onClose,
   onSaved,
 }: FormEditorProps) {
+  const { t } = useTranslation();
   // Initialize template draft
   const [template, setTemplate] = useState<FormTemplate>(() => {
     if (initialTemplate) {
@@ -188,14 +190,17 @@ export function FormEditor({
 
   const handleDeleteSection = (sectionId: string) => {
     if (template.sections.length <= 1) {
-      alert("A form must have at least one section.");
+      alert(t("editor.formEditor.minOneSectionAlert"));
       return;
     }
 
     const section = template.sections.find((s) => s.id === sectionId);
     if (section && section.fields.length > 0) {
       const confirm = window.confirm(
-        `Are you sure you want to delete "${section.title}" and its ${section.fields.length} field(s)?`,
+        t("editor.formEditor.deleteSectionConfirm", {
+          title: section.title,
+          count: section.fields.length,
+        }),
       );
       if (!confirm) return;
     }
@@ -219,31 +224,31 @@ export function FormEditor({
         newField = {
           id: `text_${timestamp}`,
           type: "text",
-          label: "Text Question",
-          placeholder: "Enter details...",
+          label: t("editor.defaults.textLabel"),
+          placeholder: t("editor.defaults.textPlaceholder"),
         };
         break;
       case "textarea":
         newField = {
           id: `notes_${timestamp}`,
           type: "textarea",
-          label: "Work Summary / Remarks",
-          placeholder: "Enter detailed remarks...",
+          label: t("editor.defaults.textareaLabel"),
+          placeholder: t("editor.defaults.textareaPlaceholder"),
         };
         break;
       case "number":
         newField = {
           id: `num_${timestamp}`,
           type: "number",
-          label: "Measurement / Reading",
-          placeholder: "0.0",
+          label: t("editor.defaults.numberLabel"),
+          placeholder: t("editor.defaults.numberPlaceholder"),
         };
         break;
       case "date":
         newField = {
           id: `date_${timestamp}`,
           type: "date",
-          label: "Inspection Date",
+          label: t("editor.defaults.dateLabel"),
           defaultValue: "today",
           required: true,
         };
@@ -252,14 +257,14 @@ export function FormEditor({
         newField = {
           id: `time_${timestamp}`,
           type: "time",
-          label: "Time of Inspection",
+          label: t("editor.defaults.timeLabel"),
         };
         break;
       case "datetime":
         newField = {
           id: `datetime_${timestamp}`,
           type: "datetime",
-          label: "Incident Timestamp",
+          label: t("editor.defaults.datetimeLabel"),
           defaultValue: "now",
           required: true,
         };
@@ -268,11 +273,11 @@ export function FormEditor({
         newField = {
           id: `select_${timestamp}`,
           type: "select",
-          label: "Condition / Status",
+          label: t("editor.defaults.selectLabel"),
           options: [
-            { label: "Satisfactory / Pass", value: "pass" },
-            { label: "Needs Attention", value: "attention" },
-            { label: "Failed / Out of Service", value: "fail" },
+            { label: t("editor.defaults.selectPass"), value: "pass" },
+            { label: t("editor.defaults.selectAttention"), value: "attention" },
+            { label: t("editor.defaults.selectFail"), value: "fail" },
           ],
         };
         break;
@@ -280,11 +285,14 @@ export function FormEditor({
         newField = {
           id: `choice_${timestamp}`,
           type: "radio",
-          label: "Operational Mode",
+          label: t("editor.defaults.radioLabel"),
           options: [
-            { label: "Normal Operation", value: "normal" },
-            { label: "Reduced / Maintenance", value: "maintenance" },
-            { label: "Shutdown", value: "shutdown" },
+            { label: t("editor.defaults.radioNormal"), value: "normal" },
+            {
+              label: t("editor.defaults.radioMaintenance"),
+              value: "maintenance",
+            },
+            { label: t("editor.defaults.radioShutdown"), value: "shutdown" },
           ],
         };
         break;
@@ -292,7 +300,7 @@ export function FormEditor({
         newField = {
           id: `check_${timestamp}`,
           type: "checkbox",
-          label: "Safety inspection completed and verified",
+          label: t("editor.defaults.checkboxLabel"),
           required: true,
         };
         break;
@@ -300,12 +308,12 @@ export function FormEditor({
         newField = {
           id: `checks_${timestamp}`,
           type: "checkbox-group",
-          label: "Personal Protective Equipment (PPE) Checked",
+          label: t("editor.defaults.checksLabel"),
           options: [
-            { label: "Hard Hat", value: "hard_hat" },
-            { label: "Safety Glasses", value: "glasses" },
-            { label: "Steel Toe Boots", value: "boots" },
-            { label: "High-Visibility Vest", value: "hi_vis" },
+            { label: t("editor.defaults.checkHardHat"), value: "hard_hat" },
+            { label: t("editor.defaults.checkGlasses"), value: "glasses" },
+            { label: t("editor.defaults.checkBoots"), value: "boots" },
+            { label: t("editor.defaults.checkHiVis"), value: "hi_vis" },
           ],
         };
         break;
@@ -313,7 +321,7 @@ export function FormEditor({
         newField = {
           id: `signature_${timestamp}`,
           type: "signature",
-          label: "Inspector / Technician Signature",
+          label: t("editor.defaults.signatureLabel"),
           required: true,
         };
         break;
@@ -321,8 +329,8 @@ export function FormEditor({
         newField = {
           id: `photo_${timestamp}`,
           type: "photo",
-          label: "Site / Inspection Photo",
-          helperText: "Capture photo with camera or choose from gallery",
+          label: t("editor.defaults.photoLabel"),
+          helperText: t("editor.defaults.photoHelper"),
           allowMultiple: true,
         };
         break;
@@ -330,8 +338,8 @@ export function FormEditor({
         newField = {
           id: `video_${timestamp}`,
           type: "video",
-          label: "Video Recording",
-          helperText: "Record video or attach video file",
+          label: t("editor.defaults.videoLabel"),
+          helperText: t("editor.defaults.videoHelper"),
           allowMultiple: false,
         };
         break;
@@ -339,22 +347,21 @@ export function FormEditor({
         newField = {
           id: `head_${timestamp}`,
           type: "heading",
-          label: "Equipment Physical Checks",
+          label: t("editor.defaults.headingLabel"),
         };
         break;
       case "notes":
         newField = {
           id: `note_${timestamp}`,
           type: "notes",
-          label:
-            "Ensure all machinery is fully de-energized and locked out prior to commencing physical inspection.",
+          label: t("editor.defaults.notesLabel"),
         };
         break;
       default:
         newField = {
           id: `field_${timestamp}`,
           type,
-          label: "New Field",
+          label: t("editor.formEditor.addField"),
         };
     }
 
@@ -426,7 +433,9 @@ export function FormEditor({
     const section = template.sections.find((s) => s.id === sectionId);
     if (section && section.fields.length <= 1) {
       const confirmed = window.confirm(
-        `Deleting this field will leave section "${section.title}" with no fields. Are you sure?`,
+        t("editor.formEditor.deleteFieldEmptySectionConfirm", {
+          title: section.title,
+        }),
       );
       if (!confirmed) return;
     }
@@ -473,7 +482,7 @@ export function FormEditor({
   const handleClose = () => {
     if (isDirty) {
       const confirmed = window.confirm(
-        "You have unsaved changes in this form template. Are you sure you want to discard them?",
+        t("editor.formEditor.discardChangesConfirm"),
       );
       if (!confirmed) return;
     }
@@ -543,7 +552,7 @@ export function FormEditor({
             size="icon"
             onClick={handleClose}
             className="rounded-full shrink-0"
-            title="Back / Close"
+            title={t("common.back")}
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
@@ -551,7 +560,7 @@ export function FormEditor({
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="font-bold text-base sm:text-lg truncate text-foreground">
-                {template.title || "Untitled Form"}
+                {template.title || t("editor.formEditor.untitledForm")}
               </h1>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
                 v{template.version || 1}
@@ -563,14 +572,16 @@ export function FormEditor({
               )}
               {isDirty && (
                 <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic">
-                  Unsaved
+                  {t("editor.formEditor.unsaved")}
                 </span>
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate">
               {template.folderPath
-                ? `Destination: /${template.folderPath}/form.json`
-                : "Form Template Editor"}
+                ? t("editor.formEditor.destinationPath", {
+                    path: template.folderPath,
+                  })
+                : t("editor.formEditor.formEditorTitle")}
             </p>
           </div>
         </div>
@@ -586,7 +597,9 @@ export function FormEditor({
               className="text-xs gap-1.5 font-semibold"
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Builder</span>
+              <span className="hidden sm:inline">
+                {t("editor.formEditor.builder")}
+              </span>
             </Button>
             <Button
               variant={viewMode === "preview" ? "secondary" : "ghost"}
@@ -595,17 +608,17 @@ export function FormEditor({
               className="text-xs gap-1.5 font-semibold"
             >
               <Eye className="w-3.5 h-3.5" />
-              <span>Preview</span>
+              <span>{t("editor.formEditor.preview")}</span>
             </Button>
             <Button
               variant={viewMode === "split" ? "secondary" : "ghost"}
               size="xs"
               onClick={() => setViewMode("split")}
               className="hidden lg:flex text-xs gap-1.5 font-semibold"
-              title="Side-by-side Builder & Live Preview"
+              title={t("editor.formEditor.sideBySideTitle")}
             >
               <Columns className="w-3.5 h-3.5" />
-              <span>Split</span>
+              <span>{t("editor.formEditor.split")}</span>
             </Button>
           </div>
 
@@ -615,7 +628,7 @@ export function FormEditor({
             className="gap-1.5 font-semibold shadow-xs"
           >
             <Save className="w-4 h-4" />
-            <span>Save Template</span>
+            <span>{t("editor.formEditor.saveTemplate")}</span>
           </Button>
         </div>
       </header>
@@ -639,9 +652,9 @@ export function FormEditor({
                     setTemplate((prev) => ({ ...prev, title: e.target.value }));
                     setIsDirty(true);
                   }}
-                  placeholder="Form Title..."
+                  placeholder={t("editor.formEditor.formTitlePlaceholder")}
                   className="font-bold text-sm h-8"
-                  title="Form Title"
+                  title={t("editor.saveDialog.formTitle")}
                 />
               </div>
 
@@ -655,9 +668,9 @@ export function FormEditor({
                     }));
                     setIsDirty(true);
                   }}
-                  placeholder="Category (e.g. Safety)..."
+                  placeholder={t("editor.formEditor.formCategoryPlaceholder")}
                   className="text-xs h-8"
-                  title="Form Category"
+                  title={t("editor.saveDialog.category")}
                 />
               </div>
 
@@ -671,9 +684,9 @@ export function FormEditor({
                     }));
                     setIsDirty(true);
                   }}
-                  placeholder="Optional brief description..."
+                  placeholder={t("editor.formEditor.formDescPlaceholder")}
                   className="text-xs h-8 text-muted-foreground"
-                  title="Description"
+                  title={t("editor.saveDialog.description")}
                 />
               </div>
             </div>
@@ -714,7 +727,7 @@ export function FormEditor({
                 className="gap-1 text-xs shrink-0 font-medium"
               >
                 <Plus className="w-3.5 h-3.5 text-primary" />
-                <span>Add Section</span>
+                <span>{t("editor.formEditor.addSection")}</span>
               </Button>
             </div>
 
@@ -734,7 +747,9 @@ export function FormEditor({
                             e.target.value,
                           )
                         }
-                        placeholder="Section Title..."
+                        placeholder={t(
+                          "editor.formEditor.sectionTitleInputPlaceholder",
+                        )}
                         className="font-bold text-sm h-8 flex-1"
                       />
                     </div>
@@ -748,7 +763,7 @@ export function FormEditor({
                           handleMoveSection(activeSectionIndex, "up")
                         }
                         disabled={activeSectionIndex === 0}
-                        title="Move Section Left / Up"
+                        title={t("editor.formEditor.moveSectionUp")}
                       >
                         <ChevronUp className="w-3.5 h-3.5" />
                       </Button>
@@ -761,7 +776,7 @@ export function FormEditor({
                         disabled={
                           activeSectionIndex === template.sections.length - 1
                         }
-                        title="Move Section Right / Down"
+                        title={t("editor.formEditor.moveSectionDown")}
                       >
                         <ChevronDown className="w-3.5 h-3.5" />
                       </Button>
@@ -771,7 +786,7 @@ export function FormEditor({
                         onClick={() => handleDeleteSection(activeSection.id)}
                         disabled={template.sections.length <= 1}
                         className="text-muted-foreground hover:text-destructive"
-                        title="Delete Section"
+                        title={t("editor.formEditor.deleteSection")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </Button>
@@ -783,7 +798,9 @@ export function FormEditor({
                     onChange={(e) =>
                       handleUpdateSectionDesc(activeSection.id, e.target.value)
                     }
-                    placeholder="Optional section description or instructions..."
+                    placeholder={t(
+                      "editor.formEditor.sectionDescInputPlaceholder",
+                    )}
                     className="text-xs h-7 text-muted-foreground"
                   />
                 </div>
@@ -795,11 +812,10 @@ export function FormEditor({
                       <FileText className="w-10 h-10 text-muted-foreground/30" />
                       <div className="space-y-0.5">
                         <h4 className="font-semibold text-sm">
-                          Section has no fields yet
+                          {t("editor.formEditor.sectionNoFieldsTitle")}
                         </h4>
                         <p className="text-xs text-muted-foreground">
-                          Add inputs, questions, or signature pads to this
-                          section.
+                          {t("editor.formEditor.sectionNoFieldsDesc")}
                         </p>
                       </div>
                       <Button
@@ -807,7 +823,8 @@ export function FormEditor({
                         onClick={() => setPaletteSectionId(activeSection.id)}
                         className="gap-1.5 mt-1"
                       >
-                        <Plus className="w-4 h-4" /> Add Field
+                        <Plus className="w-4 h-4" />{" "}
+                        {t("editor.formEditor.addField")}
                       </Button>
                     </div>
                   ) : (
@@ -830,17 +847,17 @@ export function FormEditor({
                                 </span>
                                 {field.required && (
                                   <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-destructive/10 text-destructive">
-                                    Required
+                                    {t("common.required")}
                                   </span>
                                 )}
                                 {field.isIdentifier && (
                                   <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                    File Identifier
+                                    {t("editor.formEditor.fileIdentifierBadge")}
                                   </span>
                                 )}
                                 {field.allowMultiple && (
                                   <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                    Multi-File
+                                    {t("editor.formEditor.multiFileBadge")}
                                   </span>
                                 )}
                               </div>
@@ -859,7 +876,7 @@ export function FormEditor({
                                 handleMoveField(activeSection.id, fIdx, "up")
                               }
                               disabled={fIdx === 0}
-                              title="Move Up"
+                              title={t("editor.formEditor.moveUp")}
                             >
                               <ChevronUp className="w-3.5 h-3.5" />
                             </Button>
@@ -872,7 +889,7 @@ export function FormEditor({
                               disabled={
                                 fIdx === activeSection.fields.length - 1
                               }
-                              title="Move Down"
+                              title={t("editor.formEditor.moveDown")}
                             >
                               <ChevronDown className="w-3.5 h-3.5" />
                             </Button>
@@ -884,7 +901,7 @@ export function FormEditor({
                                 setInspectingSectionId(activeSection.id);
                               }}
                               className="text-primary hover:bg-primary/10"
-                              title="Configure Field Properties"
+                              title={t("editor.formEditor.configureFieldProps")}
                             >
                               <Edit3 className="w-3.5 h-3.5" />
                             </Button>
@@ -894,7 +911,7 @@ export function FormEditor({
                               onClick={() =>
                                 handleDuplicateField(activeSection.id, fIdx)
                               }
-                              title="Duplicate Field"
+                              title={t("editor.formEditor.duplicateField")}
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </Button>
@@ -905,7 +922,7 @@ export function FormEditor({
                                 handleDeleteField(activeSection.id, field.id)
                               }
                               className="text-muted-foreground hover:text-destructive"
-                              title="Delete Field"
+                              title={t("editor.formEditor.deleteField")}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -966,7 +983,7 @@ export function FormEditor({
                             <div className="h-9 px-3 rounded-lg border bg-muted/20 text-xs text-muted-foreground flex items-center justify-between">
                               <span>
                                 {field.options?.[0]?.label ||
-                                  "Select option..."}
+                                  t("forms.runner.selectOption")}
                               </span>
                               <ChevronDown className="w-3.5 h-3.5" />
                             </div>
@@ -1028,7 +1045,9 @@ export function FormEditor({
                           {field.type === "signature" && (
                             <div className="h-20 rounded-xl border border-dashed bg-muted/15 flex flex-col items-center justify-center text-xs text-muted-foreground gap-1">
                               <PenTool className="w-5 h-5 text-purple-500 opacity-60" />
-                              <span>Touch / Stylus Digital Signature Pad</span>
+                              <span>
+                                {t("editor.palette.itemSignatureDesc")}
+                              </span>
                             </div>
                           )}
 
@@ -1062,13 +1081,17 @@ export function FormEditor({
                     onClick={() => setPaletteSectionId(activeSection.id)}
                   >
                     <Plus className="w-4 h-4 text-primary" />
-                    <span>Add Field to "{activeSection.title}"</span>
+                    <span>
+                      {t("editor.formEditor.addFieldToSection", {
+                        section: activeSection.title,
+                      })}
+                    </span>
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                No section selected.
+                {t("editor.formEditor.noSectionSelected")}
               </div>
             )}
           </div>
@@ -1087,11 +1110,10 @@ export function FormEditor({
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <span className="font-semibold">
-                  Interactive Tablet Preview
+                  {t("editor.formEditor.interactivePreview")}
                 </span>
                 <span className="text-[11px] text-muted-foreground hidden sm:inline">
-                  — Test filling the form in real time. (Submissions are not
-                  saved).
+                  {t("editor.formEditor.interactivePreviewSubtitle")}
                 </span>
               </div>
               {viewMode === "preview" && (
@@ -1101,7 +1123,7 @@ export function FormEditor({
                   onClick={() => setViewMode("builder")}
                   className="text-xs"
                 >
-                  Back to Builder
+                  {t("editor.formEditor.backToBuilder")}
                 </Button>
               )}
             </div>

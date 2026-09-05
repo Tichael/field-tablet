@@ -14,6 +14,7 @@ import { Capacitor } from "@capacitor/core";
 // @ts-ignore - plugin missing types or dynamic load
 import { FileOpener } from "@capacitor-community/file-opener";
 import { Document, Page, pdfjs } from "react-pdf";
+import { useTranslation } from "react-i18next";
 
 // Ensure worker is loaded for PDF.js locally for offline-first capabilities
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -60,6 +61,7 @@ const getContentType = (path: string) => {
 };
 
 export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
+  const { t } = useTranslation();
   const [url, setUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -103,10 +105,10 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
         }
       } catch (e) {
         console.error("Failed to open externally", e);
-        setError("Could not open this file type.");
+        setError(t("documents.openError"));
       }
     },
-    [filePath],
+    [filePath, t],
   );
 
   useEffect(() => {
@@ -125,7 +127,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
       } catch (e) {
         if (!active) return;
         console.error("Failed to load document URL", e);
-        setError("Failed to load document");
+        setError(t("documents.loadError"));
       }
     };
 
@@ -137,7 +139,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
         URL.revokeObjectURL(urlRef.current);
       }
     };
-  }, [filePath, isPDF, isImage, isVideo, openExternal]);
+  }, [filePath, isPDF, isImage, isVideo, openExternal, t]);
 
   useEffect(() => {
     setBaseDims({ width: 0, height: 0 });
@@ -232,7 +234,11 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
 
   const renderContent = () => {
     if (!url)
-      return <div className="animate-pulse p-4">Loading document...</div>;
+      return (
+        <div className="animate-pulse p-4">
+          {t("documents.loadingDocuments")}
+        </div>
+      );
 
     if (isPDF) {
       return (
@@ -357,7 +363,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
           {filePath.split("/").pop()}
         </h3>
         <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-          This file type cannot be previewed directly in the tablet viewer.
+          {t("documents.unsupportedTypeTitle")}
         </p>
         <Button
           onClick={() => url && openExternal(url)}
@@ -365,7 +371,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
           className="gap-2"
         >
           <ExternalLink className="w-4 h-4" />
-          Open Externally
+          {t("documents.openExternally")}
         </Button>
       </div>
     );
@@ -390,7 +396,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
                 disabled={pageNumber <= 1}
                 onClick={() => changePage(-1)}
                 className="h-8 px-2 rounded-none hover:bg-muted"
-                title="Previous page"
+                title={t("documents.previousPage")}
               >
                 <ChevronLeft className="w-4 h-4" />
               </Button>
@@ -403,7 +409,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
                 disabled={pageNumber >= numPages}
                 onClick={() => changePage(1)}
                 className="h-8 px-2 rounded-none hover:bg-muted"
-                title="Next page"
+                title={t("documents.nextPage")}
               >
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -417,7 +423,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
                 size="icon-sm"
                 onClick={handleZoomOut}
                 className="h-8 w-8 rounded-none hover:bg-muted"
-                title="Zoom out"
+                title={t("documents.zoomOut")}
               >
                 <ZoomOut className="w-3.5 h-3.5" />
               </Button>
@@ -426,7 +432,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
                 size="sm"
                 onClick={handleZoomReset}
                 className="h-8 px-2.5 text-xs font-mono font-medium min-w-[3.5rem] rounded-none border-x hover:bg-muted"
-                title="Reset zoom"
+                title={t("documents.resetZoom")}
               >
                 {Math.round(scale * 100)}%
               </Button>
@@ -435,7 +441,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
                 size="icon-sm"
                 onClick={handleZoomIn}
                 className="h-8 w-8 rounded-none hover:bg-muted"
-                title="Zoom in"
+                title={t("documents.zoomIn")}
               >
                 <ZoomIn className="w-3.5 h-3.5" />
               </Button>
@@ -447,7 +453,7 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
             size="icon"
             onClick={onClose}
             className="rounded-full border bg-background shadow-sm hover:bg-muted"
-            title="Close viewer"
+            title={t("documents.closeViewer")}
           >
             <X className="w-5 h-5" />
           </Button>

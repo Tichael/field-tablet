@@ -10,6 +10,7 @@ import {
   sanitizeFilenamePart,
 } from "./pdf-generator";
 import { fileToBase64 } from "./media-utils";
+import i18n from "../../i18n";
 
 export class FormService {
   /**
@@ -121,9 +122,11 @@ export class FormService {
   createEmptyTemplate(
     title: string = "New Form",
     folderPath: string = "",
+    lang?: string,
   ): FormTemplate {
+    const t = i18n.getFixedT(lang || i18n.language || "en");
     const now = new Date().toISOString();
-    const cleanTitle = title.trim() || "New Form";
+    const cleanTitle = title.trim() || t("editor.formEditor.untitledForm");
     const slug = sanitizeFilenamePart(cleanTitle).toLowerCase() || "new-form";
 
     return {
@@ -138,21 +141,21 @@ export class FormService {
       sections: [
         {
           id: "section_1",
-          title: "General Information",
+          title: t("editor.defaults.sectionGeneral"),
           description: "",
           fields: [
             {
               id: "title",
               type: "text",
-              label: "Title / Name",
-              placeholder: "Enter title or name...",
+              label: t("editor.defaults.fieldTitle"),
+              placeholder: t("editor.defaults.fieldTitlePlaceholder"),
               required: true,
               isIdentifier: true,
             },
             {
               id: "date",
               type: "date",
-              label: "Date",
+              label: t("editor.defaults.fieldDate"),
               required: true,
               defaultValue: "today",
             },

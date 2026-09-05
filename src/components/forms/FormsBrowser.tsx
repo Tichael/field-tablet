@@ -3,6 +3,7 @@ import type { FormTemplate, FormSubmission } from "../../types/form";
 import { formService } from "../../lib/forms/form-service";
 import { getFormFoldersList, useConfigStore } from "../../store/config-store";
 import { Button } from "../ui/button";
+import { useTranslation } from "react-i18next";
 import {
   Folder,
   ChevronLeft,
@@ -35,6 +36,7 @@ export function FormsBrowser({
   initialFolder,
   initialForm,
 }: FormsBrowserProps) {
+  const { t, i18n } = useTranslation();
   const formFoldersConfig = useConfigStore(
     (state) => state.config?.formFolders,
   );
@@ -56,6 +58,37 @@ export function FormsBrowser({
     useState<FormTemplate | null>(initialForm || null);
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return {
+          label: t("forms.browser.completed"),
+          className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+        };
+      case "submitted":
+        return {
+          label: t("forms.browser.submitted"),
+          className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+        };
+      case "synced":
+        return {
+          label: t("forms.browser.synced"),
+          className: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+        };
+      case "sync_error":
+        return {
+          label: t("forms.browser.syncError"),
+          className: "bg-destructive/10 text-destructive border-destructive/20",
+        };
+      case "draft":
+      default:
+        return {
+          label: t("forms.browser.draft"),
+          className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+        };
+    }
+  };
 
   // Load forms in selected folder
   const loadForms = useCallback(async () => {
@@ -122,16 +155,18 @@ export function FormsBrowser({
                 }
               }}
               className="rounded-full shrink-0"
-              title="Back"
+              title={t("common.back")}
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
             <div className="min-w-0">
               <h1 className="text-lg font-bold truncate">
-                {selectedFormForHistory.title} — Submissions & PDFs
+                {selectedFormForHistory.title} —{" "}
+                {t("forms.browser.submissionsAndPdfs")}
               </h1>
               <p className="text-xs text-muted-foreground truncate">
-                {selectedFormForHistory.folderPath}/Filled Forms
+                {selectedFormForHistory.folderPath}/
+                {t("forms.browser.filledForms")}
               </p>
             </div>
           </div>
@@ -142,7 +177,7 @@ export function FormsBrowser({
             className="gap-1.5 font-semibold shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>New Submission</span>
+            <span>{t("forms.browser.newSubmission")}</span>
           </Button>
         </header>
 
@@ -150,16 +185,17 @@ export function FormsBrowser({
           {loadingSubmissions ? (
             <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
               <Loader2 className="w-6 h-6 animate-spin mb-2" />
-              <p className="text-sm">Loading submissions...</p>
+              <p className="text-sm">{t("forms.browser.loadingSubmissions")}</p>
             </div>
           ) : submissions.length === 0 ? (
             <div className="border border-dashed rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3 bg-card">
               <FileText className="w-12 h-12 text-muted-foreground/30" />
               <div className="space-y-1">
-                <h3 className="font-semibold text-base">No Submissions Yet</h3>
+                <h3 className="font-semibold text-base">
+                  {t("forms.browser.noSubmissionsYet")}
+                </h3>
                 <p className="text-xs text-muted-foreground max-w-sm">
-                  No forms have been filled and saved in this folder yet. Start
-                  a new form to generate the first dated PDF.
+                  {t("forms.browser.noSubmissionsDesc")}
                 </p>
               </div>
               <Button
@@ -167,15 +203,18 @@ export function FormsBrowser({
                 onClick={() => onSelectForm(selectedFormForHistory)}
                 className="mt-2"
               >
-                <Plus className="w-4 h-4 mr-1.5" /> Start First Submission
+                <Plus className="w-4 h-4 mr-1.5" />{" "}
+                {t("forms.browser.startFirstSubmission")}
               </Button>
             </div>
           ) : (
             <div className="space-y-4">
               {submissions.map((sub) => {
                 const updatedDate = new Date(sub.updatedAt || sub.createdAt);
-                const { displayDate, displayTime } =
-                  formatDateTime(updatedDate);
+                const { displayDate, displayTime } = formatDateTime(
+                  updatedDate,
+                  i18n.language,
+                );
 
                 return (
                   <div
@@ -190,13 +229,11 @@ export function FormsBrowser({
                           </span>
                           <span
                             className={cn(
-                              "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold",
-                              sub.status === "completed"
-                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+                              "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold border",
+                              getStatusBadge(sub.status).className,
                             )}
                           >
-                            {sub.status}
+                            {getStatusBadge(sub.status).label}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
@@ -220,19 +257,21 @@ export function FormsBrowser({
                         className="gap-1 text-xs self-start sm:self-center"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
-                        <span>Edit / Update Form</span>
+                        <span>{t("forms.browser.editSubmission")}</span>
                       </Button>
                     </div>
 
                     {/* PDF Exports list for this submission */}
                     <div className="space-y-1.5">
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Dated PDF Copies ({sub.pdfExports?.length || 0})
+                        {t("forms.browser.datedPdfCopies", {
+                          count: sub.pdfExports?.length || 0,
+                        })}
                       </span>
 
                       {!sub.pdfExports || sub.pdfExports.length === 0 ? (
                         <p className="text-xs text-muted-foreground italic">
-                          No PDF generated yet.
+                          {t("forms.browser.noPdfGenerated")}
                         </p>
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -259,7 +298,9 @@ export function FormsBrowser({
                     {sub.attachments && sub.attachments.length > 0 && (
                       <div className="space-y-1.5 pt-2 border-t">
                         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Media Attachments ({sub.attachments.length})
+                          {t("forms.browser.mediaAttachmentsCount", {
+                            count: sub.attachments.length,
+                          })}
                         </span>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {sub.attachments.map((att) => (
@@ -267,7 +308,9 @@ export function FormsBrowser({
                               key={att.id || att.path}
                               onClick={() => onViewPdf(att.path)}
                               className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/50 hover:border-foreground/30 transition-all text-left text-foreground group"
-                              title={`Open ${att.name || att.filename}`}
+                              title={t("forms.browser.openFileTitle", {
+                                name: att.name || att.filename,
+                              })}
                             >
                               <div className="flex items-center gap-2 min-w-0 pr-2">
                                 {att.type === "photo" ? (
@@ -310,16 +353,18 @@ export function FormsBrowser({
             size="icon"
             onClick={onClose}
             className="rounded-full"
-            title="Back to Dashboard"
+            title={t("forms.browser.backToDashboard")}
           >
             <ChevronLeft className="w-5 h-5" />
           </Button>
           <div>
-            <h1 className="text-lg font-bold tracking-tight">Form Templates</h1>
+            <h1 className="text-lg font-bold tracking-tight">
+              {t("forms.browser.formTemplates")}
+            </h1>
             <p className="text-xs text-muted-foreground">
               {selectedFolder
-                ? `Browsing /${selectedFolder}`
-                : "Select a form to fill or view past submissions"}
+                ? t("forms.browser.browsingFolder", { folder: selectedFolder })
+                : t("forms.browser.selectFormSubtitle")}
             </p>
           </div>
         </div>
@@ -333,7 +378,7 @@ export function FormsBrowser({
                 onClick={() => setSelectedFolder("")}
                 className="text-xs"
               >
-                All Folders
+                {t("forms.browser.allFolders")}
               </Button>
               {formFolders.map((f) => (
                 <Button
@@ -355,17 +400,23 @@ export function FormsBrowser({
         {loading ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <Loader2 className="w-6 h-6 animate-spin mb-2" />
-            <p className="text-sm">Scanning form folders...</p>
+            <p className="text-sm">{t("forms.browser.scanningFolders")}</p>
           </div>
         ) : forms.length === 0 ? (
           <div className="border border-dashed rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-4 bg-card">
             <Folder className="w-14 h-14 text-amber-500/40" />
             <div className="space-y-1">
-              <h3 className="font-semibold text-lg">No Forms Found</h3>
+              <h3 className="font-semibold text-lg">
+                {t("forms.browser.noFormsFound")}
+              </h3>
               <p className="text-sm text-muted-foreground max-w-md">
                 {formFolders.length === 0
-                  ? "No form folders configured in Settings."
-                  : `No forms were found in ${selectedFolder ? `/${selectedFolder}` : "your configured form folders"}.`}
+                  ? t("forms.browser.noFoldersConfigured")
+                  : selectedFolder
+                    ? t("forms.browser.noFormsInThisFolder", {
+                        folder: selectedFolder,
+                      })
+                    : t("forms.browser.noFormsInConfiguredFolders")}
               </p>
             </div>
           </div>
@@ -398,10 +449,16 @@ export function FormsBrowser({
                   </div>
 
                   <div className="text-[11px] text-muted-foreground">
-                    {form.sections.length} Section
-                    {form.sections.length > 1 ? "s" : ""} •{" "}
-                    {form.sections.reduce((acc, s) => acc + s.fields.length, 0)}{" "}
-                    Fields
+                    {t("forms.browser.sectionsCount", {
+                      count: form.sections.length,
+                    })}{" "}
+                    •{" "}
+                    {t("forms.browser.fieldsCount", {
+                      count: form.sections.reduce(
+                        (acc, s) => acc + s.fields.length,
+                        0,
+                      ),
+                    })}
                   </div>
                 </div>
 
@@ -411,16 +468,18 @@ export function FormsBrowser({
                     className="flex-1 text-xs font-semibold gap-1.5 shadow-xs"
                     size="sm"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Fill Form
+                    <Plus className="w-3.5 h-3.5" />{" "}
+                    {t("forms.browser.fillForm")}
                   </Button>
                   <Button
                     variant="outline"
                     onClick={() => handleOpenHistory(form)}
                     size="sm"
                     className="text-xs gap-1"
-                    title="View Submissions & PDFs"
+                    title={t("forms.browser.submissionsAndPdfs")}
                   >
-                    <FileText className="w-3.5 h-3.5" /> History
+                    <FileText className="w-3.5 h-3.5" />{" "}
+                    {t("forms.runner.history")}
                   </Button>
                 </div>
               </div>

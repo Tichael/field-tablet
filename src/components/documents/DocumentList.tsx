@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { DocumentViewer } from "./DocumentViewer";
 import { useConfigStore } from "../../store/config-store";
+import { useTranslation } from "react-i18next";
 
 interface DocumentListProps {
   basePath?: string;
@@ -20,6 +21,7 @@ interface DocumentListProps {
 const EMPTY_SYNC_FOLDERS: string[] = [];
 
 export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
+  const { t } = useTranslation();
   const syncFolders =
     useConfigStore((state) => state.config?.syncFolders) ?? EMPTY_SYNC_FOLDERS;
 
@@ -128,22 +130,26 @@ export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
           <ChevronLeft className="w-6 h-6" />
         </button>
         <h1 className="text-xl font-semibold tracking-tight">
-          {currentPath === "" ? "Documents" : currentPath.split("/").pop()}
+          {currentPath === ""
+            ? t("documents.title")
+            : currentPath.split("/").pop()}
         </h1>
       </div>
 
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
           <div className="flex justify-center items-center h-full text-muted-foreground">
-            <div className="animate-pulse">Loading documents...</div>
+            <div className="animate-pulse">
+              {t("documents.loadingDocuments")}
+            </div>
           </div>
         ) : files.length === 0 ? (
           <div className="flex flex-col justify-center items-center h-full text-muted-foreground">
             <Folder className="w-16 h-16 opacity-20 mb-4" />
             <p>
               {currentPath === ""
-                ? "No sync folders configured."
-                : "This folder is empty"}
+                ? t("documents.noSyncFolders")
+                : t("documents.folderEmpty")}
             </p>
           </div>
         ) : (

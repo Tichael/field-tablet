@@ -20,6 +20,7 @@ import {
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface GenericFileBrowserProps {
   onFileSelect?: (path: string) => void;
@@ -42,6 +43,7 @@ export function GenericFileBrowser({
   allowSelectRoot = false,
   existingFolders = [],
 }: GenericFileBrowserProps) {
+  const { t } = useTranslation();
   const [currentPath, setCurrentPath] = useState(basePath);
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -126,7 +128,7 @@ export function GenericFileBrowser({
     if (!trimmed) return;
 
     if (/[/\\:*?"<>|]/.test(trimmed)) {
-      setCreateError('Folder name cannot contain / \\ : * ? " < > |');
+      setCreateError(t("documents.createFolderErrorChars"));
       return;
     }
 
@@ -135,7 +137,7 @@ export function GenericFileBrowser({
         (f) => f.isDirectory && f.name.toLowerCase() === trimmed.toLowerCase(),
       )
     ) {
-      setCreateError(`A folder named "${trimmed}" already exists.`);
+      setCreateError(t("documents.createFolderErrorExists", { name: trimmed }));
       return;
     }
 
@@ -193,7 +195,7 @@ export function GenericFileBrowser({
             size="icon-xs"
             onClick={navigateUp}
             disabled={!currentPath || loading}
-            title="Go up one folder"
+            title={t("documents.goUp")}
             className="shrink-0 mr-1"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -209,10 +211,10 @@ export function GenericFileBrowser({
                   ? "font-bold text-foreground"
                   : "text-muted-foreground hover:text-foreground",
               )}
-              title="Root directory"
+              title={t("documents.rootDirectory")}
             >
               <Home className="w-3.5 h-3.5" />
-              <span>root</span>
+              <span>{t("documents.root")}</span>
             </button>
 
             {pathParts.map((part, index) => {
@@ -247,7 +249,7 @@ export function GenericFileBrowser({
             size="icon-xs"
             onClick={() => loadDirectory(currentPath)}
             disabled={loading}
-            title="Refresh directory"
+            title={t("documents.refreshDirectory")}
           >
             <RotateCw
               className={cn("w-3.5 h-3.5", loading && "animate-spin")}
@@ -266,7 +268,9 @@ export function GenericFileBrowser({
               className="gap-1 text-xs"
             >
               <FolderPlus className="w-3.5 h-3.5 text-primary" />
-              <span className="hidden sm:inline">New Folder</span>
+              <span className="hidden sm:inline">
+                {t("documents.newFolder")}
+              </span>
             </Button>
           )}
 
@@ -280,19 +284,19 @@ export function GenericFileBrowser({
               className="gap-1 text-xs font-semibold shadow-xs"
               title={
                 isCurrentPathExisting
-                  ? "This folder is already added to sync"
-                  : "Select current folder"
+                  ? t("documents.alreadyAddedToSync")
+                  : t("documents.selectCurrent")
               }
             >
               {isCurrentPathExisting ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Added</span>
+                  <span>{t("documents.added")}</span>
                 </>
               ) : (
                 <>
                   <FolderCheck className="w-3.5 h-3.5" />
-                  <span>Select Current</span>
+                  <span>{t("documents.selectCurrent")}</span>
                 </>
               )}
             </Button>
@@ -307,7 +311,7 @@ export function GenericFileBrowser({
             <FolderPlus className="w-4 h-4 text-primary shrink-0" />
             <Input
               ref={newFolderInputRef}
-              placeholder="Folder name..."
+              placeholder={t("documents.folderNamePlaceholder")}
               value={newFolderName}
               onChange={(e) => {
                 setNewFolderName(e.target.value);
@@ -336,7 +340,7 @@ export function GenericFileBrowser({
               {creatingFolder ? (
                 <Loader2 className="w-3 h-3 animate-spin" />
               ) : (
-                "Create"
+                t("common.create")
               )}
             </Button>
             <Button
@@ -349,7 +353,7 @@ export function GenericFileBrowser({
               }}
               disabled={creatingFolder}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
           {createError && (
@@ -366,12 +370,14 @@ export function GenericFileBrowser({
         {loading ? (
           <div className="p-8 flex flex-col items-center justify-center space-y-2 text-muted-foreground text-sm">
             <Loader2 className="w-5 h-5 animate-spin text-primary" />
-            <span>Loading...</span>
+            <span>{t("common.loading")}</span>
           </div>
         ) : files.length === 0 ? (
           <div className="p-8 text-center flex flex-col items-center justify-center space-y-3">
             <Folder className="w-10 h-10 text-muted-foreground/30" />
-            <div className="text-sm text-muted-foreground">Empty folder</div>
+            <div className="text-sm text-muted-foreground">
+              {t("documents.emptyFolder")}
+            </div>
             {allowCreateFolder && !isCreatingFolder && (
               <Button
                 variant="outline"
@@ -383,7 +389,7 @@ export function GenericFileBrowser({
                 className="gap-1.5 text-xs mt-1"
               >
                 <FolderPlus className="w-3.5 h-3.5 text-primary" />
-                Create a folder here
+                {t("documents.createFolderHere")}
               </Button>
             )}
           </div>
@@ -426,15 +432,17 @@ export function GenericFileBrowser({
                     (isFileExisting ? (
                       <span className="ml-2 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-md font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
                         <Check className="w-3 h-3" />
-                        <span>Added</span>
+                        <span>{t("documents.added")}</span>
                       </span>
                     ) : parentOfFile ? (
                       <div className="flex items-center gap-1 ml-2 shrink-0">
                         <span
                           className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-muted text-muted-foreground border border-border/40 hidden sm:inline-block"
-                          title={`Already covered by parent folder: /${parentOfFile}`}
+                          title={t("documents.alreadyCoveredTitle", {
+                            folder: parentOfFile,
+                          })}
                         >
-                          In /{parentOfFile}
+                          {t("documents.inParent", { folder: parentOfFile })}
                         </span>
                         <Button
                           variant="outline"
@@ -444,10 +452,12 @@ export function GenericFileBrowser({
                             onFolderSelect(file.path);
                           }}
                           className="gap-1 text-xs shrink-0 font-medium"
-                          title={`Select "${file.name}"`}
+                          title={t("documents.selectFolderNamed", {
+                            name: file.name,
+                          })}
                         >
                           <Check className="w-3 h-3 text-primary" />
-                          <span>Select</span>
+                          <span>{t("common.select")}</span>
                         </Button>
                       </div>
                     ) : (
@@ -459,10 +469,12 @@ export function GenericFileBrowser({
                           onFolderSelect(file.path);
                         }}
                         className="ml-2 gap-1 text-xs shrink-0 font-medium"
-                        title={`Select "${file.name}"`}
+                        title={t("documents.selectFolderNamed", {
+                          name: file.name,
+                        })}
                       >
                         <Check className="w-3 h-3 text-primary" />
-                        <span>Select</span>
+                        <span>{t("common.select")}</span>
                       </Button>
                     ))}
                 </li>
@@ -477,23 +489,25 @@ export function GenericFileBrowser({
         <div className="flex items-center justify-between gap-3 p-3 border-t bg-muted/40 shrink-0">
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Current Folder
+              {t("documents.currentFolder")}
             </div>
             <div className="text-sm font-semibold truncate text-foreground flex items-center gap-1.5 mt-0.5">
               <Folder className="w-4 h-4 text-blue-500 shrink-0" />
               <span className="font-mono text-xs sm:text-sm">
-                {currentPath ? `/${currentPath}` : "/ (Root Directory)"}
+                {currentPath
+                  ? `/${currentPath}`
+                  : t("documents.rootDirectoryLabel")}
               </span>
             </div>
             {isCurrentPathExisting && (
               <div className="text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 mt-0.5">
                 <Check className="w-3.5 h-3.5 shrink-0" />
-                <span>This folder is already in your sync folders list</span>
+                <span>{t("documents.alreadyInSyncList")}</span>
               </div>
             )}
             {!isCurrentPathExisting && parentOfCurrentPath && (
               <div className="text-xs text-muted-foreground mt-0.5">
-                Already covered by parent folder:{" "}
+                {t("documents.alreadyCoveredByParent")}{" "}
                 <span className="font-mono font-medium text-foreground">
                   /{parentOfCurrentPath}
                 </span>
@@ -514,17 +528,19 @@ export function GenericFileBrowser({
             {isCurrentPathExisting ? (
               <>
                 <Check className="w-4 h-4 text-emerald-500" />
-                <span>Already Added</span>
+                <span>{t("documents.alreadyAdded")}</span>
               </>
             ) : (
               <>
                 <FolderCheck className="w-4 h-4" />
                 <span>
                   {!currentPath && !allowSelectRoot
-                    ? "Choose a Folder"
+                    ? t("documents.chooseFolder")
                     : currentPath
-                      ? `Select "${currentFolderName}"`
-                      : "Select Root Folder"}
+                      ? t("documents.selectFolderNamed", {
+                          name: currentFolderName,
+                        })
+                      : t("documents.selectRootFolder")}
                 </span>
               </>
             )}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import "./App.css";
 import { syncManager } from "./lib/sync/sync-manager";
 import { useAppStore } from "./store/app-store";
@@ -24,6 +25,7 @@ import { formService } from "./lib/forms/form-service";
 const MAX_DASHBOARD_FORMS = 6;
 
 function App() {
+  const { t } = useTranslation();
   const isConfigured = useAppStore((state) => state.isConfigured);
   const isEditingConfig = useAppStore((state) => state.isEditingConfig);
   const isSettingsOpen = useAppStore((state) => state.isSettingsOpen);
@@ -93,7 +95,6 @@ function App() {
       await syncManager.initialize();
       if (isConfigured) {
         if (localStorage.getItem("openEditor") === "true") {
-          localStorage.removeItem("openEditor");
           setSettingsOpen(true);
         }
       }
@@ -114,10 +115,15 @@ function App() {
     return applyTheme(config.theme);
   }, [config]);
 
+  useEffect(() => {
+    const title = config?.branding?.appTitle?.trim() || t("header.fieldTablet");
+    document.title = title;
+  }, [config?.branding?.appTitle, t]);
+
   if (isInitializing) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{t("common.loading")}</p>
       </div>
     );
   }
@@ -131,10 +137,11 @@ function App() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <div className="max-w-md w-full bg-card rounded-xl shadow border p-8 space-y-4 text-center">
           <Folder className="w-16 h-16 text-blue-500 mx-auto opacity-50" />
-          <h2 className="text-xl font-semibold">Restore Folder Access</h2>
+          <h2 className="text-xl font-semibold">
+            {t("dashboard.restoreFolderAccessTitle")}
+          </h2>
           <p className="text-muted-foreground text-sm">
-            For security reasons, your browser requires you to confirm access to
-            your local folder after a refresh.
+            {t("dashboard.restoreFolderAccessDesc")}
           </p>
           <div className="space-y-2 mt-4">
             <Button
@@ -151,7 +158,7 @@ function App() {
                 }
               }}
             >
-              Grant Permission
+              {t("dashboard.grantPermission")}
             </Button>
             <Button
               variant="ghost"
@@ -159,7 +166,7 @@ function App() {
               className="w-full text-xs text-muted-foreground hover:text-destructive"
               onClick={async () => {
                 const confirmed = window.confirm(
-                  "Reset folder configuration? You will need to select a folder again.",
+                  t("dashboard.resetFolderConfirm"),
                 );
                 if (confirmed) {
                   const { del } = await import("idb-keyval");
@@ -169,7 +176,7 @@ function App() {
                 }
               }}
             >
-              Reset Folder Selection
+              {t("dashboard.resetFolderSelection")}
             </Button>
           </div>
         </div>
@@ -259,7 +266,7 @@ function App() {
               />
             )}
             <h1 className="text-xl font-semibold tracking-tight">
-              {config.branding.appTitle || "Field Tablet App"}
+              {config.branding.appTitle || t("header.fieldTabletApp")}
             </h1>
           </div>
           <div className="flex items-center gap-3">
@@ -274,7 +281,7 @@ function App() {
                     : "text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/10 dark:text-foreground dark:border-border dark:hover:bg-accent"
                 }
               >
-                {isSettingsOpen ? "Back to App" : "Settings"}
+                {isSettingsOpen ? t("header.backToApp") : t("header.settings")}
               </Button>
             )}
           </div>
@@ -309,7 +316,7 @@ function App() {
                     <div className="space-y-2.5">
                       <div className="flex items-center">
                         <span className="inline-flex items-center leading-none text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                          {form.category || "Form"}
+                          {form.category || t("dashboard.formFallbackCategory")}
                         </span>
                       </div>
 
@@ -346,21 +353,24 @@ function App() {
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="inline-flex items-center leading-none text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-secondary text-secondary-foreground border border-border/40">
-                          All Forms
+                          {t("dashboard.allForms")}
                         </span>
                         <span className="leading-none text-[10px] font-mono font-semibold text-muted-foreground">
-                          +{remainingFormsCount} More
+                          {t("dashboard.moreFormsCount", {
+                            count: remainingFormsCount,
+                          })}
                         </span>
                       </div>
 
                       <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
-                        <span>More Forms & History</span>
+                        <span>{t("dashboard.moreFormsAndHistory")}</span>
                         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-primary transition-all shrink-0" />
                       </h3>
 
                       <p className="text-xs text-muted-foreground line-clamp-2">
-                        Browse all {dashboardForms.length} forms and past
-                        submissions
+                        {t("dashboard.browseAllFormsCount", {
+                          count: dashboardForms.length,
+                        })}
                       </p>
                     </div>
                   </div>
@@ -371,11 +381,10 @@ function App() {
                 <FileText className="w-10 h-10 text-muted-foreground/50" />
                 <div className="space-y-1">
                   <h3 className="font-semibold text-base text-foreground">
-                    No Forms Configured
+                    {t("dashboard.noFormsConfigured")}
                   </h3>
                   <p className="text-xs text-muted-foreground max-w-sm">
-                    Configure form folders or create new forms using the visual
-                    form editor in Settings.
+                    {t("dashboard.noFormsDescription")}
                   </p>
                 </div>
                 <Button
@@ -384,7 +393,7 @@ function App() {
                   onClick={() => setSettingsOpen(true)}
                   className="mt-2"
                 >
-                  Configure Forms in Settings
+                  {t("dashboard.configureFormsInSettings")}
                 </Button>
               </div>
             )}
@@ -404,11 +413,10 @@ function App() {
             >
               <Folder className="w-16 h-16 text-blue-500 mb-4 group-hover:scale-105 transition-transform" />
               <h2 className="text-2xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
-                Documents
+                {t("dashboard.documentsTitle")}
               </h2>
               <p className="text-sm text-muted-foreground text-center max-w-md">
-                Browse and view offline documents, manuals, circuit diagrams,
-                and building plans.
+                {t("dashboard.documentsDescription")}
               </p>
             </div>
           </div>

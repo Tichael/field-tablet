@@ -8,6 +8,7 @@ import {
 } from "../../lib/forms/media-utils";
 import { syncManager } from "../../lib/sync/sync-manager";
 import { Button } from "../ui/button";
+import { useTranslation } from "react-i18next";
 import {
   Camera,
   Video,
@@ -37,6 +38,7 @@ export function MediaAttachmentField({
   disabled,
   onViewMedia,
 }: MediaAttachmentFieldProps) {
+  const { t } = useTranslation();
   const isPhoto = field.type === "photo";
   const allowMultiple = Boolean(field.allowMultiple);
   const photoQuality = useConfigStore(
@@ -103,7 +105,7 @@ export function MediaAttachmentField({
       }
     } catch (e) {
       console.error("Failed to process media attachment:", e);
-      alert("Could not process attachment file.");
+      alert(t("forms.runner.couldNotProcessMedia"));
     } finally {
       setIsProcessing(false);
       if (captureInputRef.current) captureInputRef.current.value = "";
@@ -173,7 +175,11 @@ export function MediaAttachmentField({
           ) : (
             <Video className="w-4 h-4 text-blue-500" />
           )}
-          <span>{isPhoto ? "Take Photo" : "Record Video"}</span>
+          <span>
+            {isPhoto
+              ? t("forms.runner.takePhoto")
+              : t("forms.runner.recordVideo")}
+          </span>
         </Button>
 
         <Button
@@ -185,12 +191,18 @@ export function MediaAttachmentField({
           className="min-h-[44px] px-3 gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <FolderOpen className="w-4 h-4" />
-          <span>{isPhoto ? "Choose Photo" : "Choose Video"}</span>
+          <span>
+            {isPhoto
+              ? t("forms.runner.choosePhoto")
+              : t("forms.runner.chooseVideo")}
+          </span>
         </Button>
 
         {isProcessing && (
           <span className="text-xs text-muted-foreground animate-pulse">
-            Processing {isPhoto ? "photo" : "video"}...
+            {isPhoto
+              ? t("forms.runner.processingPhoto")
+              : t("forms.runner.processingVideo")}
           </span>
         )}
       </div>
@@ -225,14 +237,14 @@ export function MediaAttachmentField({
           <div className="bg-background rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col shadow-2xl border">
             <div className="p-3 border-b flex justify-between items-center bg-muted/20">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Attachment Preview
+                {t("forms.runner.attachmentPreview")}
               </span>
               <Button
                 size="xs"
                 variant="ghost"
                 onClick={() => setActivePreviewUrl(null)}
               >
-                Close
+                {t("common.close")}
               </Button>
             </div>
             <div className="p-4 overflow-auto flex items-center justify-center bg-muted/10 min-h-[250px]">
@@ -275,6 +287,7 @@ function MediaItemThumbnail({
   onView,
   onRemove,
 }: MediaItemThumbnailProps) {
+  const { t } = useTranslation();
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(
     att.dataUrl || null,
   );
@@ -332,7 +345,7 @@ function MediaItemThumbnail({
               size="icon-sm"
               onClick={() => onView(resolvedUrl || "")}
               className="rounded-full shadow"
-              title="View Photo"
+              title={t("forms.runner.viewPhoto")}
             >
               <Eye className="w-3.5 h-3.5" />
             </Button>
@@ -343,7 +356,7 @@ function MediaItemThumbnail({
                 size="icon-sm"
                 onClick={onRemove}
                 className="rounded-full shadow"
-                title="Remove Photo"
+                title={t("forms.runner.removePhoto")}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
@@ -393,10 +406,10 @@ function MediaItemThumbnail({
           size="xs"
           onClick={() => onView(resolvedUrl || "")}
           className="gap-1 text-xs"
-          title="Play Video"
+          title={t("forms.runner.playVideo")}
         >
           <Play className="w-3.5 h-3.5 text-blue-500 fill-blue-500" />
-          <span>Play</span>
+          <span>{t("forms.runner.play")}</span>
         </Button>
         {!disabled && (
           <Button
@@ -405,7 +418,7 @@ function MediaItemThumbnail({
             size="icon-xs"
             onClick={onRemove}
             className="text-muted-foreground hover:text-destructive"
-            title="Remove Video"
+            title={t("forms.runner.removeVideo")}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>

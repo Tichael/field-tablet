@@ -1,5 +1,6 @@
 import type { FormFieldType } from "../../../types/form";
 import { Button } from "../../ui/button";
+import { useTranslation } from "react-i18next";
 import {
   Type,
   FileText,
@@ -28,8 +29,8 @@ interface FieldPaletteProps {
 
 interface PaletteItem {
   type: FormFieldType;
-  label: string;
-  description: string;
+  labelKey: string;
+  descKey: string;
   icon: React.ComponentType<{ className?: string }>;
   category: "inputs" | "datetime" | "choices" | "media" | "advanced" | "layout";
 }
@@ -38,22 +39,22 @@ const PALETTE_ITEMS: PaletteItem[] = [
   // Inputs
   {
     type: "text",
-    label: "Single-Line Text",
-    description: "Names, short titles, serial numbers, locations",
+    labelKey: "editor.palette.itemTextLabel",
+    descKey: "editor.palette.itemTextDesc",
     icon: Type,
     category: "inputs",
   },
   {
     type: "textarea",
-    label: "Multi-Line Text",
-    description: "Detailed descriptions, work summaries, remarks",
+    labelKey: "editor.palette.itemTextareaLabel",
+    descKey: "editor.palette.itemTextareaDesc",
     icon: FileText,
     category: "inputs",
   },
   {
     type: "number",
-    label: "Numeric Input",
-    description: "Quantities, measurements, meter readings, hours",
+    labelKey: "editor.palette.itemNumberLabel",
+    descKey: "editor.palette.itemNumberDesc",
     icon: Hash,
     category: "inputs",
   },
@@ -61,22 +62,22 @@ const PALETTE_ITEMS: PaletteItem[] = [
   // Date & Time
   {
     type: "date",
-    label: "Date",
-    description: "Calendar date picker (can default to 'today')",
+    labelKey: "editor.palette.itemDateLabel",
+    descKey: "editor.palette.itemDateDesc",
     icon: Calendar,
     category: "datetime",
   },
   {
     type: "time",
-    label: "Time",
-    description: "Time of day picker (hours & minutes)",
+    labelKey: "editor.palette.itemTimeLabel",
+    descKey: "editor.palette.itemTimeDesc",
     icon: Clock,
     category: "datetime",
   },
   {
     type: "datetime",
-    label: "Date & Time",
-    description: "Combined timestamp picker (can default to 'now')",
+    labelKey: "editor.palette.itemDatetimeLabel",
+    descKey: "editor.palette.itemDatetimeDesc",
     icon: CalendarClock,
     category: "datetime",
   },
@@ -84,29 +85,29 @@ const PALETTE_ITEMS: PaletteItem[] = [
   // Choices
   {
     type: "select",
-    label: "Dropdown Select",
-    description: "Single choice picked from a dropdown list",
+    labelKey: "editor.palette.itemSelectLabel",
+    descKey: "editor.palette.itemSelectDesc",
     icon: List,
     category: "choices",
   },
   {
     type: "radio",
-    label: "Radio Choice Cards",
-    description: "Single choice displayed as distinct visual buttons",
+    labelKey: "editor.palette.itemRadioLabel",
+    descKey: "editor.palette.itemRadioDesc",
     icon: CircleDot,
     category: "choices",
   },
   {
     type: "checkbox",
-    label: "Yes / No Checkbox",
-    description: "Single confirmation checkbox or boolean toggle",
+    labelKey: "editor.palette.itemCheckboxLabel",
+    descKey: "editor.palette.itemCheckboxDesc",
     icon: CheckSquare,
     category: "choices",
   },
   {
     type: "checkbox-group",
-    label: "Multi-Checklist",
-    description: "Multiple selectable checkboxes from a list",
+    labelKey: "editor.palette.itemCheckboxGroupLabel",
+    descKey: "editor.palette.itemCheckboxGroupDesc",
     icon: ListChecks,
     category: "choices",
   },
@@ -114,15 +115,15 @@ const PALETTE_ITEMS: PaletteItem[] = [
   // Media & Attachments
   {
     type: "photo",
-    label: "Photo Attachment",
-    description: "Camera capture or image upload (embedded directly in PDF)",
+    labelKey: "editor.palette.itemPhotoLabel",
+    descKey: "editor.palette.itemPhotoDesc",
     icon: Camera,
     category: "media",
   },
   {
     type: "video",
-    label: "Video Attachment",
-    description: "Video recording or attachment (stored in submission folder)",
+    labelKey: "editor.palette.itemVideoLabel",
+    descKey: "editor.palette.itemVideoDesc",
     icon: Video,
     category: "media",
   },
@@ -130,22 +131,22 @@ const PALETTE_ITEMS: PaletteItem[] = [
   // Advanced & Structure
   {
     type: "signature",
-    label: "Digital Signature",
-    description: "Stylus or finger signature canvas box",
+    labelKey: "editor.palette.itemSignatureLabel",
+    descKey: "editor.palette.itemSignatureDesc",
     icon: PenTool,
     category: "advanced",
   },
   {
     type: "heading",
-    label: "Section Subheading",
-    description: "Visual divider to group related fields in a section",
+    labelKey: "editor.palette.itemHeadingLabel",
+    descKey: "editor.palette.itemHeadingDesc",
     icon: Heading,
     category: "layout",
   },
   {
     type: "notes",
-    label: "Instructional Note",
-    description: "Callout text box with guidelines or safety notices",
+    labelKey: "editor.palette.itemNotesLabel",
+    descKey: "editor.palette.itemNotesDesc",
     icon: HelpCircle,
     category: "layout",
   },
@@ -157,6 +158,8 @@ export function FieldPalette({
   onSelectType,
   sectionTitle,
 }: FieldPaletteProps) {
+  const { t } = useTranslation();
+
   if (!isOpen) return null;
 
   return (
@@ -166,12 +169,14 @@ export function FieldPalette({
         <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-muted/20 shrink-0">
           <div>
             <h3 className="font-bold text-lg text-foreground">
-              Add Form Field
+              {t("editor.palette.title")}
             </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               {sectionTitle
-                ? `Adding field to "${sectionTitle}"`
-                : "Select a field type to insert into your form"}
+                ? t("editor.palette.subtitleWithSection", {
+                    section: sectionTitle,
+                  })
+                : t("editor.palette.subtitleDefault")}
             </p>
           </div>
           <Button
@@ -179,7 +184,7 @@ export function FieldPalette({
             size="icon"
             onClick={onClose}
             className="rounded-full"
-            title="Close"
+            title={t("common.close")}
           >
             <X className="w-5 h-5" />
           </Button>
@@ -190,7 +195,7 @@ export function FieldPalette({
           {/* Inputs Section */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Text & Number Inputs
+              {t("editor.palette.categoryInputs")}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {PALETTE_ITEMS.filter((i) => i.category === "inputs").map(
@@ -211,11 +216,11 @@ export function FieldPalette({
                           <Icon className="w-4 h-4" />
                         </div>
                         <span className="font-semibold text-xs sm:text-sm">
-                          {item.label}
+                          {t(item.labelKey)}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted-foreground line-clamp-2">
-                        {item.description}
+                        {t(item.descKey)}
                       </p>
                     </button>
                   );
@@ -227,7 +232,7 @@ export function FieldPalette({
           {/* Date & Time Section */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Date & Time
+              {t("editor.palette.categoryDatetime")}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {PALETTE_ITEMS.filter((i) => i.category === "datetime").map(
@@ -248,11 +253,11 @@ export function FieldPalette({
                           <Icon className="w-4 h-4" />
                         </div>
                         <span className="font-semibold text-xs sm:text-sm">
-                          {item.label}
+                          {t(item.labelKey)}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted-foreground line-clamp-2">
-                        {item.description}
+                        {t(item.descKey)}
                       </p>
                     </button>
                   );
@@ -264,7 +269,7 @@ export function FieldPalette({
           {/* Choices Section */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Choices & Checklists
+              {t("editor.palette.categoryChoices")}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {PALETTE_ITEMS.filter((i) => i.category === "choices").map(
@@ -285,11 +290,11 @@ export function FieldPalette({
                           <Icon className="w-4 h-4" />
                         </div>
                         <span className="font-semibold text-xs sm:text-sm">
-                          {item.label}
+                          {t(item.labelKey)}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted-foreground line-clamp-2">
-                        {item.description}
+                        {t(item.descKey)}
                       </p>
                     </button>
                   );
@@ -301,7 +306,7 @@ export function FieldPalette({
           {/* Media & Attachments Section */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Media & Attachments
+              {t("editor.palette.categoryMedia")}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {PALETTE_ITEMS.filter((i) => i.category === "media").map(
@@ -322,11 +327,11 @@ export function FieldPalette({
                           <Icon className="w-4 h-4" />
                         </div>
                         <span className="font-semibold text-xs sm:text-sm">
-                          {item.label}
+                          {t(item.labelKey)}
                         </span>
                       </div>
                       <p className="text-[11px] text-muted-foreground line-clamp-2">
-                        {item.description}
+                        {t(item.descKey)}
                       </p>
                     </button>
                   );
@@ -338,7 +343,7 @@ export function FieldPalette({
           {/* Advanced & Layout */}
           <div className="space-y-2">
             <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
-              Signatures & Layout
+              {t("editor.palette.categoryAdvanced")}
             </h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {PALETTE_ITEMS.filter(
@@ -360,11 +365,11 @@ export function FieldPalette({
                         <Icon className="w-4 h-4" />
                       </div>
                       <span className="font-semibold text-xs sm:text-sm">
-                        {item.label}
+                        {t(item.labelKey)}
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground line-clamp-2">
-                      {item.description}
+                      {t(item.descKey)}
                     </p>
                   </button>
                 );

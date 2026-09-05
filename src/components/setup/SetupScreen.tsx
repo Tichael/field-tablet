@@ -1,21 +1,42 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { syncManager } from "../../lib/sync/sync-manager";
 import { useAppStore } from "../../store/app-store";
-import { useConfigStore } from "../../store/config-store";
+import {
+  useConfigStore,
+  getDefaultConfig,
+  type AppConfig,
+} from "../../store/config-store";
 import { Button } from "../ui/button";
 import { Capacitor } from "@capacitor/core";
-// idb-keyval is no longer needed here
 import { Input } from "../ui/input";
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import { GenericFileBrowser } from "../documents/GenericFileBrowser";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Languages, Loader2 } from "lucide-react";
+import {
+  SUPPORTED_LANGUAGES,
+  getAppLanguage,
+  setDeviceLanguage,
+  type SupportedLanguage,
+} from "../../i18n";
 
 export function SetupScreen() {
+  const { t } = useTranslation();
   const isSyncing = useAppStore((state) => state.isSyncing);
   const setConfigured = useAppStore((state) => state.setConfigured);
+  const setEditingConfig = useAppStore((state) => state.setEditingConfig);
+  const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const setActiveConfigFile = useConfigStore(
     (state) => state.setActiveConfigFile,
   );
+  const saveConfig = useConfigStore((state) => state.saveConfig);
+  const [isCreatingConfig, setIsCreatingConfig] = useState(false);
 
   const isNative = Capacitor.isNativePlatform();
 
@@ -44,6 +65,10 @@ export function SetupScreen() {
     }
   }, []);
 
+  useEffect(() => {
+    document.title = t("header.fieldTablet");
+  }, [t]);
+
   const handleSelectFolder = async () => {
     try {
       const success = await syncManager.configure({ forcePrompt: true });
@@ -52,7 +77,7 @@ export function SetupScreen() {
       }
     } catch (e) {
       console.error("Error during configure:", e);
-      alert("An error occurred. Check the console for details.");
+      alert(t("setup.genericError"));
     }
   };
 
@@ -67,36 +92,104 @@ export function SetupScreen() {
         password: smbPass,
       });
       if (!success) {
-        alert("Failed to connect to SMB share. Please check your credentials.");
+        alert(t("setup.smbConnectionError"));
       } else {
         setStep(2);
       }
     } catch (e: any) {
       console.error("Error during native configure:", e);
-      alert(`SMB Configuration Error: ${e.message || "Unknown error"}`);
+      alert(t("setup.smbConfigError", { error: e.message || "Unknown error" }));
     }
   };
 
-  const selectConfigFile = (filename: string, isNew = false) => {
+  const selectConfigFile = async (filename: string, isNew = false) => {
     let finalName = filename.trim();
     if (!finalName) {
-      alert("Filename cannot be empty");
+      alert(t("setup.emptyFilenameError"));
       return;
     }
     if (!finalName.endsWith(".json")) {
       finalName += ".json";
     }
+
     if (isNew) {
-      localStorage.setItem("openEditor", "true");
+      setIsCreatingConfig(true);
+      try {
+        // If file already exists on the storage share, ask for confirmation
+        try {
+          const adapter = syncManager.getAdapter();
+          const existing = await adapter.readFileText(finalName);
+          if (existing) {
+            const overwrite = window.confirm(
+              t("editor.config.confirmOverwriteConfig", { name: finalName }),
+            );
+            if (!overwrite) {
+              setIsCreatingConfig(false);
+              return;
+            }
+          }
+        } catch {
+          // File does not exist yet, proceed
+        }
+
+        const currentLang = getAppLanguage();
+        const initialConfig: AppConfig = getDefaultConfig(currentLang);
+
+        await saveConfig(initialConfig, finalName);
+        localStorage.setItem("openEditor", "true");
+        setActiveConfigFile(finalName);
+        setSettingsOpen(true);
+        setEditingConfig(true);
+        setConfigured(true);
+      } catch (e) {
+        console.error("Failed to save initial configuration:", e);
+        alert(t("editor.config.failedToSaveConfig"));
+      } finally {
+        setIsCreatingConfig(false);
+      }
+    } else {
+      localStorage.removeItem("openEditor");
+      setActiveConfigFile(finalName);
+      setConfigured(true);
     }
-    setActiveConfigFile(finalName);
-    setConfigured(true);
   };
+
+  const handleCreateNewConfig = () => {
+    const defaultName = t("setup.defaultConfigFilename");
+    const name = newFileName.trim() || defaultName;
+    const jsonName = name.endsWith(".json") ? name : name + ".json";
+    const fullPath = browserPath ? `${browserPath}/${jsonName}` : jsonName;
+    selectConfigFile(fullPath, true);
+  };
+
+  const renderLanguagePicker = () => (
+    <div className="flex justify-end mb-2">
+      <Select
+        value={getAppLanguage()}
+        onValueChange={(val) => {
+          if (val) setDeviceLanguage(val as SupportedLanguage);
+        }}
+      >
+        <SelectTrigger className="h-8 text-xs gap-1.5 w-[150px]">
+          <Languages className="w-3.5 h-3.5 text-muted-foreground" />
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {SUPPORTED_LANGUAGES.map((l) => (
+            <SelectItem key={l.code} value={l.code}>
+              {l.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 
   if (step === 2) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
         <div className="max-w-2xl w-full bg-background rounded-xl shadow-lg border p-8 space-y-6 flex flex-col h-[80vh]">
+          {renderLanguagePicker()}
           <div className="relative flex items-center justify-center shrink-0">
             <Button
               variant="ghost"
@@ -105,14 +198,14 @@ export function SetupScreen() {
               className="absolute left-0 gap-1 text-muted-foreground hover:text-foreground"
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>Back</span>
+              <span>{t("common.back")}</span>
             </Button>
             <div className="text-center">
               <h1 className="text-2xl font-bold tracking-tight">
-                Select Configuration
+                {t("setup.selectConfiguration")}
               </h1>
               <p className="mt-1 text-muted-foreground text-sm">
-                Please browse and select the active configuration (.json) file.
+                {t("setup.selectConfigSubtitle")}
               </p>
             </div>
           </div>
@@ -127,28 +220,36 @@ export function SetupScreen() {
 
           <div className="border-t pt-4 space-y-3 mt-4 shrink-0">
             <h3 className="text-sm font-medium">
-              Or create a new configuration{" "}
-              {browserPath ? `in /${browserPath}` : "at root"}:
+              {browserPath
+                ? t("setup.orCreateNewIn", { path: browserPath })
+                : t("setup.orCreateNewAtRoot")}
             </h3>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g. tablet-config"
+                placeholder={t("setup.newConfigPlaceholder")}
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateNewConfig();
+                  }
+                }}
+                disabled={isCreatingConfig}
               />
               <Button
-                onClick={() => {
-                  const name = newFileName.trim() || "tablet-config";
-                  const jsonName = name.endsWith(".json")
-                    ? name
-                    : name + ".json";
-                  const fullPath = browserPath
-                    ? `${browserPath}/${jsonName}`
-                    : jsonName;
-                  selectConfigFile(fullPath, true);
-                }}
+                onClick={handleCreateNewConfig}
+                disabled={isCreatingConfig}
+                className="gap-1.5"
               >
-                Create
+                {isCreatingConfig ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{t("common.loading")}</span>
+                  </>
+                ) : (
+                  t("common.create")
+                )}
               </Button>
             </div>
           </div>
@@ -160,24 +261,24 @@ export function SetupScreen() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
       <div className="max-w-md w-full bg-background rounded-xl shadow-lg border p-8 space-y-6">
+        {renderLanguagePicker()}
         <div className="text-center">
           <h1 className="text-2xl font-bold tracking-tight">
-            App Configuration
+            {t("setup.appConfiguration")}
           </h1>
           <p className="mt-2 text-muted-foreground text-sm">
             {isNative
-              ? "Please configure your SMB share details."
-              : "Please select a source folder containing your configuration files."}
+              ? t("setup.step1SubtitleNative")
+              : t("setup.step1SubtitleWeb")}
           </p>
         </div>
 
         {isAndroidBrowser ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg text-sm mb-4">
-            <p className="font-semibold mb-2">Android Web Browser Detected</p>
-            <p className="mb-3">
-              The web version is not supported on Android browsers. Please
-              download the native app for the best experience.
+            <p className="font-semibold mb-2">
+              {t("setup.androidDetectedTitle")}
             </p>
+            <p className="mb-3">{t("setup.androidDetectedDesc")}</p>
             <Button
               className="w-full bg-amber-600 hover:bg-amber-700 text-white"
               onClick={() =>
@@ -187,28 +288,22 @@ export function SetupScreen() {
                 )
               }
             >
-              Get Android App
+              {t("setup.getAndroidApp")}
             </Button>
           </div>
         ) : !isNative && !isBrowserSupported ? (
           <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-lg text-sm mb-4">
-            <p className="font-semibold mb-1">Browser Not Supported</p>
-            <p>
-              Your browser does not support the required File System
-              capabilities. Please use a recent Chromium-based browser (Chrome,
-              Edge, Opera).
+            <p className="font-semibold mb-1">
+              {t("setup.browserNotSupportedTitle")}
             </p>
+            <p>{t("setup.browserNotSupportedDesc")}</p>
           </div>
         ) : !isNative ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-lg text-sm mb-4">
             <p className="font-semibold mb-1">
-              Important: Select the Main Folder
+              {t("setup.selectMainFolderTitle")}
             </p>
-            <p>
-              Please make sure to select the main, top-level folder of your
-              server drive. If you select a sub-folder, the paths might not
-              match and the app may not work correctly on other devices.
-            </p>
+            <p>{t("setup.selectMainFolderDesc")}</p>
           </div>
         ) : null}
 
@@ -219,34 +314,34 @@ export function SetupScreen() {
           >
             <Input
               type="text"
-              placeholder="SMB Host (e.g. 192.168.1.10)"
+              placeholder={t("setup.smbHost")}
               value={smbHost}
               onChange={(e) => setSmbHost(e.target.value)}
               required
             />
             <Input
               type="text"
-              placeholder="Share Name"
+              placeholder={t("setup.shareName")}
               value={smbShare}
               onChange={(e) => setSmbShare(e.target.value)}
               required
             />
             <Input
               type="text"
-              placeholder="Domain (Optional)"
+              placeholder={t("setup.domain")}
               value={smbDomain}
               onChange={(e) => setSmbDomain(e.target.value)}
             />
             <Input
               type="text"
-              placeholder="Username"
+              placeholder={t("setup.username")}
               value={smbUser}
               onChange={(e) => setSmbUser(e.target.value)}
               required
             />
             <Input
               type="password"
-              placeholder="Password"
+              placeholder={t("setup.password")}
               value={smbPass}
               onChange={(e) => setSmbPass(e.target.value)}
               required
@@ -256,7 +351,7 @@ export function SetupScreen() {
               disabled={isSyncing}
               className="w-full h-10 mt-2"
             >
-              {isSyncing ? "Configuring..." : "Connect and Sync"}
+              {isSyncing ? t("setup.configuring") : t("setup.connectAndSync")}
             </Button>
           </form>
         ) : (
@@ -266,7 +361,9 @@ export function SetupScreen() {
               disabled={isSyncing || isAndroidBrowser || !isBrowserSupported}
               className="w-full h-10"
             >
-              {isSyncing ? "Configuring..." : "Select Source Folder"}
+              {isSyncing
+                ? t("setup.configuring")
+                : t("setup.selectSourceFolder")}
             </Button>
           </div>
         )}

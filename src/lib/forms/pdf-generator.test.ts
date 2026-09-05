@@ -555,5 +555,122 @@ describe("pdf-generator", () => {
       const pdfRaw = atob(result.base64);
       expect(pdfRaw.startsWith("%PDF")).toBe(true);
     });
+
+    it("generates PDF in French when config.language is fr-CA", async () => {
+      const frConfig: AppConfig = {
+        theme: { primaryColor: "#0f172a", darkMode: "system" },
+        branding: { appTitle: "Test App" },
+        language: "fr-CA",
+      };
+
+      const submission: FormSubmission = {
+        id: "sub-fr-1",
+        templateId: TEST_REPORT_TEMPLATE.id,
+        templateTitle: TEST_REPORT_TEMPLATE.title,
+        templateVersion: 1,
+        folderPath: TEST_REPORT_TEMPLATE.folderPath,
+        status: "completed",
+        createdAt: "2026-09-05T10:00:00.000Z",
+        updatedAt: "2026-09-05T10:00:00.000Z",
+        values: { work_date: "2026-09-05" },
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: TEST_REPORT_TEMPLATE,
+        submission,
+        config: frConfig,
+      });
+
+      const pdfRaw = atob(result.base64);
+      expect(pdfRaw).toContain("RAPPORT DE SOUMISSION DE FORMULAIRE");
+    });
+
+    it("generates PDF in English when config.language is en", async () => {
+      const enConfig: AppConfig = {
+        theme: { primaryColor: "#0f172a", darkMode: "system" },
+        branding: { appTitle: "Test App" },
+        language: "en",
+      };
+
+      const submission: FormSubmission = {
+        id: "sub-en-1",
+        templateId: TEST_REPORT_TEMPLATE.id,
+        templateTitle: TEST_REPORT_TEMPLATE.title,
+        templateVersion: 1,
+        folderPath: TEST_REPORT_TEMPLATE.folderPath,
+        status: "completed",
+        createdAt: "2026-09-05T10:00:00.000Z",
+        updatedAt: "2026-09-05T10:00:00.000Z",
+        values: { work_date: "2026-09-05" },
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: TEST_REPORT_TEMPLATE,
+        submission,
+        config: enConfig,
+      });
+
+      const pdfRaw = atob(result.base64);
+      expect(pdfRaw).toContain("FORM SUBMISSION REPORT");
+      expect(pdfRaw).toContain("COMPLETED");
+    });
+
+    it("generates French PDF with localized video, photo, and checkbox values", async () => {
+      const frConfig: AppConfig = {
+        theme: { primaryColor: "#0f172a", darkMode: "system" },
+        branding: { appTitle: "Test App" },
+        language: "fr-CA",
+      };
+
+      const templateWithMedia = {
+        id: "tmpl-media",
+        title: "Inspection de Chantier",
+        sections: [
+          {
+            id: "s1",
+            title: "Médias",
+            fields: [
+              {
+                id: "safety_checked",
+                type: "checkbox",
+                label: "Sécurité vérifiée",
+              },
+              { id: "photos", type: "photo", label: "Photos du site" },
+              { id: "videos", type: "video", label: "Vidéos du site" },
+            ],
+          },
+        ],
+      } as any;
+
+      const submission: FormSubmission = {
+        id: "sub-fr-media",
+        templateId: "tmpl-media",
+        templateTitle: "Inspection de Chantier",
+        templateVersion: 1,
+        folderPath: "Chantier",
+        status: "completed",
+        createdAt: "2026-09-05T10:00:00.000Z",
+        updatedAt: "2026-09-05T10:00:00.000Z",
+        values: {
+          safety_checked: true,
+          photos: [],
+          videos: [],
+        },
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: templateWithMedia,
+        submission,
+        config: frConfig,
+      });
+
+      const pdfRaw = atob(result.base64);
+      expect(pdfRaw).toContain("[X] Oui");
+      expect(pdfRaw).toContain("[Aucune photo jointe]");
+      expect(pdfRaw).toContain("[Aucune vidéo jointe]");
+    });
   });
 });

@@ -2,6 +2,7 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { Button } from "../ui/button";
 import { RotateCcw, PenTool, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 interface SignaturePadProps {
   value?: string | null;
@@ -16,6 +17,7 @@ export function SignaturePad({
   disabled = false,
   className,
 }: SignaturePadProps) {
+  const { t } = useTranslation();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const isDrawingRef = useRef(false);
@@ -214,7 +216,7 @@ export function SignaturePad({
           <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center text-slate-400">
             <PenTool className="w-5 h-5 mb-1 opacity-50" />
             <span className="text-xs font-medium">
-              Sign here using finger or stylus
+              {t("forms.runner.signHere")}
             </span>
           </div>
         )}
@@ -222,14 +224,14 @@ export function SignaturePad({
         {hasDrawn && (
           <div className="absolute top-2 right-2 pointer-events-none bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1">
             <Check className="w-3 h-3" />
-            <span>Signed</span>
+            <span>{t("forms.runner.signed")}</span>
           </div>
         )}
       </div>
 
       <div className="flex justify-between items-center px-1">
         <p className="text-[11px] text-muted-foreground">
-          Signatures are embedded directly into generated PDF copies.
+          {t("forms.runner.signaturePdfNote")}
         </p>
         <Button
           type="button"
@@ -240,7 +242,7 @@ export function SignaturePad({
           className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-destructive"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>Clear</span>
+          <span>{t("forms.runner.clearSignature")}</span>
         </Button>
       </div>
     </div>

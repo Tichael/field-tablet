@@ -4,6 +4,7 @@ import { syncManager } from "../../../lib/sync/sync-manager";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
+import { useTranslation } from "react-i18next";
 import { sanitizeFilenamePart } from "../../../lib/forms/pdf-generator";
 import { GenericFileBrowser } from "../../documents/GenericFileBrowser";
 import {
@@ -28,6 +29,7 @@ export function TemplateSaveDialog({
   onClose,
   onSave,
 }: TemplateSaveDialogProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(template.title);
   const [description, setDescription] = useState(template.description || "");
   const [category, setCategory] = useState(template.category || "");
@@ -68,12 +70,12 @@ export function TemplateSaveDialog({
 
   const handleConfirmSave = async () => {
     if (!title.trim()) {
-      setError("Form title is required.");
+      setError(t("editor.saveDialog.formTitleRequired"));
       return;
     }
 
     if (!targetFolder) {
-      setError("Destination folder is required.");
+      setError(t("editor.saveDialog.folderPathRequired"));
       return;
     }
 
@@ -95,7 +97,7 @@ export function TemplateSaveDialog({
           );
           if (existing) {
             const confirmed = window.confirm(
-              `A form template already exists in "/${cleanTarget}". Do you want to overwrite it?`,
+              t("editor.saveDialog.overwriteConfirm", { folder: cleanTarget }),
             );
             if (!confirmed) {
               setIsSaving(false);
@@ -119,7 +121,7 @@ export function TemplateSaveDialog({
       onClose();
     } catch (e: any) {
       console.error("Failed to save template:", e);
-      setError(e.message || "Failed to save template to disk.");
+      setError(e.message || t("editor.saveDialog.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -131,9 +133,11 @@ export function TemplateSaveDialog({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-muted/20 shrink-0">
           <div>
-            <h3 className="font-bold text-lg">Save Form Template</h3>
+            <h3 className="font-bold text-lg">
+              {t("editor.saveDialog.title")}
+            </h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Confirm form details and select destination folder.
+              {t("editor.saveDialog.subtitle")}
             </p>
           </div>
           <Button
@@ -141,7 +145,7 @@ export function TemplateSaveDialog({
             size="icon"
             onClick={onClose}
             className="rounded-full"
-            title="Close"
+            title={t("common.close")}
             disabled={isSaving}
           >
             <X className="w-5 h-5" />
@@ -160,7 +164,8 @@ export function TemplateSaveDialog({
           {/* Title */}
           <div className="space-y-1.5">
             <Label htmlFor="save-title" className="text-xs font-semibold">
-              Form Title <span className="text-destructive">*</span>
+              {t("editor.saveDialog.formTitle")}{" "}
+              <span className="text-destructive">*</span>
             </Label>
             <Input
               id="save-title"
@@ -182,13 +187,13 @@ export function TemplateSaveDialog({
           {/* Description */}
           <div className="space-y-1.5">
             <Label htmlFor="save-desc" className="text-xs font-semibold">
-              Description (Optional)
+              {t("editor.saveDialog.description")}
             </Label>
             <Input
               id="save-desc"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief summary shown on forms dashboard"
+              placeholder={t("editor.saveDialog.descriptionPlaceholder")}
               className="text-xs"
             />
           </div>
@@ -196,13 +201,13 @@ export function TemplateSaveDialog({
           {/* Category */}
           <div className="space-y-1.5">
             <Label htmlFor="save-cat" className="text-xs font-semibold">
-              Category Tag (Optional)
+              {t("editor.saveDialog.category")}
             </Label>
             <Input
               id="save-cat"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. Safety, Maintenance, Reports, Quality"
+              placeholder={t("editor.saveDialog.categoryPlaceholder")}
               className="text-xs"
             />
           </div>
@@ -211,10 +216,11 @@ export function TemplateSaveDialog({
           <div className="pt-3 border-t space-y-3">
             <div className="flex items-center justify-between">
               <Label htmlFor="save-folder" className="text-xs font-semibold">
-                Direct Folder Path <span className="text-destructive">*</span>
+                {t("editor.saveDialog.folderPath")}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <span className="text-[10px] text-muted-foreground">
-                Destination on storage / SMB share
+                {t("editor.saveDialog.storageDestinationHint")}
               </span>
             </div>
 
@@ -227,7 +233,7 @@ export function TemplateSaveDialog({
                     setFolderPath(e.target.value);
                     setIsFolderManuallyEdited(true);
                   }}
-                  placeholder="e.g. Daily Reports or Safety/Inspections"
+                  placeholder={t("editor.saveDialog.folderPathPlaceholder")}
                   className="font-mono text-xs pl-6"
                 />
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-xs select-none">
@@ -240,10 +246,10 @@ export function TemplateSaveDialog({
                 size="sm"
                 onClick={() => setIsBrowserOpen(true)}
                 className="gap-1.5 text-xs shrink-0"
-                title="Browse existing folders"
+                title={t("editor.saveDialog.browseExistingFolders")}
               >
                 <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
-                <span>Browse</span>
+                <span>{t("common.browse")}</span>
               </Button>
             </div>
 
@@ -251,17 +257,17 @@ export function TemplateSaveDialog({
             <div className="p-3.5 rounded-xl border bg-muted/20 space-y-1.5">
               <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                 <FolderCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-                <span>Disk & SMB Storage Layout</span>
+                <span>{t("editor.saveDialog.storageLayoutTitle")}</span>
               </div>
               <div className="text-[11px] font-mono text-muted-foreground space-y-0.5 pl-6">
                 <div>
-                  Template:{" "}
+                  {t("editor.saveDialog.templatePathLabel")}{" "}
                   <span className="text-foreground font-semibold">
                     /{targetFolder || "..."}/form.json
                   </span>
                 </div>
                 <div>
-                  Submissions & PDFs:{" "}
+                  {t("editor.saveDialog.submissionsPathLabel")}{" "}
                   <span className="text-foreground">
                     /{targetFolder || "..."}/Filled Forms/
                   </span>
@@ -279,7 +285,7 @@ export function TemplateSaveDialog({
             onClick={onClose}
             disabled={isSaving}
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             size="sm"
@@ -290,12 +296,12 @@ export function TemplateSaveDialog({
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Saving Template...</span>
+                <span>{t("editor.saveDialog.savingTemplate")}</span>
               </>
             ) : (
               <>
                 <Save className="w-4 h-4" />
-                <span>Save Template</span>
+                <span>{t("editor.saveDialog.saveTemplateButton")}</span>
               </>
             )}
           </Button>
@@ -309,10 +315,10 @@ export function TemplateSaveDialog({
             <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
               <div>
                 <h4 className="font-semibold text-base">
-                  Select Destination Folder
+                  {t("editor.saveDialog.selectDestinationFolder")}
                 </h4>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Browse or create a folder on the storage share.
+                  {t("editor.saveDialog.selectDestinationFolderSubtitle")}
                 </p>
               </div>
               <Button
@@ -320,7 +326,7 @@ export function TemplateSaveDialog({
                 size="sm"
                 onClick={() => setIsBrowserOpen(false)}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
             <div className="flex-1 overflow-hidden p-3 sm:p-4">
