@@ -51,6 +51,7 @@ export interface FormTemplate {
   updatedAt: string;
   folderPath: string; // e.g. "Reports/Daily Report"
   category?: string;
+  legacyFolderPaths?: string[];
   sections: FormSection[];
 }
 

@@ -11,7 +11,6 @@ import {
   Clock,
   ExternalLink,
   Edit3,
-  Sparkles,
   Loader2,
   Calendar,
 } from "lucide-react";
@@ -79,7 +78,10 @@ export function FormsBrowser({
   const loadSubmissions = useCallback(async (form: FormTemplate) => {
     setLoadingSubmissions(true);
     try {
-      const subs = await formService.listSubmissions(form.folderPath);
+      const subs = await formService.listSubmissions(
+        form.folderPath,
+        form.legacyFolderPaths,
+      );
       setSubmissions(subs);
     } catch (e) {
       console.error("Failed to load submissions:", e);
@@ -98,19 +100,6 @@ export function FormsBrowser({
   const handleOpenHistory = (form: FormTemplate) => {
     setSelectedFormForHistory(form);
     loadSubmissions(form);
-  };
-
-  const handleSeedStarters = async () => {
-    const targetFolder = selectedFolder || formFolders[0] || "";
-    setLoading(true);
-    try {
-      await formService.seedStarterTemplates(targetFolder, formFoldersConfig);
-      await loadForms();
-    } catch (e) {
-      console.error("Failed to seed starter forms:", e);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // 1. If viewing submissions history for a form
@@ -296,29 +285,31 @@ export function FormsBrowser({
           </div>
         </div>
 
-        {formFolders.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            <Button
-              variant={selectedFolder === "" ? "secondary" : "ghost"}
-              size="xs"
-              onClick={() => setSelectedFolder("")}
-              className="text-xs"
-            >
-              All Folders
-            </Button>
-            {formFolders.map((f) => (
+        <div className="flex items-center gap-2">
+          {formFolders.length > 1 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto">
               <Button
-                key={f}
-                variant={selectedFolder === f ? "secondary" : "ghost"}
+                variant={selectedFolder === "" ? "secondary" : "ghost"}
                 size="xs"
-                onClick={() => setSelectedFolder(f)}
+                onClick={() => setSelectedFolder("")}
                 className="text-xs"
               >
-                /{f}
+                All Folders
               </Button>
-            ))}
-          </div>
-        )}
+              {formFolders.map((f) => (
+                <Button
+                  key={f}
+                  variant={selectedFolder === f ? "secondary" : "ghost"}
+                  size="xs"
+                  onClick={() => setSelectedFolder(f)}
+                  className="text-xs"
+                >
+                  /{f}
+                </Button>
+              ))}
+            </div>
+          )}
+        </div>
       </header>
 
       <main className="flex-1 overflow-auto p-4 sm:p-6 max-w-5xl w-full mx-auto space-y-6">
@@ -334,20 +325,10 @@ export function FormsBrowser({
               <h3 className="font-semibold text-lg">No Forms Found</h3>
               <p className="text-sm text-muted-foreground max-w-md">
                 {formFolders.length === 0
-                  ? "You haven't configured any Form Folders in Settings yet."
+                  ? "No form folders configured in Settings."
                   : `No forms were found in ${selectedFolder ? `/${selectedFolder}` : "your configured form folders"}.`}
               </p>
             </div>
-
-            {formFolders.length > 0 && (
-              <Button onClick={handleSeedStarters} className="gap-2 mt-2">
-                <Sparkles className="w-4 h-4" />
-                <span>
-                  Add Starter Forms (Daily Report, Incident Log, Equipment
-                  Check)
-                </span>
-              </Button>
-            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -385,7 +366,7 @@ export function FormsBrowser({
                   </div>
                 </div>
 
-                <div className="pt-4 mt-4 border-t flex items-center gap-2">
+                <div className="pt-4 mt-4 border-t flex items-center gap-1.5">
                   <Button
                     onClick={() => onSelectForm(form)}
                     className="flex-1 text-xs font-semibold gap-1.5 shadow-xs"

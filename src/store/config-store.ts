@@ -18,28 +18,48 @@ export function detectDefaultPdfPageSize(): "a4" | "letter" {
   return "a4";
 }
 
-export interface FormFoldersConfig {
-  dailyReports?: string;
-  incidentLogs?: string;
-  equipmentChecks?: string;
-}
+export type FormFoldersConfig =
+  | string[]
+  | {
+      folders?: string[];
+      dailyReports?: string;
+      incidentLogs?: string;
+      equipmentChecks?: string;
+      customFolders?: string[];
+      [key: string]: any;
+    };
 
 export function getFormFoldersList(config?: AppConfig | null): string[] {
   if (!config || !config.formFolders) return [];
   if (Array.isArray(config.formFolders)) {
     return Array.from(
       new Set(
-        (config.formFolders as string[])
+        config.formFolders
           .map((f) => f?.trim())
           .filter((f): f is string => Boolean(f)),
       ),
     );
   }
-  const { dailyReports, incidentLogs, equipmentChecks } = config.formFolders;
+  const {
+    folders,
+    customFolders,
+    dailyReports,
+    incidentLogs,
+    equipmentChecks,
+    ...rest
+  } = config.formFolders;
+  const list = [
+    ...(Array.isArray(folders) ? folders : []),
+    dailyReports,
+    incidentLogs,
+    equipmentChecks,
+    ...(Array.isArray(customFolders) ? customFolders : []),
+    ...Object.values(rest),
+  ];
   return Array.from(
     new Set(
-      [dailyReports, incidentLogs, equipmentChecks]
-        .map((f) => f?.trim())
+      list
+        .map((f) => (typeof f === "string" ? f.trim() : ""))
         .filter((f): f is string => Boolean(f)),
     ),
   );
@@ -67,7 +87,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   branding: {
     appTitle: "Field Tablet App",
   },
-  formFolders: {},
+  formFolders: [],
   pdfPageSize: detectDefaultPdfPageSize(),
 };
 

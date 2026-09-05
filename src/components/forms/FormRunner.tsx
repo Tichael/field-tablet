@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type {
   FormTemplate,
   FormSubmission,
@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   FileText,
   Check,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,8 @@ interface FormRunnerProps {
   initialSubmission?: FormSubmission;
   onClose: () => void;
   onViewPdf?: (filePath: string) => void;
+  onOpenHistory?: () => void;
+  isPreview?: boolean;
 }
 
 export function FormRunner({
@@ -42,6 +45,8 @@ export function FormRunner({
   initialSubmission,
   onClose,
   onViewPdf,
+  onOpenHistory,
+  isPreview = false,
 }: FormRunnerProps) {
   const config = useConfigStore((state) => state.config);
 
@@ -104,6 +109,16 @@ export function FormRunner({
 
   // Track if user has modified anything
   const [isDirty, setIsDirty] = useState(false);
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   // Prevent accidental data loss on browser refresh / navigation when dirty
   useEffect(() => {
@@ -171,6 +186,25 @@ export function FormRunner({
             }
           }
         }
+
+        // Custom regex pattern validation
+        if (
+          field.validation?.pattern &&
+          val !== undefined &&
+          val !== null &&
+          val !== ""
+        ) {
+          try {
+            const regex = new RegExp(field.validation.pattern);
+            if (!regex.test(String(val))) {
+              if (!missing.includes(field.id)) {
+                missing.push(field.id);
+              }
+            }
+          } catch {
+            // ignore invalid regex pattern in template definition
+          }
+        }
       }
     }
     setValidationErrors(missing);
@@ -191,6 +225,16 @@ export function FormRunner({
         }
         return;
       }
+    }
+
+    if (isPreview) {
+      setIsDirty(false);
+      setJustSaved(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        setJustSaved(false);
+      }, 2500);
+      return;
     }
 
     if (!config) {
@@ -242,7 +286,8 @@ export function FormRunner({
       setLastExportedPdfPath(result.pdfPath);
       setIsDirty(false);
       setJustSaved(true);
-      setTimeout(() => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
         setJustSaved(false);
       }, 3500);
     } catch (e) {
@@ -261,6 +306,16 @@ export function FormRunner({
       if (!confirmed) return;
     }
     onClose();
+  };
+
+  const handleOpenHistory = () => {
+    if (isDirty) {
+      const confirmed = window.confirm(
+        "You have unsaved changes. Are you sure you want to navigate to previously filled forms without saving?",
+      );
+      if (!confirmed) return;
+    }
+    onOpenHistory?.();
   };
 
   const renderFieldInput = (field: FormField) => {
@@ -552,8 +607,46 @@ export function FormRunner({
     );
   }, [template.sections, activeSectionId]);
 
+  if (!activeSection) {
+    return (
+      <div
+        className={cn(
+          "flex flex-col bg-background text-foreground",
+          isPreview ? "h-full" : "h-screen",
+        )}
+      >
+        <header className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-xs">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClose}
+            className="rounded-full"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <h1 className="text-lg font-bold">{template.title || "Form"}</h1>
+          <div className="w-9" />
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
+          <FileText className="w-12 h-12 mb-3 opacity-30" />
+          <p className="font-semibold text-base">
+            This form template has no sections.
+          </p>
+          <p className="text-xs mt-1">
+            Open this form in the Form Editor to add sections and fields.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
+    <div
+      className={cn(
+        "flex flex-col bg-background text-foreground",
+        isPreview ? "h-full min-h-0" : "min-h-screen",
+      )}
+    >
       {/* Top Tablet Header */}
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-md px-4 py-3 shadow-xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
@@ -577,9 +670,15 @@ export function FormRunner({
                     Editing
                   </span>
                 )}
+                {isPreview && (
+                  <span className="text-[10px] uppercase tracking-wider font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 shrink-0">
+                    Preview
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {template.folderPath}
+                {template.folderPath ||
+                  (isPreview ? "Previewing Template" : "")}
               </p>
             </div>
           </div>
@@ -594,6 +693,19 @@ export function FormRunner({
               >
                 <FileText className="w-3.5 h-3.5 text-red-500" />
                 <span>View PDF</span>
+              </Button>
+            )}
+            {!isPreview && onOpenHistory && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenHistory}
+                className="text-xs gap-1.5 font-medium"
+                title="Browse previously filled submissions for this form"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Previously Filled</span>
+                <span className="sm:hidden">History</span>
               </Button>
             )}
             <Button
