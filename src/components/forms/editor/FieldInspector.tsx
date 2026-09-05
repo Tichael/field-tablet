@@ -237,9 +237,7 @@ export function FieldInspector({
       id: cleanId,
       label: draft.label.trim(),
       isIdentifier: canBeIdentifier ? draft.isIdentifier : undefined,
-      options: hasOptions
-        ? options.map(({ _key, ...opt }) => opt)
-        : undefined,
+      options: hasOptions ? options.map(({ _key, ...opt }) => opt) : undefined,
     };
 
     onSave(finalField);

@@ -374,7 +374,8 @@ function App() {
                     No Forms Configured
                   </h3>
                   <p className="text-xs text-muted-foreground max-w-sm">
-                    Configure form folders or create new forms using the visual form editor in Settings.
+                    Configure form folders or create new forms using the visual
+                    form editor in Settings.
                   </p>
                 </div>
                 <Button
