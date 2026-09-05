@@ -11,6 +11,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import { useTranslation } from "react-i18next";
 import {
   Select,
   SelectContent,
@@ -49,6 +50,7 @@ export function FormRunner({
   onOpenHistory,
   isPreview = false,
 }: FormRunnerProps) {
+  const { t } = useTranslation();
   const config = useConfigStore((state) => state.config);
 
   // Initialize form state
@@ -252,7 +254,7 @@ export function FormRunner({
     }
 
     if (!config) {
-      alert("App configuration not loaded. Please try again.");
+      alert(t("forms.runner.configNotLoaded"));
       return;
     }
 
@@ -310,7 +312,7 @@ export function FormRunner({
       }, 3500);
     } catch (e) {
       console.error("Failed to save form submission:", e);
-      alert("An error occurred while saving the form and exporting the PDF.");
+      alert(t("forms.runner.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -318,9 +320,7 @@ export function FormRunner({
 
   const handleClose = () => {
     if (isDirty) {
-      const confirmed = window.confirm(
-        "You have unsaved changes. Are you sure you want to close without saving?",
-      );
+      const confirmed = window.confirm(t("forms.runner.unsavedCloseConfirm"));
       if (!confirmed) return;
     }
     onClose();
@@ -328,9 +328,7 @@ export function FormRunner({
 
   const handleOpenHistory = () => {
     if (isDirty) {
-      const confirmed = window.confirm(
-        "You have unsaved changes. Are you sure you want to navigate to previously filled forms without saving?",
-      );
+      const confirmed = window.confirm(t("forms.runner.unsavedHistoryConfirm"));
       if (!confirmed) return;
     }
     onOpenHistory?.();
@@ -460,7 +458,9 @@ export function FormRunner({
               )}
             >
               <SelectValue
-                placeholder={field.placeholder || "Select option..."}
+                placeholder={
+                  field.placeholder || t("forms.runner.selectOption")
+                }
               />
             </SelectTrigger>
             <SelectContent>
@@ -537,7 +537,9 @@ export function FormRunner({
               {val && <CheckCircle2 className="w-3.5 h-3.5" />}
             </div>
             <span className="text-sm font-medium">
-              {val ? "Yes / Confirmed" : "No / Not Checked"}
+              {val
+                ? t("forms.runner.yesConfirmed")
+                : t("forms.runner.noNotChecked")}
             </span>
           </button>
         );
@@ -668,11 +670,9 @@ export function FormRunner({
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
           <FileText className="w-12 h-12 mb-3 opacity-30" />
           <p className="font-semibold text-base">
-            This form template has no sections.
+            {t("forms.runner.noSectionsTitle")}
           </p>
-          <p className="text-xs mt-1">
-            Open this form in the Form Editor to add sections and fields.
-          </p>
+          <p className="text-xs mt-1">{t("forms.runner.noSectionsDesc")}</p>
         </div>
       </div>
     );
@@ -694,7 +694,7 @@ export function FormRunner({
               size="icon"
               onClick={handleClose}
               className="rounded-full shrink-0"
-              title="Close"
+              title={t("common.close")}
             >
               <ChevronLeft className="w-5 h-5" />
             </Button>
@@ -705,18 +705,18 @@ export function FormRunner({
                 </h1>
                 {initialSubmission && (
                   <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border shrink-0">
-                    Editing
+                    {t("forms.runner.editing")}
                   </span>
                 )}
                 {isPreview && (
                   <span className="text-[10px] uppercase tracking-wider font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 shrink-0">
-                    Preview
+                    {t("forms.runner.preview")}
                   </span>
                 )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
                 {template.folderPath ||
-                  (isPreview ? "Previewing Template" : "")}
+                  (isPreview ? t("forms.runner.previewingTemplate") : "")}
               </p>
             </div>
           </div>
@@ -730,7 +730,7 @@ export function FormRunner({
                 className="text-xs gap-1.5 font-medium border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
               >
                 <FileText className="w-3.5 h-3.5 text-red-500" />
-                <span>View PDF</span>
+                <span>{t("forms.runner.viewPdf")}</span>
               </Button>
             )}
             {!isPreview && onOpenHistory && (
@@ -739,11 +739,13 @@ export function FormRunner({
                 size="sm"
                 onClick={handleOpenHistory}
                 className="text-xs gap-1.5 font-medium"
-                title="Browse previously filled submissions for this form"
+                title={t("forms.runner.viewSubmissionHistory")}
               >
                 <Clock className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Previously Filled</span>
-                <span className="sm:hidden">History</span>
+                <span className="hidden sm:inline">
+                  {t("forms.runner.previouslyFilled")}
+                </span>
+                <span className="sm:hidden">{t("forms.runner.history")}</span>
               </Button>
             )}
             <Button
@@ -753,7 +755,7 @@ export function FormRunner({
               disabled={isSaving}
               className="px-3"
             >
-              Close
+              {t("common.close")}
             </Button>
             <Button
               size="sm"
@@ -764,17 +766,17 @@ export function FormRunner({
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  <span>Saving...</span>
+                  <span>{t("forms.runner.saving")}</span>
                 </>
               ) : justSaved ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
-                  <span>Saved!</span>
+                  <span>{t("forms.runner.saved")}</span>
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-1.5" />
-                  <span>Save</span>
+                  <span>{t("common.save")}</span>
                 </>
               )}
             </Button>
@@ -824,10 +826,11 @@ export function FormRunner({
           <div className="bg-destructive/10 border border-destructive/30 text-destructive p-3.5 rounded-xl flex items-center gap-3 text-sm animate-in fade-in">
             <AlertCircle className="w-5 h-5 shrink-0" />
             <div>
-              <p className="font-semibold">Required Fields Incomplete</p>
+              <p className="font-semibold">
+                {t("forms.runner.requiredFieldsIncomplete")}
+              </p>
               <p className="text-xs mt-0.5">
-                Please fill in all fields marked with an asterisk before
-                finalizing your submission.
+                {t("forms.runner.requiredFieldsDesc")}
               </p>
             </div>
           </div>
@@ -872,8 +875,8 @@ export function FormRunner({
                           values[field.id] !== undefined &&
                           values[field.id] !== null &&
                           values[field.id] !== ""
-                            ? "Invalid range"
-                            : "Required"}
+                            ? t("forms.runner.invalidRange")
+                            : t("common.required")}
                         </span>
                       )}
                     </div>
@@ -907,7 +910,7 @@ export function FormRunner({
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               >
-                Previous Section
+                {t("forms.runner.previousSection")}
               </Button>
             ) : (
               <div />
@@ -924,7 +927,7 @@ export function FormRunner({
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
               >
-                Next Section
+                {t("forms.runner.nextSection")}
               </Button>
             ) : (
               <div className="flex items-center gap-2">
@@ -936,7 +939,7 @@ export function FormRunner({
                     className="gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
                   >
                     <FileText className="w-4 h-4 text-red-500" />
-                    <span>View PDF</span>
+                    <span>{t("forms.runner.viewPdf")}</span>
                   </Button>
                 )}
                 <Button
@@ -947,17 +950,17 @@ export function FormRunner({
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      <span>Saving...</span>
+                      <span>{t("forms.runner.saving")}</span>
                     </>
                   ) : justSaved ? (
                     <>
                       <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
-                      <span>Saved!</span>
+                      <span>{t("forms.runner.saved")}</span>
                     </>
                   ) : (
                     <>
                       <Save className="w-4 h-4 mr-1.5" />
-                      <span>Save</span>
+                      <span>{t("common.save")}</span>
                     </>
                   )}
                 </Button>
@@ -974,7 +977,7 @@ export function FormRunner({
                 className="gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
               >
                 <FileText className="w-4 h-4 text-red-500" />
-                <span>View PDF</span>
+                <span>{t("forms.runner.viewPdf")}</span>
               </Button>
             )}
             <Button
@@ -985,17 +988,17 @@ export function FormRunner({
               {isSaving ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  <span>Saving...</span>
+                  <span>{t("forms.runner.saving")}</span>
                 </>
               ) : justSaved ? (
                 <>
                   <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
-                  <span>Saved!</span>
+                  <span>{t("forms.runner.saved")}</span>
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4 mr-1.5" />
-                  <span>Save Form</span>
+                  <span>{t("forms.runner.saveForm")}</span>
                 </>
               )}
             </Button>

@@ -2,6 +2,7 @@ import { jsPDF } from "jspdf";
 import type { FormTemplate, FormSubmission } from "../../types/form";
 import type { AppConfig } from "../../store/config-store";
 import { formatBytes } from "./media-utils";
+import i18n from "../../i18n";
 
 export interface GeneratePdfOptions {
   template: FormTemplate;
@@ -18,7 +19,8 @@ export interface GeneratedPdfResult {
 /**
  * Format a Date object into human-readable date and time parts.
  */
-export function formatDateTime(date: Date) {
+export function formatDateTime(date: Date, lang: string = "en") {
+  const locale = lang === "fr-CA" || lang.startsWith("fr") ? "fr-CA" : "en-US";
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -30,8 +32,8 @@ export function formatDateTime(date: Date) {
     dateStr: `${year}-${month}-${day}`,
     timeStr: `${hours}${minutes}`,
     timeFullStr: `${hours}${minutes}${seconds}`,
-    displayDate: date.toLocaleDateString(),
-    displayTime: date.toLocaleTimeString([], {
+    displayDate: date.toLocaleDateString(locale),
+    displayTime: date.toLocaleTimeString(locale, {
       hour: "2-digit",
       minute: "2-digit",
     }),
@@ -83,6 +85,8 @@ export async function generateFormSubmissionPdf({
   config,
   exportDate = new Date(),
 }: GeneratePdfOptions): Promise<GeneratedPdfResult> {
+  const pdfLang = config.language || "en";
+  const t = i18n.getFixedT(pdfLang);
   const pageSize = config.pdfPageSize === "letter" ? "letter" : "a4";
   const doc = new jsPDF({
     orientation: "portrait",
@@ -147,16 +151,20 @@ export async function generateFormSubmissionPdf({
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text(config.branding?.appTitle || "Field Tablet App", textStartX, y + 9);
+  doc.text(
+    config.branding?.appTitle || t("header.fieldTabletApp"),
+    textStartX,
+    y + 9,
+  );
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(220, 220, 220);
-  doc.text("FORM SUBMISSION REPORT", textStartX, y + 16);
+  doc.text(t("pdf.submissionReport"), textStartX, y + 16);
 
   // Status badge on header right
   const isCompleted = submission.status === "completed";
-  const badgeText = isCompleted ? "COMPLETED" : "DRAFT";
+  const badgeText = isCompleted ? t("pdf.completed") : t("pdf.draft");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   const badgeWidth = doc.getTextWidth(badgeText) + 8;
@@ -186,24 +194,32 @@ export async function generateFormSubmissionPdf({
   doc.setFontSize(8.5);
   doc.setTextColor(100, 116, 139);
 
-  const { displayDate, displayTime } = formatDateTime(exportDate);
+  const { displayDate, displayTime } = formatDateTime(exportDate, pdfLang);
   const createdDate = new Date(submission.createdAt || exportDate);
   const { displayDate: subDisplayDate, displayTime: subDisplayTime } =
-    formatDateTime(createdDate);
+    formatDateTime(createdDate, pdfLang);
 
   doc.text(
-    `Submitted: ${subDisplayDate} at ${subDisplayTime}`,
+    t("pdf.submittedAt", { date: subDisplayDate, time: subDisplayTime }),
     margin + 4,
     y + 14,
   );
-  doc.text(`Exported: ${displayDate} at ${displayTime}`, margin + 4, y + 20);
+  doc.text(
+    t("pdf.exportedAt", { date: displayDate, time: displayTime }),
+    margin + 4,
+    y + 20,
+  );
 
   doc.text(
-    `Template Version: ${template.version || 1}`,
+    t("pdf.templateVersion", { version: template.version || 1 }),
     margin + contentWidth / 2,
     y + 14,
   );
-  doc.text(`Reference: ${submission.id}`, margin + contentWidth / 2, y + 20);
+  doc.text(
+    t("pdf.reference", { id: submission.id }),
+    margin + contentWidth / 2,
+    y + 20,
+  );
 
   y += 28;
 
@@ -284,20 +300,24 @@ export async function generateFormSubmissionPdf({
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7.5);
             doc.setTextColor(148, 163, 184);
-            doc.text(`Digitally signed: ${displayDate}`, margin + 74, y + 18);
+            doc.text(
+              t("pdf.digitallySigned", { date: displayDate }),
+              margin + 74,
+              y + 18,
+            );
             y += 31;
           } catch {
             doc.setFont("helvetica", "italic");
             doc.setFontSize(8);
             doc.setTextColor(148, 163, 184);
-            doc.text("[Signature captured]", margin, y + 10);
+            doc.text(t("pdf.signatureCaptured"), margin, y + 10);
             y += 14;
           }
         } else {
           doc.setFont("helvetica", "italic");
           doc.setFontSize(8);
           doc.setTextColor(148, 163, 184);
-          doc.text("[No signature provided]", margin, y + 10);
+          doc.text(t("pdf.noSignature"), margin, y + 10);
           y += 14;
         }
         continue;
@@ -319,7 +339,7 @@ export async function generateFormSubmissionPdf({
           doc.setFont("helvetica", "italic");
           doc.setFontSize(8);
           doc.setTextColor(148, 163, 184);
-          doc.text("[No photos attached]", margin, y + 2);
+          doc.text(t("pdf.noPhotos"), margin, y + 2);
           y += 8;
         } else {
           for (let pi = 0; pi < photoList.length; pi++) {
@@ -587,12 +607,12 @@ export async function generateFormSubmissionPdf({
     doc.setTextColor(148, 163, 184);
 
     doc.text(
-      `${config.branding?.appTitle || "Field Tablet App"} | ${template.title}`,
+      `${config.branding?.appTitle || t("header.fieldTabletApp")} | ${template.title}`,
       margin,
       pageHeight - 7,
     );
 
-    const pageText = `Page ${i} of ${totalPages}`;
+    const pageText = t("pdf.pageOf", { current: i, total: totalPages });
     doc.text(
       pageText,
       margin + contentWidth - doc.getTextWidth(pageText),

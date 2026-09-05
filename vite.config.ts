@@ -35,6 +35,33 @@ export default defineConfig({
         name: "Field Tablet",
         short_name: "FieldTablet",
         description: "Field Tablet Application",
+        name_localized: {
+          en: { value: "Field Tablet" },
+          fr: { value: "Tablette de terrain" },
+          "fr-CA": { value: "Tablette de terrain" },
+        },
+        short_name_localized: {
+          en: { value: "FieldTablet" },
+          fr: { value: "Tablette" },
+          "fr-CA": { value: "Tablette" },
+        },
+        description_localized: {
+          en: { value: "Field Tablet" },
+          fr: { value: "Tablette de terrain" },
+          "fr-CA": { value: "Tablette de terrain" },
+        },
+        translations: {
+          fr: {
+            name: "Tablette de terrain",
+            short_name: "Tablette",
+            description: "Tablette de terrain",
+          },
+          "fr-CA": {
+            name: "Tablette de terrain",
+            short_name: "Tablette",
+            description: "Tablette de terrain",
+          },
+        },
         theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",
@@ -60,7 +87,7 @@ export default defineConfig({
             purpose: "maskable",
           },
         ],
-      },
+      } as any,
     }),
   ],
   resolve: {

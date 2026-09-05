@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { get } from "idb-keyval";
 import {
   useConfigStore,
   DEFAULT_CONFIG,
+  detectDefaultAppTitle,
   getFormFoldersList,
 } from "../../store/config-store";
 import type { AppConfig } from "../../store/config-store";
@@ -12,6 +14,7 @@ import { FormEditor } from "../forms/editor/FormEditor";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { SUPPORTED_LANGUAGES, type SupportedLanguage } from "../../i18n";
 import {
   Card,
   CardContent,
@@ -49,6 +52,7 @@ interface ConfigEditorScreenProps {
 }
 
 export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
+  const { t } = useTranslation();
   const { config, saveConfig, activeConfigFile } = useConfigStore();
   const isSyncing = useAppStore((state) => state.isSyncing);
   const isConfigured = useAppStore((state) => state.isConfigured);
@@ -62,6 +66,35 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   } | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [checkingConnection, setCheckingConnection] = useState(false);
+
+  const handleLanguageChange = (language: SupportedLanguage) => {
+    setFormData((prev) => {
+      const prevLang = prev.language || "en";
+      const prevDefaultTitle = detectDefaultAppTitle(prevLang);
+      const isUntouchedTitle =
+        !prev.branding?.appTitle ||
+        prev.branding.appTitle.trim() === "" ||
+        prev.branding.appTitle === prevDefaultTitle ||
+        prev.branding.appTitle === "Field Tablet" ||
+        prev.branding.appTitle === "Tablette de terrain" ||
+        prev.branding.appTitle === "Field Tablet App" ||
+        prev.branding.appTitle === "Application Tablette Terrain" ||
+        prev.branding.appTitle === "Application tablette de terrain";
+
+      const newTitle = isUntouchedTitle
+        ? detectDefaultAppTitle(language)
+        : prev.branding.appTitle;
+
+      return {
+        ...prev,
+        language,
+        branding: {
+          ...prev.branding,
+          appTitle: newTitle,
+        },
+      };
+    });
+  };
 
   const handleAddSyncFolder = (path: string) => {
     const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
@@ -79,7 +112,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     if (normalizedCurrent.includes(cleanPath)) {
       setFolderNotice({
         type: "warning",
-        message: `Folder "/${cleanPath}" is already configured to sync.`,
+        message: t("editor.config.folderAlreadyInSync", { path: cleanPath }),
       });
       setBrowserOpen(false);
       return;
@@ -91,7 +124,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     );
     if (parentFolder) {
       const confirmed = window.confirm(
-        `Folder "/${cleanPath}" is inside "/${parentFolder}", which is already being synced. Do you still want to add it as a separate sync folder?`,
+        t("editor.config.confirmAddSubfolderSync", {
+          path: cleanPath,
+          parent: parentFolder,
+        }),
       );
       if (!confirmed) {
         setBrowserOpen(false);
@@ -111,7 +147,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
       newFolders.push(cleanPath);
       setFolderNotice({
         type: "info",
-        message: `Added "/${cleanPath}" and merged redundant subfolder(s): ${childFolders.map((c) => `/${c}`).join(", ")}.`,
+        message: t("editor.config.folderAddedAndMergedSubfolders", {
+          path: cleanPath,
+          subfolders: childFolders.map((c) => `/${c}`).join(", "),
+        }),
       });
     } else {
       newFolders = [...normalizedCurrent, cleanPath];
@@ -204,7 +243,12 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     if (tmpl) {
       setTemplateToEdit(tmpl);
     } else {
-      setTemplateToEdit(formService.createEmptyTemplate("New Form", folder));
+      setTemplateToEdit(
+        formService.createEmptyTemplate(
+          t("editor.formEditor.untitledForm"),
+          folder,
+        ),
+      );
     }
     setIsEditingTemplate(true);
   };
@@ -217,7 +261,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     if (!tmpl) return;
 
     const randomSuffix = Math.random().toString(36).slice(2, 6);
-    const cleanTitle = `${tmpl.title} (Copy)`;
+    const cleanTitle = t("editor.config.formCopySuffix", {
+      title: tmpl.title,
+    });
     const cloned: FormTemplate = {
       ...JSON.parse(JSON.stringify(tmpl)),
       id: `${tmpl.id}_copy_${randomSuffix}`,
@@ -281,7 +327,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
     setFolderNotice({
       type: "info",
-      message: `Unlinked "/${folderToRemove}". Files on the storage share were not deleted.`,
+      message: t("editor.config.unlinkFolderSuccess", {
+        folder: folderToRemove,
+      }),
     });
   };
 
@@ -323,7 +371,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     if (currentList.includes(cleanPath)) {
       setFolderNotice({
         type: "info",
-        message: `Folder "/${cleanPath}" is already added as a form folder.`,
+        message: t("editor.config.folderAlreadyAddedForm", { path: cleanPath }),
       });
       setBrowserOpen(false);
       return;
@@ -340,12 +388,15 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         setLoadedTemplates((prev) => ({ ...prev, [cleanPath]: tmpl }));
         setFolderNotice({
           type: "info",
-          message: `Linked "/${cleanPath}" (Found form: "${tmpl.title}").`,
+          message: t("editor.config.linkedFormFound", {
+            path: cleanPath,
+            title: tmpl.title,
+          }),
         });
       } else {
         setFolderNotice({
           type: "info",
-          message: `Linked "/${cleanPath}". No form.json found yet—click "Create Template" to add one.`,
+          message: t("editor.config.linkedNoFormJson", { path: cleanPath }),
         });
       }
     } catch {
@@ -486,7 +537,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
           const exists = files.find((f: any) => f.name === finalName);
           if (exists) {
             const confirm = window.confirm(
-              `A configuration file named "${finalName}" already exists. Do you want to overwrite it?`,
+              t("editor.config.confirmOverwriteConfig", { name: finalName }),
             );
             if (!confirm) return;
           }
@@ -501,7 +552,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
       await saveConfig(formData, finalName);
       onClose();
     } catch (e) {
-      alert("Failed to save configuration.");
+      alert(t("editor.config.failedToSaveConfig"));
       console.error(e);
     } finally {
       setIsSaving(false);
@@ -513,7 +564,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
       JSON.stringify(formData) !== JSON.stringify(config || DEFAULT_CONFIG);
     if (hasUnsavedChanges) {
       const confirm = window.confirm(
-        "You have unsaved changes. Are you sure you want to discard them?",
+        t("editor.config.discardUnsavedChangesPrompt"),
       );
       if (!confirm) return;
     }
@@ -540,10 +591,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold tracking-tight">
-            Configuration Editor
+            {t("editor.config.title")}
           </h2>
           <p className="text-sm text-muted-foreground mt-1">
-            Customize the app's appearance, forms, and folders.
+            {t("editor.config.subtitle")}
           </p>
         </div>
       </div>
@@ -552,10 +603,11 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in duration-150">
           <AlertCircle className="w-5 h-5 shrink-0" />
           <div className="text-sm">
-            <p className="font-semibold">Network Share Disconnected</p>
+            <p className="font-semibold">
+              {t("editor.config.networkShareDisconnectedTitle")}
+            </p>
             <p className="text-xs mt-0.5">
-              Configuration cannot be edited while offline to prevent conflicts.
-              Please reconnect to your network share to make and save changes.
+              {t("editor.config.networkShareDisconnectedDesc")}
             </p>
           </div>
         </div>
@@ -563,24 +615,33 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
       <Tabs defaultValue="theme" className="w-full">
         <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="theme">Theme & Layout</TabsTrigger>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="sync">Sync Folders</TabsTrigger>
-          <TabsTrigger value="forms">Forms & Folders</TabsTrigger>
+          <TabsTrigger value="theme">
+            {t("editor.config.themeAndLayout")}
+          </TabsTrigger>
+          <TabsTrigger value="branding">
+            {t("editor.config.branding")}
+          </TabsTrigger>
+          <TabsTrigger value="sync">
+            {t("editor.config.syncFolders")}
+          </TabsTrigger>
+          <TabsTrigger value="forms">
+            {t("editor.config.formsAndFolders")}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="theme">
           <Card>
             <CardHeader>
-              <CardTitle>Theme Colors & Layout</CardTitle>
+              <CardTitle>{t("editor.config.themeColorsTitle")}</CardTitle>
               <CardDescription>
-                Adjust primary colors, dark mode preference, and PDF export
-                sizing.
+                {t("editor.config.themeColorsDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="primaryColor">Primary Color</Label>
+                <Label htmlFor="primaryColor">
+                  {t("editor.config.primaryColor")}
+                </Label>
                 <div className="flex gap-3 items-center">
                   <Input
                     id="primaryColor"
@@ -603,7 +664,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="darkMode">Dark Mode</Label>
+                <Label htmlFor="darkMode">{t("editor.config.darkMode")}</Label>
                 <Select
                   value={formData.theme.darkMode}
                   onValueChange={(val) => {
@@ -611,21 +672,51 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   }}
                 >
                   <SelectTrigger id="darkMode">
-                    <SelectValue placeholder="Select dark mode preference" />
+                    <SelectValue placeholder={t("editor.config.darkMode")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="system">
-                      Auto (System Default)
+                      {t("editor.config.darkModeAuto")}
                     </SelectItem>
-                    <SelectItem value="light">Always Light</SelectItem>
-                    <SelectItem value="dark">Always Dark</SelectItem>
+                    <SelectItem value="light">
+                      {t("editor.config.darkModeLight")}
+                    </SelectItem>
+                    <SelectItem value="dark">
+                      {t("editor.config.darkModeDark")}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="appLanguage">
+                  {t("editor.config.appLanguageTitle")}
+                </Label>
+                <Select
+                  value={formData.language || "en"}
+                  onValueChange={(val: any) => {
+                    if (val) handleLanguageChange(val);
+                  }}
+                >
+                  <SelectTrigger id="appLanguage">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SUPPORTED_LANGUAGES.map((l) => (
+                      <SelectItem key={l.code} value={l.code}>
+                        {l.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {t("editor.config.appLanguageDesc")}
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="pdfPageSize">
-                  Default PDF Page Size (App-Wide)
+                  {t("editor.config.pdfPageSizeTitle")}
                 </Label>
                 <Select
                   value={formData.pdfPageSize || "a4"}
@@ -635,25 +726,27 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   }}
                 >
                   <SelectTrigger id="pdfPageSize">
-                    <SelectValue placeholder="Select default PDF page size" />
+                    <SelectValue
+                      placeholder={t("editor.config.pdfPageSizeTitle")}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="a4">
-                      A4 (210 × 297 mm - Standard International)
+                      {t("editor.config.pdfPageSizeA4")}
                     </SelectItem>
                     <SelectItem value="letter">
-                      Letter (8.5 × 11 in - US / Canada / Mexico)
+                      {t("editor.config.pdfPageSizeLetter")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Applied across all generated form PDF snapshots.
+                  {t("editor.config.pdfPageSizeDesc")}
                 </p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="photoQuality">
-                  Form Photo Attachment Quality
+                  {t("editor.config.photoQualityTitle")}
                 </Label>
                 <Select
                   value={formData.media?.photoQuality || "2mp"}
@@ -662,27 +755,27 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   }}
                 >
                   <SelectTrigger id="photoQuality">
-                    <SelectValue placeholder="Select photo quality limit" />
+                    <SelectValue
+                      placeholder={t("editor.config.photoQualityTitle")}
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="2mp">
-                      Standard (2 MP — ~1920×1080) — Fast sync & compact PDFs
+                      {t("editor.config.photoQuality2mp")}
                     </SelectItem>
                     <SelectItem value="5mp">
-                      High (5 MP — ~2560×1920) — Sharper details for labels &
-                      text
+                      {t("editor.config.photoQuality5mp")}
                     </SelectItem>
                     <SelectItem value="10mp">
-                      Ultra (10 MP — ~3648×2736) — Fine inspection & high detail
+                      {t("editor.config.photoQuality10mp")}
                     </SelectItem>
                     <SelectItem value="original">
-                      Original (Unlimited) — Full tablet camera resolution
+                      {t("editor.config.photoQualityOriginal")}
                     </SelectItem>
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Limits camera photo resolution on tablets to optimize memory,
-                  storage, and SMB sync speeds.
+                  {t("editor.config.photoQualityDesc")}
                 </p>
               </div>
             </CardContent>
@@ -692,31 +785,35 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         <TabsContent value="branding">
           <Card>
             <CardHeader>
-              <CardTitle>App Branding</CardTitle>
+              <CardTitle>{t("editor.config.brandingTitle")}</CardTitle>
               <CardDescription>
-                Customize the app title and logo.
+                {t("editor.config.brandingDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="appTitle">In-App Title</Label>
+                <Label htmlFor="appTitle">
+                  {t("editor.config.inAppTitle")}
+                </Label>
                 <Input
                   id="appTitle"
                   value={formData.branding.appTitle}
                   onChange={(e) =>
                     handleBrandingChange("appTitle", e.target.value)
                   }
-                  placeholder="e.g. Field Tablet App"
+                  placeholder={t("editor.config.inAppTitlePlaceholder")}
                 />
               </div>
 
               <div className="space-y-3">
-                <Label htmlFor="logoUpload">Company Logo (Optional)</Label>
+                <Label htmlFor="logoUpload">
+                  {t("editor.config.companyLogo")}
+                </Label>
                 {formData.branding.logoBase64 ? (
                   <div className="flex flex-col gap-3 items-start border rounded-md p-4">
                     <img
                       src={formData.branding.logoBase64}
-                      alt="Logo preview"
+                      alt={t("editor.config.logoPreviewAlt")}
                       className="max-h-24 object-contain rounded"
                     />
                     <Button
@@ -724,7 +821,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                       size="sm"
                       onClick={handleRemoveImage}
                     >
-                      Remove Image
+                      {t("editor.config.removeImage")}
                     </Button>
                   </div>
                 ) : (
@@ -736,8 +833,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   />
                 )}
                 <p className="text-xs text-muted-foreground">
-                  This image will be saved directly into your configuration
-                  file. For best performance, use a small image.
+                  {t("editor.config.logoDesc")}
                 </p>
               </div>
             </CardContent>
@@ -747,10 +843,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         <TabsContent value="sync">
           <Card>
             <CardHeader>
-              <CardTitle>Sync Folders</CardTitle>
+              <CardTitle>{t("editor.config.syncFoldersTabTitle")}</CardTitle>
               <CardDescription>
-                Configure the folders that should be synchronized for offline
-                document viewing.
+                {t("editor.config.syncFoldersTabDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -770,7 +865,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   <button
                     onClick={() => setFolderNotice(null)}
                     className="text-muted-foreground hover:text-foreground p-1 text-xs"
-                    title="Dismiss"
+                    title={t("common.dismiss")}
                   >
                     ✕
                   </button>
@@ -778,10 +873,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               )}
 
               <div className="space-y-2">
-                <Label>Folders to Sync</Label>
+                <Label>{t("editor.config.foldersToSync")}</Label>
                 {!formData.syncFolders || formData.syncFolders.length === 0 ? (
                   <p className="text-sm text-muted-foreground italic">
-                    No sync folders added. Root files will be synced.
+                    {t("editor.config.noSyncFolders")}
                   </p>
                 ) : (
                   <ul className="space-y-2">
@@ -801,7 +896,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                           size="sm"
                           onClick={() => handleRemoveSyncFolder(folder)}
                           className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
-                          title={`Remove /${folder}`}
+                          title={t("editor.config.removeFolderTitle", {
+                            folder,
+                          })}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -817,7 +914,8 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                     setBrowserOpen(true);
                   }}
                 >
-                  <FolderPlus className="w-4 h-4 mr-2" /> Add Document Folder
+                  <FolderPlus className="w-4 h-4 mr-2" />{" "}
+                  {t("editor.config.addDocumentFolder")}
                 </Button>
               </div>
             </CardContent>
@@ -828,11 +926,11 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <CardTitle>Forms & Folders</CardTitle>
+                <CardTitle>
+                  {t("editor.config.formsAndFoldersTabTitle")}
+                </CardTitle>
                 <CardDescription>
-                  Create, edit, and organize form templates and their folders.
-                  Forms configured here appear on the main screen for field
-                  operators to fill.
+                  {t("editor.config.formsAndFoldersTabDesc")}
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -842,7 +940,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   className="gap-1.5 font-semibold text-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Create New Form</span>
+                  <span>{t("editor.config.createNewForm")}</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -854,7 +952,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   className="gap-1.5 text-xs"
                 >
                   <FolderPlus className="w-3.5 h-3.5" />
-                  <span>Link Existing Folder</span>
+                  <span>{t("editor.config.linkExistingFolder")}</span>
                 </Button>
               </div>
             </CardHeader>
@@ -875,7 +973,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   <button
                     onClick={() => setFolderNotice(null)}
                     className="text-muted-foreground hover:text-foreground p-1 text-xs"
-                    title="Dismiss"
+                    title={t("common.dismiss")}
                   >
                     ✕
                   </button>
@@ -887,12 +985,10 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   <FolderPlus className="w-10 h-10 text-muted-foreground/50" />
                   <div className="space-y-1">
                     <h4 className="font-semibold text-sm">
-                      No Forms or Form Folders Configured
+                      {t("editor.config.noFormsConfigured")}
                     </h4>
                     <p className="text-xs text-muted-foreground max-w-sm">
-                      Create a new form template to define questions and its
-                      storage folder, or link an existing folder on the storage
-                      share.
+                      {t("editor.config.noFormsConfiguredDesc")}
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
@@ -902,7 +998,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                       className="gap-1.5 text-xs font-semibold"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>Create First Form</span>
+                      <span>{t("editor.config.createFirstForm")}</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -914,14 +1010,14 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                       className="gap-1.5 text-xs"
                     >
                       <FolderPlus className="w-3.5 h-3.5" />
-                      <span>Link Folder</span>
+                      <span>{t("editor.config.linkFolder")}</span>
                     </Button>
                   </div>
                 </div>
               ) : loadingTemplates ? (
                 <div className="border rounded-xl p-8 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/10">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Loading form templates...</span>
+                  <span>{t("editor.config.loadingFormTemplates")}</span>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -956,18 +1052,32 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
                           {tmpl ? (
                             <p className="text-xs text-muted-foreground">
-                              {tmpl.sections.length} Section
-                              {tmpl.sections.length > 1 ? "s" : ""} •{" "}
-                              {tmpl.sections.reduce(
-                                (acc, s) => acc + s.fields.length,
-                                0,
-                              )}{" "}
-                              Fields
+                              {tmpl.sections.length === 1
+                                ? t("editor.config.sectionCountSingular", {
+                                    count: tmpl.sections.length,
+                                  })
+                                : t("editor.config.sectionCountPlural", {
+                                    count: tmpl.sections.length,
+                                  })}{" "}
+                              •{" "}
+                              {(() => {
+                                const fieldCount = tmpl.sections.reduce(
+                                  (acc, s) => acc + s.fields.length,
+                                  0,
+                                );
+                                return fieldCount === 1
+                                  ? t("editor.config.fieldCountSingular", {
+                                      count: fieldCount,
+                                    })
+                                  : t("editor.config.fieldCountPlural", {
+                                      count: fieldCount,
+                                    });
+                              })()}
                               {tmpl.description ? ` — ${tmpl.description}` : ""}
                             </p>
                           ) : (
                             <p className="text-xs text-amber-600 dark:text-amber-400">
-                              No form.json found in this folder yet.
+                              {t("editor.config.noFormJsonFound")}
                             </p>
                           )}
                         </div>
@@ -978,11 +1088,13 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                             size="sm"
                             onClick={() => handleEditForm(folder)}
                             className="gap-1 text-xs"
-                            title="Edit Template Schema & Questions"
+                            title={t("editor.config.editTemplateTooltip")}
                           >
                             <Edit3 className="w-3.5 h-3.5 text-primary" />
                             <span>
-                              {tmpl ? "Edit Form" : "Create Template"}
+                              {tmpl
+                                ? t("editor.config.editForm")
+                                : t("editor.config.createTemplate")}
                             </span>
                           </Button>
 
@@ -992,7 +1104,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                               size="sm"
                               onClick={() => handleDuplicateForm(folder)}
                               className="text-xs px-2"
-                              title="Duplicate / Clone Form"
+                              title={t("editor.config.duplicateFormTooltip")}
                             >
                               <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                             </Button>
@@ -1003,7 +1115,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                             size="sm"
                             onClick={() => handleUnlinkFormFolder(folder)}
                             className="text-destructive hover:bg-destructive/10 text-xs px-2"
-                            title="Unlink form folder from configuration (files on share are not deleted)"
+                            title={t("editor.config.unlinkFolderTooltip")}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
@@ -1025,13 +1137,13 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               <div>
                 <h3 className="font-semibold text-lg">
                   {browserMode === "form"
-                    ? "Select Folder to Link"
-                    : "Select Folder to Sync"}
+                    ? t("editor.config.selectFolderToLinkTitle")
+                    : t("editor.config.selectFolderToSyncTitle")}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {browserMode === "form"
-                    ? "Browse or select an existing folder on the storage share to link as a form folder."
-                    : "Browse or create a folder to synchronize with this device."}
+                    ? t("editor.config.selectFolderToLinkDesc")
+                    : t("editor.config.selectFolderToSyncDesc")}
                 </p>
               </div>
               <Button
@@ -1041,7 +1153,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   setBrowserOpen(false);
                 }}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
             <div className="flex-1 overflow-hidden p-3 sm:p-4">
@@ -1068,7 +1180,9 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="saveAsName">Save Configuration As</Label>
+            <Label htmlFor="saveAsName">
+              {t("editor.config.configFilenameLabel")}
+            </Label>
             <Input
               id="saveAsName"
               value={saveAsName}
@@ -1085,7 +1199,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               onClick={handleCancel}
               disabled={isSaving || isSyncing}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               className="flex-1"
@@ -1100,21 +1214,20 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
               }
               title={
                 isConfigured && isConnected === false
-                  ? "Cannot save while disconnected from network share"
+                  ? t("editor.config.offlineWarning")
                   : undefined
               }
             >
               {isSaving || isSyncing
-                ? "Saving..."
+                ? t("editor.config.savingConfig")
                 : checkingConnection
-                  ? "Checking Connection..."
-                  : "Save & Apply Configuration"}
+                  ? t("common.loading")
+                  : t("editor.config.saveConfig")}
             </Button>
           </div>
           {isConfigured && isConnected === false && (
             <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
-              Network share is disconnected. Connect to the network share to
-              save configuration changes.
+              {t("editor.config.offlineWarning")}
             </p>
           )}
         </CardContent>

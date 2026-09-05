@@ -4,6 +4,7 @@ import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Switch } from "../../ui/switch";
+import { useTranslation } from "react-i18next";
 import { sanitizeFilenamePart } from "../../../lib/forms/pdf-generator";
 import {
   X,
@@ -34,6 +35,7 @@ export function FieldInspector({
   onSave,
   existingFieldIds,
 }: FieldInspectorProps) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState<FormField | null>(null);
   const [options, setOptions] = useState<EditorOption[]>([]);
   const [newOptionLabel, setNewOptionLabel] = useState("");
@@ -155,29 +157,25 @@ export function FieldInspector({
 
   const handleApply = () => {
     if (!draft.label.trim()) {
-      setError("Field label is required.");
+      setError(t("editor.inspector.errorLabelRequired"));
       return;
     }
 
     const cleanId = draft.id.trim();
     if (!cleanId) {
-      setError("Field ID is required.");
+      setError(t("editor.inspector.errorIdRequired"));
       return;
     }
 
     if (!/^[a-zA-Z0-9_-]+$/.test(cleanId)) {
-      setError(
-        "Field ID must contain only letters, numbers, hyphens, and underscores (no spaces).",
-      );
+      setError(t("editor.inspector.errorIdFormat"));
       return;
     }
 
     // Check duplicate ID (excluding self)
     const otherIds = existingFieldIds.filter((id) => id !== field?.id);
     if (otherIds.includes(cleanId)) {
-      setError(
-        `Field ID "${cleanId}" is already used by another field in this form.`,
-      );
+      setError(t("editor.inspector.errorIdDuplicate", { id: cleanId }));
       return;
     }
 
@@ -188,28 +186,24 @@ export function FieldInspector({
 
     if (hasOptions) {
       if (options.length === 0) {
-        setError(
-          `Please provide at least one option for this ${draft.type} field.`,
-        );
+        setError(t("editor.inspector.errorOptionMin", { type: draft.type }));
         return;
       }
       const emptyLabel = options.find((opt) => !opt.label.trim());
       if (emptyLabel) {
-        setError("All options must have a label.");
+        setError(t("editor.inspector.errorOptionLabel"));
         return;
       }
       const emptyValue = options.find((opt) => !opt.value.trim());
       if (emptyValue) {
-        setError("All options must have a value.");
+        setError(t("editor.inspector.errorOptionValue"));
         return;
       }
       const seenValues = new Set<string>();
       for (const opt of options) {
         const val = opt.value.trim();
         if (seenValues.has(val)) {
-          setError(
-            `Option value "${val}" is duplicated. Each option must have a unique value.`,
-          );
+          setError(t("editor.inspector.errorOptionDuplicate", { value: val }));
           return;
         }
         seenValues.add(val);
@@ -222,7 +216,7 @@ export function FieldInspector({
       draft.validation?.max !== undefined &&
       draft.validation.min > draft.validation.max
     ) {
-      setError("Minimum value cannot be greater than maximum value.");
+      setError(t("editor.inspector.errorMinMax"));
       return;
     }
 
@@ -267,14 +261,14 @@ export function FieldInspector({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-bold text-lg text-foreground">
-                Edit Field Properties
+                {t("editor.inspector.title")}
               </h3>
               <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border/40">
                 {draft.type}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Configure labels, rules, and options for this input field.
+              {t("editor.inspector.subtitle")}
             </p>
           </div>
           <Button
@@ -282,7 +276,7 @@ export function FieldInspector({
             size="icon"
             onClick={onClose}
             className="rounded-full"
-            title="Cancel"
+            title={t("common.cancel")}
           >
             <X className="w-5 h-5" />
           </Button>
@@ -300,7 +294,8 @@ export function FieldInspector({
           {/* Label */}
           <div className="space-y-1.5">
             <Label htmlFor="field-label" className="text-xs font-semibold">
-              Field Label <span className="text-destructive">*</span>
+              {t("editor.inspector.label")}{" "}
+              <span className="text-destructive">*</span>
             </Label>
             <Input
               id="field-label"
@@ -316,10 +311,11 @@ export function FieldInspector({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label htmlFor="field-id" className="text-xs font-semibold">
-                Field Key / ID <span className="text-destructive">*</span>
+                {t("editor.inspector.fieldKeyId")}{" "}
+                <span className="text-destructive">*</span>
               </Label>
               <span className="text-[10px] text-muted-foreground">
-                Used internally in saved JSON
+                {t("editor.inspector.usedInternally")}
               </span>
             </div>
             <Input
@@ -348,7 +344,7 @@ export function FieldInspector({
                       htmlFor="field-placeholder"
                       className="text-xs font-semibold"
                     >
-                      Placeholder Text
+                      {t("editor.inspector.placeholderText")}
                     </Label>
                     <Input
                       id="field-placeholder"
@@ -360,7 +356,7 @@ export function FieldInspector({
                             : null,
                         )
                       }
-                      placeholder="e.g. Enter details..."
+                      placeholder={t("editor.inspector.placeholderExample")}
                       className="text-xs"
                     />
                   </div>
@@ -368,7 +364,7 @@ export function FieldInspector({
 
               <div className="space-y-1.5">
                 <Label htmlFor="field-helper" className="text-xs font-semibold">
-                  Helper Subtext
+                  {t("editor.inspector.helperSubtext")}
                 </Label>
                 <Input
                   id="field-helper"
@@ -378,7 +374,7 @@ export function FieldInspector({
                       prev ? { ...prev, helperText: e.target.value } : null,
                     )
                   }
-                  placeholder="Optional instruction below field"
+                  placeholder={t("editor.inspector.helperExample")}
                   className="text-xs"
                 />
               </div>
@@ -390,9 +386,11 @@ export function FieldInspector({
             <div className="pt-2 border-t space-y-3">
               <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
                 <div className="space-y-0.5 pr-4">
-                  <span className="text-xs font-semibold">Required Field</span>
+                  <span className="text-xs font-semibold">
+                    {t("editor.inspector.required")}
+                  </span>
                   <p className="text-[11px] text-muted-foreground">
-                    Must be completed before submitting the form.
+                    {t("editor.inspector.requiredFieldDesc")}
                   </p>
                 </div>
                 <Switch
@@ -410,12 +408,12 @@ export function FieldInspector({
                 <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
                   <div className="space-y-0.5 pr-4">
                     <span className="text-xs font-semibold">
-                      Allow Multiple Files
+                      {t("editor.inspector.allowMultipleFiles")}
                     </span>
                     <p className="text-[11px] text-muted-foreground">
-                      Enable workers to attach more than one{" "}
-                      {draft.type === "photo" ? "photo" : "video"} to this
-                      question.
+                      {t("editor.inspector.allowMultipleFilesDesc", {
+                        type: draft.type,
+                      })}
                     </p>
                   </div>
                   <Switch
@@ -435,16 +433,13 @@ export function FieldInspector({
                   <div className="space-y-1 pr-4">
                     <div className="flex items-center gap-1.5">
                       <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        Use as File Identifier
+                        {t("editor.inspector.useAsFileIdentifier")}
                       </span>
                     </div>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      Values entered here will be used in naming the submission
-                      file and dated PDF snapshots (e.g.{" "}
-                      <code className="bg-muted px-1 rounded font-mono text-[10px]">
-                        Inspection_Truck-10_2026-09-04_1430.pdf
-                      </code>
-                      ).
+                      {t("editor.inspector.fileIdentifierDesc", {
+                        example: "Inspection_Truck-10_2026-09-04_1430.pdf",
+                      })}
                     </p>
                   </div>
                   <Switch
@@ -464,7 +459,7 @@ export function FieldInspector({
           {draft.type === "date" && (
             <div className="space-y-1.5 pt-2 border-t">
               <Label className="text-xs font-semibold">
-                Default Date Value
+                {t("editor.inspector.defaultDateValue")}
               </Label>
               <div className="flex items-center gap-2">
                 <Button
@@ -479,7 +474,7 @@ export function FieldInspector({
                     )
                   }
                 >
-                  Default to Today's Date
+                  {t("editor.inspector.defaultToToday")}
                 </Button>
                 <Button
                   type="button"
@@ -491,7 +486,7 @@ export function FieldInspector({
                     )
                   }
                 >
-                  Leave Blank
+                  {t("editor.inspector.leaveBlank")}
                 </Button>
               </div>
             </div>
@@ -500,7 +495,7 @@ export function FieldInspector({
           {draft.type === "datetime" && (
             <div className="space-y-1.5 pt-2 border-t">
               <Label className="text-xs font-semibold">
-                Default Timestamp Value
+                {t("editor.inspector.defaultTimestampValue")}
               </Label>
               <div className="flex items-center gap-2">
                 <Button
@@ -515,7 +510,7 @@ export function FieldInspector({
                     )
                   }
                 >
-                  Default to Current Date & Time
+                  {t("editor.inspector.defaultToNow")}
                 </Button>
                 <Button
                   type="button"
@@ -527,7 +522,7 @@ export function FieldInspector({
                     )
                   }
                 >
-                  Leave Blank
+                  {t("editor.inspector.leaveBlank")}
                 </Button>
               </div>
             </div>
@@ -536,12 +531,12 @@ export function FieldInspector({
           {draft.type === "number" && (
             <div className="space-y-1.5 pt-2 border-t">
               <Label className="text-xs font-semibold">
-                Optional Bounds (Validation)
+                {t("editor.inspector.optionalBounds")}
               </Label>
               <div className="grid grid-cols-2 gap-3">
                 <Input
                   type="number"
-                  placeholder="Min value"
+                  placeholder={t("editor.inspector.minValue")}
                   value={draft.validation?.min ?? ""}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -562,7 +557,7 @@ export function FieldInspector({
                 />
                 <Input
                   type="number"
-                  placeholder="Max value"
+                  placeholder={t("editor.inspector.maxValue")}
                   value={draft.validation?.max ?? ""}
                   onChange={(e) => {
                     const raw = e.target.value;
@@ -590,13 +585,17 @@ export function FieldInspector({
             <div className="space-y-3 pt-3 border-t">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-xs font-semibold">Choice Options</h4>
+                  <h4 className="text-xs font-semibold">
+                    {t("editor.inspector.choiceOptions")}
+                  </h4>
                   <p className="text-[11px] text-muted-foreground">
-                    Available selections for field workers.
+                    {t("editor.inspector.choiceOptionsDesc")}
                   </p>
                 </div>
                 <span className="text-[10px] font-mono text-muted-foreground">
-                  {options.length} option{options.length === 1 ? "" : "s"}
+                  {t("editor.inspector.optionsCount", {
+                    count: options.length,
+                  })}
                 </span>
               </div>
 
@@ -611,7 +610,7 @@ export function FieldInspector({
                       handleAddOption();
                     }
                   }}
-                  placeholder="Add new option label..."
+                  placeholder={t("editor.inspector.addOptionLabel")}
                   className="text-xs flex-1"
                 />
                 <Button
@@ -622,7 +621,7 @@ export function FieldInspector({
                   className="gap-1 font-semibold"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  Add
+                  {t("editor.inspector.add")}
                 </Button>
               </div>
 
@@ -639,7 +638,7 @@ export function FieldInspector({
                         onClick={() => handleMoveOption(idx, "up")}
                         disabled={idx === 0}
                         className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        title="Move Up"
+                        title={t("editor.formEditor.moveUp")}
                       >
                         <ChevronUp className="w-3.5 h-3.5" />
                       </button>
@@ -648,7 +647,7 @@ export function FieldInspector({
                         onClick={() => handleMoveOption(idx, "down")}
                         disabled={idx === options.length - 1}
                         className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        title="Move Down"
+                        title={t("editor.formEditor.moveDown")}
                       >
                         <ChevronDown className="w-3.5 h-3.5" />
                       </button>
@@ -659,7 +658,7 @@ export function FieldInspector({
                       onChange={(e) =>
                         handleUpdateOption(idx, "label", e.target.value)
                       }
-                      placeholder="Option label"
+                      placeholder={t("editor.inspector.optionLabel")}
                       className="text-xs flex-1 h-7"
                     />
 
@@ -668,9 +667,9 @@ export function FieldInspector({
                       onChange={(e) =>
                         handleUpdateOption(idx, "value", e.target.value)
                       }
-                      placeholder="Value"
+                      placeholder={t("editor.inspector.optionValue")}
                       className="text-xs w-28 h-7 font-mono text-muted-foreground"
-                      title="Value stored in data"
+                      title={t("editor.inspector.optionValueTitle")}
                     />
 
                     <Button
@@ -679,7 +678,7 @@ export function FieldInspector({
                       size="icon-xs"
                       onClick={() => handleRemoveOption(idx)}
                       className="text-muted-foreground hover:text-destructive shrink-0"
-                      title="Remove option"
+                      title={t("editor.inspector.removeOption")}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </Button>
@@ -693,7 +692,7 @@ export function FieldInspector({
         {/* Footer */}
         <div className="p-4 border-t flex items-center justify-end gap-2 bg-muted/10 shrink-0">
           <Button variant="outline" size="sm" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             size="sm"
@@ -701,7 +700,7 @@ export function FieldInspector({
             className="gap-1.5 font-semibold"
           >
             <Check className="w-4 h-4" />
-            Apply Changes
+            {t("editor.inspector.applyChanges")}
           </Button>
         </div>
       </div>
