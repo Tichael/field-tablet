@@ -220,7 +220,7 @@ export function SignaturePad({
         )}
 
         {hasDrawn && (
-          <div className="absolute top-2 right-2 pointer-events-none bg-emerald-500/10 text-emerald-700 dark:text-emerald-800 border border-emerald-500/20 px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1">
+          <div className="absolute top-2 right-2 pointer-events-none bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[11px] font-medium flex items-center gap-1">
             <Check className="w-3 h-3" />
             <span>Signed</span>
           </div>

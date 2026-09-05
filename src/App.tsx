@@ -11,23 +11,17 @@ import { SetupScreen } from "./components/setup/SetupScreen";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
 import { Button } from "./components/ui/button";
 
-import {
-  Folder,
-  FileText,
-  ClipboardList,
-  Plus,
-  FolderPlus,
-  Loader2,
-} from "lucide-react";
+import { Folder, ChevronRight } from "lucide-react";
 import { applyTheme } from "./lib/theme";
 import { DocumentList } from "./components/documents/DocumentList";
 import { DocumentViewer } from "./components/documents/DocumentViewer";
 import { SyncIndicator } from "./components/ui/SyncIndicator";
 import { FormRunner } from "./components/forms/FormRunner";
 import { FormsBrowser } from "./components/forms/FormsBrowser";
-import { FormEditor } from "./components/forms/editor/FormEditor";
 import type { FormTemplate, FormSubmission } from "./types/form";
 import { formService } from "./lib/forms/form-service";
+
+const MAX_DASHBOARD_FORMS = 6;
 
 function App() {
   const isConfigured = useAppStore((state) => state.isConfigured);
@@ -42,7 +36,6 @@ function App() {
 
   // Forms state
   const [dashboardForms, setDashboardForms] = useState<FormTemplate[]>([]);
-  const [isLoadingForms, setIsLoadingForms] = useState(false);
   const [activeFormTemplate, setActiveFormTemplate] =
     useState<FormTemplate | null>(null);
   const [activeSubmission, setActiveSubmission] = useState<
@@ -57,40 +50,6 @@ function App() {
   >(undefined);
   const [viewingPdfPath, setViewingPdfPath] = useState<string | null>(null);
 
-  // Form Editor state
-  const [isEditingTemplate, setIsEditingTemplate] = useState(false);
-  const [templateToEdit, setTemplateToEdit] = useState<FormTemplate | null>(
-    null,
-  );
-
-  const handleOpenCreateForm = () => {
-    setTemplateToEdit(null);
-    setIsEditingTemplate(true);
-    setFormsBrowserOpen(false);
-  };
-
-  const handleOpenEditTemplate = (tmpl: FormTemplate) => {
-    setTemplateToEdit(tmpl);
-    setIsEditingTemplate(true);
-    setFormsBrowserOpen(false);
-  };
-
-  const handleOpenCloneTemplate = (tmpl: FormTemplate) => {
-    const randomSuffix = Math.random().toString(36).slice(2, 6);
-    const cloned: FormTemplate = {
-      ...JSON.parse(JSON.stringify(tmpl)),
-      id: `${tmpl.id}_copy_${randomSuffix}`,
-      title: `${tmpl.title} (Copy)`,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      folderPath: "",
-    };
-    setTemplateToEdit(cloned);
-    setIsEditingTemplate(true);
-    setFormsBrowserOpen(false);
-  };
-
   const loadDashboardForms = useCallback(async () => {
     if (!config) return;
     const folders = getFormFoldersList(config);
@@ -98,16 +57,19 @@ function App() {
       setDashboardForms([]);
       return;
     }
-    setIsLoadingForms(true);
     try {
       const discovered = await formService.discoverForms(folders);
       setDashboardForms(discovered);
     } catch (e) {
       console.error("Failed to load dashboard forms:", e);
-    } finally {
-      setIsLoadingForms(false);
     }
   }, [config]);
+
+  const hasTooManyForms = dashboardForms.length > MAX_DASHBOARD_FORMS;
+  const visibleForms = hasTooManyForms
+    ? dashboardForms.slice(0, MAX_DASHBOARD_FORMS - 1)
+    : dashboardForms;
+  const remainingFormsCount = dashboardForms.length - visibleForms.length;
 
   useEffect(() => {
     if (isConfigured && !isSettingsOpen) {
@@ -222,24 +184,6 @@ function App() {
     );
   }
 
-  if (isEditingTemplate) {
-    return (
-      <FormEditor
-        initialTemplate={templateToEdit}
-        onClose={() => {
-          setIsEditingTemplate(false);
-          setTemplateToEdit(null);
-          loadDashboardForms();
-        }}
-        onSaved={(_saved) => {
-          setIsEditingTemplate(false);
-          setTemplateToEdit(null);
-          loadDashboardForms();
-        }}
-      />
-    );
-  }
-
   if (activeFormTemplate) {
     return (
       <FormRunner
@@ -251,6 +195,14 @@ function App() {
           loadDashboardForms();
         }}
         onViewPdf={(path) => setViewingPdfPath(path)}
+        onOpenHistory={() => {
+          const currentForm = activeFormTemplate;
+          setActiveFormTemplate(null);
+          setActiveSubmission(undefined);
+          setFormsBrowserInitialForm(currentForm);
+          setFormsBrowserFolder(currentForm.folderPath);
+          setFormsBrowserOpen(true);
+        }}
       />
     );
   }
@@ -273,9 +225,6 @@ function App() {
           setActiveSubmission(sub);
         }}
         onViewPdf={(path) => setViewingPdfPath(path)}
-        onCreateForm={handleOpenCreateForm}
-        onEditTemplate={handleOpenEditTemplate}
-        onCloneTemplate={handleOpenCloneTemplate}
       />
     );
   }
@@ -288,7 +237,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-muted/20">
-      <header className="bg-primary text-primary-foreground border-b sticky top-0 z-10">
+      <header className="bg-primary text-primary-foreground dark:bg-card dark:text-card-foreground border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
             {config.branding.logoBase64 && (
@@ -308,6 +257,11 @@ function App() {
               <Button
                 onClick={() => setSettingsOpen(!isSettingsOpen)}
                 variant={isSettingsOpen ? "secondary" : "outline"}
+                className={
+                  isSettingsOpen
+                    ? ""
+                    : "text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/10 dark:text-foreground dark:border-border dark:hover:bg-accent"
+                }
               >
                 {isSettingsOpen ? "Back to App" : "Settings"}
               </Button>
@@ -320,168 +274,106 @@ function App() {
           <SettingsScreen />
         ) : (
           <div className="px-4 py-6 sm:px-0 max-w-4xl mx-auto space-y-6">
-            {/* Forms Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-amber-500" />
-                  <h2 className="text-xl font-bold tracking-tight">
-                    Field Forms
-                  </h2>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleOpenCreateForm}
-                    className="text-xs gap-1.5 font-semibold"
+            {/* Forms dashboard grid if templates exist */}
+            {dashboardForms.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {visibleForms.map((form) => (
+                  <div
+                    key={form.folderPath || form.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      setActiveFormTemplate(form);
+                      setActiveSubmission(undefined);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setActiveFormTemplate(form);
+                        setActiveSubmission(undefined);
+                      }
+                    }}
+                    className="group text-left border rounded-xl p-5 flex flex-col justify-between bg-card shadow-xs hover:border-primary/50 hover:shadow-md active:scale-[0.99] transition-all cursor-pointer select-none"
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Create Form</span>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                    <div className="space-y-2.5">
+                      <div className="flex items-center">
+                        <span className="inline-flex items-center leading-none text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          {form.category || "Form"}
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors">
+                        {form.title}
+                      </h3>
+
+                      {form.description ? (
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {form.description}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+
+                {hasTooManyForms && (
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       setFormsBrowserFolder(undefined);
                       setFormsBrowserOpen(true);
                     }}
-                    className="text-xs gap-1.5"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setFormsBrowserFolder(undefined);
+                        setFormsBrowserOpen(true);
+                      }
+                    }}
+                    className="group text-left border border-dashed rounded-xl p-5 flex flex-col justify-between bg-card/60 hover:bg-muted/30 hover:border-primary/50 hover:shadow-md active:scale-[0.99] transition-all cursor-pointer select-none"
                   >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>Browse All & History</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Dynamic User Forms */}
-              {getFormFoldersList(config).length === 0 ? (
-                <div className="border border-dashed rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-muted/10">
-                  <FolderPlus className="w-10 h-10 text-muted-foreground/60" />
-                  <div>
-                    <h4 className="font-semibold text-sm">
-                      No Form Folders Configured
-                    </h4>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                      Configure folders in Settings to store and organize your
-                      custom forms and submissions.
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="text-xs gap-1.5 mt-2"
-                    onClick={() => setSettingsOpen(true)}
-                  >
-                    <FolderPlus className="w-3.5 h-3.5" />
-                    <span>Configure Form Folders</span>
-                  </Button>
-                </div>
-              ) : isLoadingForms ? (
-                <div className="border rounded-xl p-12 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/5">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Loading forms...</span>
-                </div>
-              ) : dashboardForms.length === 0 ? (
-                <div className="border border-dashed rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-muted/10">
-                  <ClipboardList className="w-10 h-10 text-muted-foreground/60" />
-                  <div>
-                    <h4 className="font-semibold text-sm">
-                      No Forms Created Yet
-                    </h4>
-                    <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                      Create your first custom form template using the Form
-                      Editor to start collecting field data.
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="text-xs gap-1.5 mt-2"
-                    onClick={handleOpenCreateForm}
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Create New Form</span>
-                  </Button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {dashboardForms.map((form) => (
-                    <div
-                      key={form.folderPath || form.id}
-                      className="border rounded-xl p-5 flex flex-col justify-between bg-card shadow-xs hover:border-foreground/40 hover:bg-muted/20 transition-all"
-                    >
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] uppercase tracking-wider font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                            v{form.version || 1}
-                          </span>
-                          {form.folderPath && (
-                            <span
-                              className="text-[10px] text-muted-foreground font-mono truncate max-w-[130px]"
-                              title={`/${form.folderPath}`}
-                            >
-                              /{form.folderPath}
-                            </span>
-                          )}
-                        </div>
-
-                        <h3 className="font-bold text-base text-foreground">
-                          {form.title}
-                        </h3>
-                        {form.description ? (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {form.description}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-muted-foreground italic">
-                            {form.sections.reduce(
-                              (acc, s) => acc + s.fields.length,
-                              0,
-                            )}{" "}
-                            fields
-                          </p>
-                        )}
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center leading-none text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-secondary text-secondary-foreground border border-border/40">
+                          All Forms
+                        </span>
+                        <span className="leading-none text-[10px] font-mono font-semibold text-muted-foreground">
+                          +{remainingFormsCount} More
+                        </span>
                       </div>
 
-                      <div className="pt-4 mt-3 border-t flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          className="flex-1 text-xs gap-1 font-semibold"
-                          onClick={() => {
-                            setActiveFormTemplate(form);
-                            setActiveSubmission(undefined);
-                          }}
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Fill Form</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs"
-                          onClick={() => {
-                            setFormsBrowserInitialForm(form);
-                            setFormsBrowserFolder(form.folderPath);
-                            setFormsBrowserOpen(true);
-                          }}
-                          title="View Previous Submissions & PDFs"
-                        >
-                          <FileText className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
+                      <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors flex items-center justify-between">
+                        <span>More Forms & History</span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:translate-x-0.5 group-hover:text-primary transition-all shrink-0" />
+                      </h3>
+
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        Browse all {dashboardForms.length} forms and past
+                        submissions
+                      </p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Bottom row: Large document button */}
             <div
-              className="border border-muted-foreground/25 rounded-xl p-10 flex flex-col items-center justify-center bg-card shadow-xs hover:shadow-md transition-shadow cursor-pointer w-full"
+              role="button"
+              tabIndex={0}
               onClick={() => setDocumentBrowserOpen(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setDocumentBrowserOpen(true);
+                }
+              }}
+              className="group border rounded-xl p-10 flex flex-col items-center justify-center bg-card shadow-xs hover:border-primary/50 hover:shadow-md active:scale-[0.99] transition-all cursor-pointer select-none w-full"
             >
-              <Folder className="w-16 h-16 text-blue-500 mb-4" />
-              <h2 className="text-2xl font-semibold mb-2">Documents</h2>
+              <Folder className="w-16 h-16 text-blue-500 mb-4 group-hover:scale-105 transition-transform" />
+              <h2 className="text-2xl font-semibold mb-2 text-foreground group-hover:text-primary transition-colors">
+                Documents
+              </h2>
               <p className="text-sm text-muted-foreground text-center max-w-md">
                 Browse and view offline documents, manuals, circuit diagrams,
                 and building plans.

@@ -288,6 +288,25 @@ export class FormService {
       sanitizeFilenamePart(cleanTitle).toLowerCase() ||
       "custom-form";
 
+    // Track folder move in legacyFolderPaths and leave a notice in old folder
+    const previousFolder = template.folderPath
+      ?.trim()
+      .replace(/^\/+|\/+$/g, "");
+    let legacyFolderPaths = template.legacyFolderPaths
+      ? [...template.legacyFolderPaths]
+      : [];
+    if (
+      previousFolder &&
+      previousFolder !== destinationFolder &&
+      !legacyFolderPaths.includes(previousFolder)
+    ) {
+      legacyFolderPaths.push(previousFolder);
+      // Attempt to write notice file in previous folder
+      this.writeMoveNotice(previousFolder, destinationFolder).catch(
+        console.warn,
+      );
+    }
+
     const savedTemplate: FormTemplate = {
       ...template,
       id: slug,
@@ -296,6 +315,8 @@ export class FormService {
       createdAt,
       updatedAt: now,
       folderPath: destinationFolder,
+      legacyFolderPaths:
+        legacyFolderPaths.length > 0 ? legacyFolderPaths : undefined,
     };
 
     await adapter.saveFile(
@@ -304,6 +325,27 @@ export class FormService {
     );
 
     return savedTemplate;
+  }
+
+  /**
+   * Drops a _MOVED_TO.txt notice into an old folder so desktop users browsing SMB share know where it moved.
+   */
+  async writeMoveNotice(
+    oldFolderPath: string,
+    newFolderPath: string,
+  ): Promise<void> {
+    const adapter = syncManager.getAdapter();
+    const cleanOld = oldFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    const cleanNew = newFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
+
+    try {
+      await adapter.createDirectory(cleanOld);
+      const noticeText = `NOTICE:\nThis form template was relocated to:\n/${cleanNew}\n\nPlease check the new folder for current templates, submissions, and PDF copies.\n`;
+      await adapter.saveFile(`${cleanOld}/_MOVED_TO.txt`, noticeText);
+    } catch (e) {
+      console.warn(`Could not write move notice in /${cleanOld}:`, e);
+    }
   }
 
   /**
@@ -330,6 +372,7 @@ export class FormService {
       createdAt: now,
       updatedAt: now,
       folderPath: cleanFolder,
+      legacyFolderPaths: undefined,
       sections: clonedSections,
     };
 
@@ -415,95 +458,127 @@ export class FormService {
   }
 
   /**
-   * List all previous submissions for a form folder.
+   * List all previous submissions for a form folder (and any legacy folders).
    */
-  async listSubmissions(formFolderPath: string): Promise<FormSubmission[]> {
+  async listSubmissions(
+    formFolderPath: string,
+    legacyFolderPaths?: string[],
+  ): Promise<FormSubmission[]> {
+    const foldersToScan = [formFolderPath, ...(legacyFolderPaths || [])]
+      .map((f) => f?.trim().replace(/^\/+|\/+$/g, ""))
+      .filter((f): f is string => Boolean(f));
+
     const adapter = syncManager.getAdapter();
-    const cleanFolderPath = formFolderPath.trim().replace(/^\/+|\/+$/g, "");
-    const filledFormsDir = `${cleanFolderPath}/Filled Forms`;
+    const submissionMap = new Map<string, FormSubmission>();
 
-    try {
-      let files = await adapter.listLocalFiles(filledFormsDir);
-      // If Filled Forms is empty or does not exist, check the folder itself
-      if (files.length === 0) {
-        try {
-          files = await adapter.listLocalFiles(cleanFolderPath);
-        } catch {
-          // ignore
-        }
-      }
-
-      const jsonFiles = files.filter(
-        (f) =>
-          !f.isDirectory && f.name.endsWith(".json") && f.name !== "form.json",
-      );
-      const pdfFiles = files.filter(
-        (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
-      );
-
-      const submissions: FormSubmission[] = [];
-      for (const file of jsonFiles) {
-        try {
-          const text = await adapter.readFileText(file.path);
-          const sub = JSON.parse(text) as FormSubmission;
-
-          // If pdfExports is empty or missing, populate from discovered PDFs
-          if (!sub.pdfExports || sub.pdfExports.length === 0) {
-            const matching = pdfFiles.filter((p) => p.name.startsWith(sub.id));
-            if (matching.length > 0) {
-              sub.pdfExports = matching.map((p) => ({
-                path: p.path,
-                filename: p.name,
-                exportedAt: sub.updatedAt || sub.createdAt,
-              }));
-            }
+    for (const folder of foldersToScan) {
+      const filledFormsDir = `${folder}/Filled Forms`;
+      try {
+        let files = await adapter.listLocalFiles(filledFormsDir);
+        // If Filled Forms is empty or does not exist, check the folder itself
+        if (files.length === 0) {
+          try {
+            files = await adapter.listLocalFiles(folder);
+          } catch {
+            // ignore
           }
-
-          submissions.push(sub);
-        } catch (e) {
-          console.warn(`Failed to parse submission file ${file.path}:`, e);
         }
-      }
 
-      // Sort newest first
-      submissions.sort(
-        (a, b) =>
-          new Date(b.updatedAt || b.createdAt).getTime() -
-          new Date(a.updatedAt || a.createdAt).getTime(),
-      );
-      return submissions;
-    } catch {
-      return [];
+        const jsonFiles = files.filter(
+          (f) =>
+            !f.isDirectory &&
+            f.name.endsWith(".json") &&
+            f.name !== "form.json",
+        );
+        const pdfFiles = files.filter(
+          (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+        );
+
+        for (const file of jsonFiles) {
+          try {
+            const text = await adapter.readFileText(file.path);
+            const sub = JSON.parse(text) as FormSubmission;
+
+            // If pdfExports is empty or missing, populate from discovered PDFs
+            if (!sub.pdfExports || sub.pdfExports.length === 0) {
+              const matching = pdfFiles.filter((p) =>
+                p.name.startsWith(sub.id),
+              );
+              if (matching.length > 0) {
+                sub.pdfExports = matching.map((p) => ({
+                  path: p.path,
+                  filename: p.name,
+                  exportedAt: sub.updatedAt || sub.createdAt,
+                }));
+              }
+            }
+
+            if (!submissionMap.has(sub.id)) {
+              submissionMap.set(sub.id, sub);
+            }
+          } catch (e) {
+            console.warn(`Failed to parse submission file ${file.path}:`, e);
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
+
+    const submissions = Array.from(submissionMap.values());
+    submissions.sort(
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt).getTime() -
+        new Date(a.updatedAt || a.createdAt).getTime(),
+    );
+    return submissions;
   }
 
   /**
-   * List all dated PDF exports in the Filled Forms folder.
+   * List all dated PDF exports in the Filled Forms folder (and any legacy folders).
    */
   async listPdfExports(
     formFolderPath: string,
+    legacyFolderPaths?: string[],
   ): Promise<{ name: string; path: string }[]> {
+    const foldersToScan = [formFolderPath, ...(legacyFolderPaths || [])]
+      .map((f) => f?.trim().replace(/^\/+|\/+$/g, ""))
+      .filter((f): f is string => Boolean(f));
+
     const adapter = syncManager.getAdapter();
-    const cleanFolderPath = formFolderPath.trim().replace(/^\/+|\/+$/g, "");
-    const filledFormsDir = `${cleanFolderPath}/Filled Forms`;
+    const pdfMap = new Map<string, { name: string; path: string }>();
 
-    try {
-      let files = await adapter.listLocalFiles(filledFormsDir);
-      if (files.length === 0) {
-        try {
-          files = await adapter.listLocalFiles(cleanFolderPath);
-        } catch {
-          // ignore
+    for (const folder of foldersToScan) {
+      const filledFormsDir = `${folder}/Filled Forms`;
+      try {
+        let files = await adapter.listLocalFiles(filledFormsDir);
+        if (files.length === 0) {
+          try {
+            files = await adapter.listLocalFiles(folder);
+          } catch {
+            // ignore
+          }
         }
-      }
 
-      return files
-        .filter((f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"))
-        .map((f) => ({ name: f.name, path: f.path }))
-        .sort((a, b) => b.name.localeCompare(a.name));
-    } catch {
-      return [];
+        const pdfs = files
+          .filter(
+            (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+          )
+          .map((f) => ({ name: f.name, path: f.path }));
+
+        for (const pdf of pdfs) {
+          if (!pdfMap.has(pdf.name)) {
+            pdfMap.set(pdf.name, pdf);
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
+
+    return Array.from(pdfMap.values()).sort((a, b) =>
+      b.name.localeCompare(a.name),
+    );
   }
 
   /**

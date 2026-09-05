@@ -538,9 +538,9 @@ describe("FormService", () => {
       });
       const result = formService.validateTemplate(template);
       expect(result.valid).toBe(false);
-      expect(
-        result.errors.some((e) => e.includes("must have a value")),
-      ).toBe(true);
+      expect(result.errors.some((e) => e.includes("must have a value"))).toBe(
+        true,
+      );
       expect(
         result.errors.some((e) => e.includes("Duplicate option value")),
       ).toBe(true);
@@ -557,8 +557,103 @@ describe("FormService", () => {
       const result = formService.validateTemplate(template);
       expect(result.valid).toBe(false);
       expect(
-        result.errors.some((e) => e.includes("cannot be greater than max value")),
+        result.errors.some((e) =>
+          e.includes("cannot be greater than max value"),
+        ),
       ).toBe(true);
+    });
+
+    it("should track legacyFolderPaths and write _MOVED_TO.txt when folderPath is changed", async () => {
+      const template = await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "OldFolder",
+      });
+
+      // Now save with a new folder
+      const moved = await formService.saveTemplate(template, "NewFolder");
+      expect(moved.folderPath).toBe("NewFolder");
+      expect(moved.legacyFolderPaths).toContain("OldFolder");
+
+      // Verify _MOVED_TO.txt was written to OldFolder
+      const noticeContent = await mockAdapter.readFileText(
+        "OldFolder/_MOVED_TO.txt",
+      );
+      expect(noticeContent).toContain("/NewFolder");
+    });
+
+    it("should list submissions and pdfs across active and legacyFolderPaths", async () => {
+      // 1. Create a submission in LegacyFolder
+      await mockAdapter.createDirectory("LegacyFolder/Filled Forms");
+      const oldSub: FormSubmission = {
+        id: "Old_Sub_1",
+        templateId: "test-daily-report",
+        templateTitle: "Daily Report",
+        templateVersion: 1,
+        folderPath: "LegacyFolder",
+        createdAt: "2026-09-01T10:00:00.000Z",
+        updatedAt: "2026-09-01T10:00:00.000Z",
+        status: "completed",
+        values: {},
+        pdfExports: [
+          {
+            path: "LegacyFolder/Filled Forms/Old_Sub_1.pdf",
+            filename: "Old_Sub_1.pdf",
+            exportedAt: "2026-09-01T10:00:00.000Z",
+          },
+        ],
+      };
+      await mockAdapter.saveFile(
+        "LegacyFolder/Filled Forms/Old_Sub_1.json",
+        JSON.stringify(oldSub),
+      );
+      await mockAdapter.saveFile(
+        "LegacyFolder/Filled Forms/Old_Sub_1.pdf",
+        "pdfcontent",
+      );
+
+      // 2. Create a submission in CurrentFolder
+      await mockAdapter.createDirectory("CurrentFolder/Filled Forms");
+      const currentSub: FormSubmission = {
+        id: "Current_Sub_2",
+        templateId: "test-daily-report",
+        templateTitle: "Daily Report",
+        templateVersion: 2,
+        folderPath: "CurrentFolder",
+        createdAt: "2026-09-02T10:00:00.000Z",
+        updatedAt: "2026-09-02T10:00:00.000Z",
+        status: "completed",
+        values: {},
+        pdfExports: [
+          {
+            path: "CurrentFolder/Filled Forms/Current_Sub_2.pdf",
+            filename: "Current_Sub_2.pdf",
+            exportedAt: "2026-09-02T10:00:00.000Z",
+          },
+        ],
+      };
+      await mockAdapter.saveFile(
+        "CurrentFolder/Filled Forms/Current_Sub_2.json",
+        JSON.stringify(currentSub),
+      );
+      await mockAdapter.saveFile(
+        "CurrentFolder/Filled Forms/Current_Sub_2.pdf",
+        "pdfcontent",
+      );
+
+      // 3. Query listSubmissions with legacyFolderPaths
+      const subs = await formService.listSubmissions("CurrentFolder", [
+        "LegacyFolder",
+      ]);
+      expect(subs.length).toBe(2);
+      expect(subs.map((s) => s.id)).toEqual(["Current_Sub_2", "Old_Sub_1"]);
+
+      // 4. Query listPdfExports with legacyFolderPaths
+      const pdfs = await formService.listPdfExports("CurrentFolder", [
+        "LegacyFolder",
+      ]);
+      expect(pdfs.length).toBe(2);
+      expect(pdfs.map((p) => p.name)).toContain("Old_Sub_1.pdf");
+      expect(pdfs.map((p) => p.name)).toContain("Current_Sub_2.pdf");
     });
   });
 });

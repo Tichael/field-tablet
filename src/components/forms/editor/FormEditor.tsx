@@ -460,19 +460,27 @@ export function FormEditor({
   ) => {
     const saved = await formService.saveTemplate(finalTemplate, targetFolder);
 
-    // Auto-register destination base folder into config if not already tracked
+    // Auto-register destination direct folder into config if not already tracked
     const currentConfig = useConfigStore.getState().config;
     if (currentConfig) {
       const currentFolders = getFormFoldersList(currentConfig);
       const cleanTarget = targetFolder.trim().replace(/^\/+|\/+$/g, "");
-      const isCovered = currentFolders.some(
-        (f) => cleanTarget === f || cleanTarget.startsWith(`${f}/`),
-      );
-      if (!isCovered) {
-        const baseFolder = cleanTarget.split("/")[0] || cleanTarget;
-        const updatedFolders = Array.from(
-          new Set([...currentFolders, baseFolder]),
-        );
+
+      // If the template moved from a previous folder, replace old folder with new one
+      const previousFolder =
+        finalTemplate.legacyFolderPaths?.[
+          finalTemplate.legacyFolderPaths.length - 1
+        ];
+      let updatedFolders = currentFolders;
+      if (previousFolder && previousFolder !== cleanTarget) {
+        updatedFolders = updatedFolders.filter((f) => f !== previousFolder);
+      }
+
+      if (!updatedFolders.includes(cleanTarget)) {
+        updatedFolders = [...updatedFolders, cleanTarget];
+      }
+
+      if (JSON.stringify(updatedFolders) !== JSON.stringify(currentFolders)) {
         try {
           await useConfigStore.getState().saveConfig({
             ...currentConfig,
@@ -551,7 +559,7 @@ export function FormEditor({
                 v{template.version || 1}
               </span>
               {template.category && (
-                <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded font-semibold bg-primary/10 text-primary">
+                <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded font-semibold bg-secondary text-secondary-foreground border border-border/40">
                   {template.category}
                 </span>
               )}

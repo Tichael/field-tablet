@@ -13,7 +13,6 @@ import {
   Edit3,
   Loader2,
   Calendar,
-  Copy,
 } from "lucide-react";
 import { formatDateTime } from "../../lib/forms/pdf-generator";
 import { cn } from "@/lib/utils";
@@ -24,9 +23,6 @@ interface FormsBrowserProps {
   onViewPdf: (filePath: string) => void;
   initialFolder?: string;
   initialForm?: FormTemplate;
-  onCreateForm?: () => void;
-  onEditTemplate?: (template: FormTemplate) => void;
-  onCloneTemplate?: (template: FormTemplate) => void;
 }
 
 export function FormsBrowser({
@@ -35,9 +31,6 @@ export function FormsBrowser({
   onViewPdf,
   initialFolder,
   initialForm,
-  onCreateForm,
-  onEditTemplate,
-  onCloneTemplate,
 }: FormsBrowserProps) {
   const formFoldersConfig = useConfigStore(
     (state) => state.config?.formFolders,
@@ -85,7 +78,10 @@ export function FormsBrowser({
   const loadSubmissions = useCallback(async (form: FormTemplate) => {
     setLoadingSubmissions(true);
     try {
-      const subs = await formService.listSubmissions(form.folderPath);
+      const subs = await formService.listSubmissions(
+        form.folderPath,
+        form.legacyFolderPaths,
+      );
       setSubmissions(subs);
     } catch (e) {
       console.error("Failed to load submissions:", e);
@@ -313,17 +309,6 @@ export function FormsBrowser({
               ))}
             </div>
           )}
-
-          {onCreateForm && (
-            <Button
-              size="sm"
-              onClick={onCreateForm}
-              className="text-xs gap-1.5 font-semibold shrink-0"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Create Form</span>
-            </Button>
-          )}
         </div>
       </header>
 
@@ -340,19 +325,10 @@ export function FormsBrowser({
               <h3 className="font-semibold text-lg">No Forms Found</h3>
               <p className="text-sm text-muted-foreground max-w-md">
                 {formFolders.length === 0
-                  ? "You haven't configured any Form Folders in Settings yet."
+                  ? "No form folders configured in Settings."
                   : `No forms were found in ${selectedFolder ? `/${selectedFolder}` : "your configured form folders"}.`}
               </p>
             </div>
-
-            {onCreateForm && (
-              <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-                <Button onClick={onCreateForm} className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  <span>Create New Form Template</span>
-                </Button>
-              </div>
-            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -407,28 +383,6 @@ export function FormsBrowser({
                   >
                     <FileText className="w-3.5 h-3.5" /> History
                   </Button>
-                  {onEditTemplate && (
-                    <Button
-                      variant="outline"
-                      onClick={() => onEditTemplate(form)}
-                      size="sm"
-                      className="text-xs px-2"
-                      title="Edit Template (WYSIWYG Editor)"
-                    >
-                      <Edit3 className="w-3.5 h-3.5 text-primary" />
-                    </Button>
-                  )}
-                  {onCloneTemplate && (
-                    <Button
-                      variant="outline"
-                      onClick={() => onCloneTemplate(form)}
-                      size="sm"
-                      className="text-xs px-2"
-                      title="Duplicate / Clone as New Form"
-                    >
-                      <Copy className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Button>
-                  )}
                 </div>
               </div>
             ))}

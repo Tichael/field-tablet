@@ -243,7 +243,7 @@ export function FieldInspector({
               <h3 className="font-bold text-lg text-foreground">
                 Edit Field Properties
               </h3>
-              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary">
+              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border/40">
                 {draft.type}
               </span>
             </div>

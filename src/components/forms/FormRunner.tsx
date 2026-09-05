@@ -27,6 +27,7 @@ import {
   CheckCircle2,
   FileText,
   Check,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,7 @@ interface FormRunnerProps {
   initialSubmission?: FormSubmission;
   onClose: () => void;
   onViewPdf?: (filePath: string) => void;
+  onOpenHistory?: () => void;
   isPreview?: boolean;
 }
 
@@ -43,6 +45,7 @@ export function FormRunner({
   initialSubmission,
   onClose,
   onViewPdf,
+  onOpenHistory,
   isPreview = false,
 }: FormRunnerProps) {
   const config = useConfigStore((state) => state.config);
@@ -272,6 +275,16 @@ export function FormRunner({
       if (!confirmed) return;
     }
     onClose();
+  };
+
+  const handleOpenHistory = () => {
+    if (isDirty) {
+      const confirmed = window.confirm(
+        "You have unsaved changes. Are you sure you want to navigate to previously filled forms without saving?",
+      );
+      if (!confirmed) return;
+    }
+    onOpenHistory?.();
   };
 
   const renderFieldInput = (field: FormField) => {
@@ -623,7 +636,8 @@ export function FormRunner({
                 )}
               </div>
               <p className="text-xs text-muted-foreground truncate">
-                {template.folderPath || (isPreview ? "Previewing Template" : "")}
+                {template.folderPath ||
+                  (isPreview ? "Previewing Template" : "")}
               </p>
             </div>
           </div>
@@ -638,6 +652,19 @@ export function FormRunner({
               >
                 <FileText className="w-3.5 h-3.5 text-red-500" />
                 <span>View PDF</span>
+              </Button>
+            )}
+            {!isPreview && onOpenHistory && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleOpenHistory}
+                className="text-xs gap-1.5 font-medium"
+                title="Browse previously filled submissions for this form"
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Previously Filled</span>
+                <span className="sm:hidden">History</span>
               </Button>
             )}
             <Button

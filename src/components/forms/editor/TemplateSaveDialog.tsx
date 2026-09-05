@@ -1,15 +1,19 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import type { FormTemplate } from "../../../types/form";
-import {
-  useConfigStore,
-  getFormFoldersList,
-} from "../../../store/config-store";
 import { syncManager } from "../../../lib/sync/sync-manager";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { sanitizeFilenamePart } from "../../../lib/forms/pdf-generator";
-import { X, Save, Loader2, FolderCheck, AlertCircle } from "lucide-react";
+import { GenericFileBrowser } from "../../documents/GenericFileBrowser";
+import {
+  X,
+  Save,
+  Loader2,
+  FolderCheck,
+  AlertCircle,
+  FolderOpen,
+} from "lucide-react";
 
 interface TemplateSaveDialogProps {
   isOpen: boolean;
@@ -24,25 +28,19 @@ export function TemplateSaveDialog({
   onClose,
   onSave,
 }: TemplateSaveDialogProps) {
-  const config = useConfigStore((state) => state.config);
-  const formFolders = useMemo(() => getFormFoldersList(config), [config]);
-
   const [title, setTitle] = useState(template.title);
   const [description, setDescription] = useState(template.description || "");
   const [category, setCategory] = useState(template.category || "");
 
-  // Base folder + subfolder strategy
-  const [selectedBaseFolder, setSelectedBaseFolder] = useState<string>(
-    formFolders[0] || "Forms",
-  );
-  const [subfolderName, setSubfolderName] = useState<string>(() => {
+  // Direct folder path
+  const [folderPath, setFolderPath] = useState<string>(() => {
     if (template.folderPath) {
-      const parts = template.folderPath.split("/").filter(Boolean);
-      return parts.length > 1 ? parts[parts.length - 1] : parts[0] || "";
+      return template.folderPath.trim().replace(/^\/+|\/+$/g, "");
     }
     return sanitizeFilenamePart(template.title) || "Custom Form";
   });
 
+  const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,33 +52,16 @@ export function TemplateSaveDialog({
     setCategory(template.category || "");
 
     if (template.folderPath) {
-      const clean = template.folderPath.trim().replace(/^\/+|\/+$/g, "");
-      // Check if matches an existing base folder
-      const matchingBase = formFolders.find(
-        (f) => clean === f || clean.startsWith(`${f}/`),
-      );
-      if (matchingBase) {
-        setSelectedBaseFolder(matchingBase);
-        const sub = clean.slice(matchingBase.length).replace(/^\/+/, "");
-        setSubfolderName(sub);
-      } else {
-        setSelectedBaseFolder(clean);
-        setSubfolderName("");
-      }
+      setFolderPath(template.folderPath.trim().replace(/^\/+|\/+$/g, ""));
     } else {
-      setSelectedBaseFolder(formFolders[0] || "Forms");
-      setSubfolderName(sanitizeFilenamePart(template.title) || "Custom Form");
+      setFolderPath(sanitizeFilenamePart(template.title) || "Custom Form");
     }
     setError(null);
-  }, [isOpen, template, formFolders]);
+  }, [isOpen, template]);
 
   if (!isOpen) return null;
 
-  const targetFolder = subfolderName.trim()
-    ? selectedBaseFolder
-      ? `${selectedBaseFolder.trim().replace(/^\/+|\/+$/g, "")}/${subfolderName.trim().replace(/^\/+|\/+$/g, "")}`
-      : subfolderName.trim().replace(/^\/+|\/+$/g, "")
-    : selectedBaseFolder.trim().replace(/^\/+|\/+$/g, "");
+  const targetFolder = folderPath.trim().replace(/^\/+|\/+$/g, "");
 
   const handleConfirmSave = async () => {
     if (!title.trim()) {
@@ -123,12 +104,26 @@ export function TemplateSaveDialog({
         }
       }
 
+      // Track previous folder path in legacyFolderPaths if moved
+      let legacyFolderPaths = template.legacyFolderPaths
+        ? [...template.legacyFolderPaths]
+        : [];
+      if (
+        cleanOriginal &&
+        cleanOriginal !== cleanTarget &&
+        !legacyFolderPaths.includes(cleanOriginal)
+      ) {
+        legacyFolderPaths.push(cleanOriginal);
+      }
+
       const updatedTemplate: FormTemplate = {
         ...template,
         title: title.trim(),
         description: description.trim() || undefined,
         category: category.trim() || undefined,
         folderPath: targetFolder,
+        legacyFolderPaths:
+          legacyFolderPaths.length > 0 ? legacyFolderPaths : undefined,
       };
 
       await onSave(updatedTemplate, targetFolder);
@@ -181,7 +176,15 @@ export function TemplateSaveDialog({
             <Input
               id="save-title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                const newTitle = e.target.value;
+                setTitle(newTitle);
+                if (!template.folderPath) {
+                  setFolderPath(
+                    sanitizeFilenamePart(newTitle) || "Custom Form",
+                  );
+                }
+              }}
               placeholder="e.g. Daily Safety Inspection"
               className="text-sm font-medium"
             />
@@ -218,56 +221,38 @@ export function TemplateSaveDialog({
           {/* Destination Folder Selector */}
           <div className="pt-3 border-t space-y-3">
             <div className="flex items-center justify-between">
-              <Label className="text-xs font-semibold">
-                Destination Folder
+              <Label htmlFor="save-folder" className="text-xs font-semibold">
+                Direct Folder Path <span className="text-destructive">*</span>
               </Label>
               <span className="text-[10px] text-muted-foreground">
-                Saved into SMB / local folder
+                Destination on storage / SMB share
               </span>
             </div>
 
-            {/* Base Folder buttons */}
-            {formFolders.length > 0 && (
-              <div className="space-y-1">
-                <span className="text-[11px] text-muted-foreground">
-                  Base Form Folder:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {formFolders.map((f) => (
-                    <button
-                      key={f}
-                      type="button"
-                      onClick={() => setSelectedBaseFolder(f)}
-                      className={`text-xs px-2.5 py-1 rounded-lg border font-mono transition-all cursor-pointer ${
-                        selectedBaseFolder === f
-                          ? "bg-primary text-primary-foreground border-primary font-semibold"
-                          : "bg-muted/30 hover:bg-muted/70 text-foreground border-input"
-                      }`}
-                    >
-                      /{f}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Subfolder Input */}
-            <div className="space-y-1.5">
-              <Label htmlFor="save-subfolder" className="text-xs font-semibold">
-                Form Folder Name
-              </Label>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-muted text-muted-foreground shrink-0 font-mono text-xs">
-                  /{selectedBaseFolder}/
-                </div>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
                 <Input
-                  id="save-subfolder"
-                  value={subfolderName}
-                  onChange={(e) => setSubfolderName(e.target.value)}
-                  placeholder="e.g. HVAC Inspection"
-                  className="font-mono text-xs"
+                  id="save-folder"
+                  value={folderPath}
+                  onChange={(e) => setFolderPath(e.target.value)}
+                  placeholder="e.g. Daily Reports or Safety/Inspections"
+                  className="font-mono text-xs pl-6"
                 />
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground font-mono text-xs select-none">
+                  /
+                </span>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBrowserOpen(true)}
+                className="gap-1.5 text-xs shrink-0"
+                title="Browse existing folders"
+              >
+                <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>Browse</span>
+              </Button>
             </div>
 
             {/* Resulting Path Preview Card */}
@@ -280,13 +265,13 @@ export function TemplateSaveDialog({
                 <div>
                   Template:{" "}
                   <span className="text-foreground font-semibold">
-                    /{targetFolder}/form.json
+                    /{targetFolder || "..."}/form.json
                   </span>
                 </div>
                 <div>
                   Submissions & PDFs:{" "}
                   <span className="text-foreground">
-                    /{targetFolder}/Filled Forms/
+                    /{targetFolder || "..."}/Filled Forms/
                   </span>
                 </div>
               </div>
@@ -324,6 +309,42 @@ export function TemplateSaveDialog({
           </Button>
         </div>
       </div>
+
+      {/* Directory Browser Modal */}
+      {isBrowserOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-background rounded-xl shadow-2xl w-full max-w-xl h-[80vh] flex flex-col overflow-hidden border">
+            <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
+              <div>
+                <h4 className="font-semibold text-base">
+                  Select Destination Folder
+                </h4>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Browse or create a folder on the storage share.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsBrowserOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+            <div className="flex-1 overflow-hidden p-3 sm:p-4">
+              <GenericFileBrowser
+                onFolderSelect={(path) => {
+                  setFolderPath(path);
+                  setIsBrowserOpen(false);
+                }}
+                onFileSelect={() => {}}
+                allowCreateFolder={true}
+                allowSelectRoot={false}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
