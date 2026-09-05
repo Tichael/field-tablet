@@ -6,7 +6,6 @@ import { Button } from "../ui/button";
 import { useTranslation } from "react-i18next";
 import {
   Folder,
-  ChevronLeft,
   FileText,
   Plus,
   Clock,
@@ -20,6 +19,8 @@ import {
 import { formatDateTime } from "../../lib/forms/pdf-generator";
 import { formatBytes } from "../../lib/forms/media-utils";
 import { cn } from "@/lib/utils";
+import { AppHeader } from "../layout/AppHeader";
+import { EmptyState } from "../ui/empty-state";
 
 interface FormsBrowserProps {
   onClose: () => void;
@@ -142,44 +143,27 @@ export function FormsBrowser({
   if (selectedFormForHistory) {
     return (
       <div className="flex flex-col h-screen bg-background text-foreground">
-        <header className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-xs shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <AppHeader
+          onBack={() => {
+            if (initialForm) {
+              onClose();
+            } else {
+              setSelectedFormForHistory(null);
+            }
+          }}
+          title={`${selectedFormForHistory.title} — ${t("forms.browser.submissionsAndPdfs")}`}
+          subtitle={`${selectedFormForHistory.folderPath}/${t("forms.browser.filledForms")}`}
+          actions={
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (initialForm) {
-                  onClose();
-                } else {
-                  setSelectedFormForHistory(null);
-                }
-              }}
-              className="rounded-full shrink-0"
-              title={t("common.back")}
+              size="sm"
+              onClick={() => onSelectForm(selectedFormForHistory)}
+              className="gap-1.5 font-semibold shrink-0"
             >
-              <ChevronLeft className="w-5 h-5" />
+              <Plus className="w-4 h-4" />
+              <span>{t("forms.browser.newSubmission")}</span>
             </Button>
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold truncate">
-                {selectedFormForHistory.title} —{" "}
-                {t("forms.browser.submissionsAndPdfs")}
-              </h1>
-              <p className="text-xs text-muted-foreground truncate">
-                {selectedFormForHistory.folderPath}/
-                {t("forms.browser.filledForms")}
-              </p>
-            </div>
-          </div>
-
-          <Button
-            size="sm"
-            onClick={() => onSelectForm(selectedFormForHistory)}
-            className="gap-1.5 font-semibold shrink-0"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t("forms.browser.newSubmission")}</span>
-          </Button>
-        </header>
+          }
+        />
 
         <main className="flex-1 overflow-auto p-4 sm:p-6 max-w-4xl w-full mx-auto space-y-4">
           {loadingSubmissions ? (
@@ -188,25 +172,15 @@ export function FormsBrowser({
               <p className="text-sm">{t("forms.browser.loadingSubmissions")}</p>
             </div>
           ) : submissions.length === 0 ? (
-            <div className="border border-dashed rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-3 bg-card">
-              <FileText className="w-12 h-12 text-muted-foreground/30" />
-              <div className="space-y-1">
-                <h3 className="font-semibold text-base">
-                  {t("forms.browser.noSubmissionsYet")}
-                </h3>
-                <p className="text-xs text-muted-foreground max-w-sm">
-                  {t("forms.browser.noSubmissionsDesc")}
-                </p>
-              </div>
-              <Button
-                size="sm"
-                onClick={() => onSelectForm(selectedFormForHistory)}
-                className="mt-2"
-              >
-                <Plus className="w-4 h-4 mr-1.5" />{" "}
-                {t("forms.browser.startFirstSubmission")}
-              </Button>
-            </div>
+            <EmptyState
+              icon={FileText}
+              title={t("forms.browser.noSubmissionsYet")}
+              description={t("forms.browser.noSubmissionsDesc")}
+              action={{
+                label: t("forms.browser.startFirstSubmission"),
+                onClick: () => onSelectForm(selectedFormForHistory),
+              }}
+            />
           ) : (
             <div className="space-y-4">
               {submissions.map((sub) => {
@@ -346,35 +320,21 @@ export function FormsBrowser({
   // 2. Main forms browser view
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <header className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-xs shrink-0">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="rounded-full"
-            title={t("forms.browser.backToDashboard")}
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <div>
-            <h1 className="text-lg font-bold tracking-tight">
-              {t("forms.browser.formTemplates")}
-            </h1>
-            <p className="text-xs text-muted-foreground">
-              {selectedFolder
-                ? t("forms.browser.browsingFolder", { folder: selectedFolder })
-                : t("forms.browser.selectFormSubtitle")}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {formFolders.length > 1 && (
+      <AppHeader
+        onBack={onClose}
+        backLabel={t("forms.browser.backToDashboard")}
+        title={t("forms.browser.formTemplates")}
+        subtitle={
+          selectedFolder
+            ? t("forms.browser.browsingFolder", { folder: selectedFolder })
+            : t("forms.browser.selectFormSubtitle")
+        }
+        actions={
+          formFolders.length > 1 ? (
             <div className="flex items-center gap-1.5 overflow-x-auto">
               <Button
                 variant={selectedFolder === "" ? "secondary" : "ghost"}
-                size="xs"
+                size="sm"
                 onClick={() => setSelectedFolder("")}
                 className="text-xs"
               >
@@ -384,7 +344,7 @@ export function FormsBrowser({
                 <Button
                   key={f}
                   variant={selectedFolder === f ? "secondary" : "ghost"}
-                  size="xs"
+                  size="sm"
                   onClick={() => setSelectedFolder(f)}
                   className="text-xs"
                 >
@@ -392,9 +352,9 @@ export function FormsBrowser({
                 </Button>
               ))}
             </div>
-          )}
-        </div>
-      </header>
+          ) : undefined
+        }
+      />
 
       <main className="flex-1 overflow-auto p-4 sm:p-6 max-w-5xl w-full mx-auto space-y-6">
         {loading ? (
@@ -403,23 +363,19 @@ export function FormsBrowser({
             <p className="text-sm">{t("forms.browser.scanningFolders")}</p>
           </div>
         ) : forms.length === 0 ? (
-          <div className="border border-dashed rounded-2xl p-12 text-center flex flex-col items-center justify-center space-y-4 bg-card">
-            <Folder className="w-14 h-14 text-amber-500/40" />
-            <div className="space-y-1">
-              <h3 className="font-semibold text-lg">
-                {t("forms.browser.noFormsFound")}
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-md">
-                {formFolders.length === 0
-                  ? t("forms.browser.noFoldersConfigured")
-                  : selectedFolder
-                    ? t("forms.browser.noFormsInThisFolder", {
-                        folder: selectedFolder,
-                      })
-                    : t("forms.browser.noFormsInConfiguredFolders")}
-              </p>
-            </div>
-          </div>
+          <EmptyState
+            icon={Folder}
+            title={t("forms.browser.noFormsFound")}
+            description={
+              formFolders.length === 0
+                ? t("forms.browser.noFoldersConfigured")
+                : selectedFolder
+                  ? t("forms.browser.noFormsInThisFolder", {
+                      folder: selectedFolder,
+                    })
+                  : t("forms.browser.noFormsInConfiguredFolders")
+            }
+          />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {forms.map((form) => (

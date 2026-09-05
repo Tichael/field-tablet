@@ -5,6 +5,7 @@ import { useAppStore } from "../../store/app-store";
 import { useConfigStore } from "../../store/config-store";
 import { del } from "idb-keyval";
 import { Button } from "../ui/button";
+import { SyncIndicator } from "../ui/SyncIndicator";
 import {
   Select,
   SelectContent,
@@ -87,32 +88,23 @@ export function SettingsScreen() {
 
   if (isEditingConfig) {
     return (
-      <div className="p-8">
+      <div className="fixed inset-0 z-40 bg-background flex flex-col">
         <ConfigEditorScreen onClose={handleCloseEditor} />
       </div>
     );
   }
 
   return (
-    <div className="p-8 bg-background border rounded-xl shadow-sm max-w-2xl mx-auto mt-10 space-y-8">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {t("settings.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t("settings.subtitle")}
-        </p>
-      </div>
-
+    <div className="p-6 sm:p-8 bg-background border rounded-xl shadow-sm max-w-2xl mx-auto space-y-6">
       <div className="space-y-6">
         {/* Sync Status */}
-        <div className="bg-muted/50 p-4 rounded-lg border">
-          <h3 className="text-sm font-medium">{t("settings.syncStatus")}</h3>
-          <p className="mt-1 text-sm">
-            {isSyncing ? t("sync.syncingNow") : t("sync.idle")}
-          </p>
+        <div className="bg-muted/50 p-4 rounded-lg border space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-medium">{t("settings.syncStatus")}</h3>
+            <SyncIndicator />
+          </div>
           {lastSyncTime && (
-            <p className="text-xs text-muted-foreground mt-2">
+            <p className="text-xs text-muted-foreground">
               {t("settings.lastSynced", {
                 time: formatAppDateTime(lastSyncTime),
               })}

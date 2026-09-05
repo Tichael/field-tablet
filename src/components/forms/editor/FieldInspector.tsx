@@ -6,8 +6,8 @@ import { Label } from "../../ui/label";
 import { Switch } from "../../ui/switch";
 import { useTranslation } from "react-i18next";
 import { sanitizeFilenamePart } from "../../../lib/forms/pdf-generator";
+import { AppDialog } from "../../ui/app-dialog";
 import {
-  X,
   Plus,
   Trash2,
   ChevronUp,
@@ -254,443 +254,23 @@ export function FieldInspector({
     draft.type === "date";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150">
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-muted/20 shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-lg text-foreground">
-                {t("editor.inspector.title")}
-              </h3>
-              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border/40">
-                {draft.type}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t("editor.inspector.subtitle")}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="rounded-full"
-            title={t("common.cancel")}
-          >
-            <X className="w-5 h-5" />
-          </Button>
+    <AppDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      title={
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-lg text-foreground">
+            {t("editor.inspector.title")}
+          </span>
+          <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-secondary text-secondary-foreground border border-border/40">
+            {draft.type}
+          </span>
         </div>
-
-        {/* Form Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4 text-foreground">
-          {error && (
-            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Label */}
-          <div className="space-y-1.5">
-            <Label htmlFor="field-label" className="text-xs font-semibold">
-              {t("editor.inspector.label")}{" "}
-              <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="field-label"
-              value={draft.label}
-              onChange={(e) => handleLabelChange(e.target.value)}
-              placeholder="e.g. Technician Name, Fluid Level, Inspection Date"
-              className="text-sm"
-              autoFocus
-            />
-          </div>
-
-          {/* Field ID / Key */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="field-id" className="text-xs font-semibold">
-                {t("editor.inspector.fieldKeyId")}{" "}
-                <span className="text-destructive">*</span>
-              </Label>
-              <span className="text-[10px] text-muted-foreground">
-                {t("editor.inspector.usedInternally")}
-              </span>
-            </div>
-            <Input
-              id="field-id"
-              value={draft.id}
-              onChange={(e) => {
-                setIsIdManuallyEdited(true);
-                setDraft((prev) =>
-                  prev ? { ...prev, id: e.target.value } : null,
-                );
-              }}
-              placeholder="e.g. technician_name"
-              className="font-mono text-xs"
-            />
-          </div>
-
-          {/* Placeholder & Helper Text (for inputs) */}
-          {draft.type !== "heading" && draft.type !== "notes" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {draft.type !== "checkbox" &&
-                draft.type !== "signature" &&
-                draft.type !== "photo" &&
-                draft.type !== "video" && (
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="field-placeholder"
-                      className="text-xs font-semibold"
-                    >
-                      {t("editor.inspector.placeholderText")}
-                    </Label>
-                    <Input
-                      id="field-placeholder"
-                      value={draft.placeholder || ""}
-                      onChange={(e) =>
-                        setDraft((prev) =>
-                          prev
-                            ? { ...prev, placeholder: e.target.value }
-                            : null,
-                        )
-                      }
-                      placeholder={t("editor.inspector.placeholderExample")}
-                      className="text-xs"
-                    />
-                  </div>
-                )}
-
-              <div className="space-y-1.5">
-                <Label htmlFor="field-helper" className="text-xs font-semibold">
-                  {t("editor.inspector.helperSubtext")}
-                </Label>
-                <Input
-                  id="field-helper"
-                  value={draft.helperText || ""}
-                  onChange={(e) =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, helperText: e.target.value } : null,
-                    )
-                  }
-                  placeholder={t("editor.inspector.helperExample")}
-                  className="text-xs"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Toggles: Required & IsIdentifier */}
-          {draft.type !== "heading" && draft.type !== "notes" && (
-            <div className="pt-2 border-t space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-                <div className="space-y-0.5 pr-4">
-                  <span className="text-xs font-semibold">
-                    {t("editor.inspector.required")}
-                  </span>
-                  <p className="text-[11px] text-muted-foreground">
-                    {t("editor.inspector.requiredFieldDesc")}
-                  </p>
-                </div>
-                <Switch
-                  checked={draft.required || false}
-                  onCheckedChange={(checked) =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, required: checked } : null,
-                    )
-                  }
-                />
-              </div>
-
-              {/* Allow Multiple Files toggle for photo and video */}
-              {(draft.type === "photo" || draft.type === "video") && (
-                <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
-                  <div className="space-y-0.5 pr-4">
-                    <span className="text-xs font-semibold">
-                      {t("editor.inspector.allowMultipleFiles")}
-                    </span>
-                    <p className="text-[11px] text-muted-foreground">
-                      {t("editor.inspector.allowMultipleFilesDesc", {
-                        type: draft.type,
-                      })}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={draft.allowMultiple || false}
-                    onCheckedChange={(checked) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, allowMultiple: checked } : null,
-                      )
-                    }
-                  />
-                </div>
-              )}
-
-              {/* IsIdentifier toggle */}
-              {canBeIdentifier && (
-                <div className="flex items-start justify-between p-3 rounded-xl border bg-blue-500/5 border-blue-500/20">
-                  <div className="space-y-1 pr-4">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                        {t("editor.inspector.useAsFileIdentifier")}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      {t("editor.inspector.fileIdentifierDesc", {
-                        example: "Inspection_Truck-10_2026-09-04_1430.pdf",
-                      })}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={draft.isIdentifier || false}
-                    onCheckedChange={(checked) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, isIdentifier: checked } : null,
-                      )
-                    }
-                  />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Default Value Settings */}
-          {draft.type === "date" && (
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label className="text-xs font-semibold">
-                {t("editor.inspector.defaultDateValue")}
-              </Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={
-                    draft.defaultValue === "today" ? "secondary" : "outline"
-                  }
-                  onClick={() =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, defaultValue: "today" } : null,
-                    )
-                  }
-                >
-                  {t("editor.inspector.defaultToToday")}
-                </Button>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={!draft.defaultValue ? "secondary" : "outline"}
-                  onClick={() =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, defaultValue: undefined } : null,
-                    )
-                  }
-                >
-                  {t("editor.inspector.leaveBlank")}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {draft.type === "datetime" && (
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label className="text-xs font-semibold">
-                {t("editor.inspector.defaultTimestampValue")}
-              </Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={
-                    draft.defaultValue === "now" ? "secondary" : "outline"
-                  }
-                  onClick={() =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, defaultValue: "now" } : null,
-                    )
-                  }
-                >
-                  {t("editor.inspector.defaultToNow")}
-                </Button>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={!draft.defaultValue ? "secondary" : "outline"}
-                  onClick={() =>
-                    setDraft((prev) =>
-                      prev ? { ...prev, defaultValue: undefined } : null,
-                    )
-                  }
-                >
-                  {t("editor.inspector.leaveBlank")}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {draft.type === "number" && (
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label className="text-xs font-semibold">
-                {t("editor.inspector.optionalBounds")}
-              </Label>
-              <div className="grid grid-cols-2 gap-3">
-                <Input
-                  type="number"
-                  placeholder={t("editor.inspector.minValue")}
-                  value={draft.validation?.min ?? ""}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const min =
-                      raw !== "" && !Number.isNaN(Number(raw))
-                        ? Number(raw)
-                        : undefined;
-                    setDraft((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            validation: { ...prev.validation, min },
-                          }
-                        : null,
-                    );
-                  }}
-                  className="text-xs"
-                />
-                <Input
-                  type="number"
-                  placeholder={t("editor.inspector.maxValue")}
-                  value={draft.validation?.max ?? ""}
-                  onChange={(e) => {
-                    const raw = e.target.value;
-                    const max =
-                      raw !== "" && !Number.isNaN(Number(raw))
-                        ? Number(raw)
-                        : undefined;
-                    setDraft((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            validation: { ...prev.validation, max },
-                          }
-                        : null,
-                    );
-                  }}
-                  className="text-xs"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Options Manager for choices */}
-          {hasOptions && (
-            <div className="space-y-3 pt-3 border-t">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="text-xs font-semibold">
-                    {t("editor.inspector.choiceOptions")}
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground">
-                    {t("editor.inspector.choiceOptionsDesc")}
-                  </p>
-                </div>
-                <span className="text-[10px] font-mono text-muted-foreground">
-                  {t("editor.inspector.optionsCount", {
-                    count: options.length,
-                  })}
-                </span>
-              </div>
-
-              {/* Add option row */}
-              <div className="flex items-center gap-2">
-                <Input
-                  value={newOptionLabel}
-                  onChange={(e) => setNewOptionLabel(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAddOption();
-                    }
-                  }}
-                  placeholder={t("editor.inspector.addOptionLabel")}
-                  className="text-xs flex-1"
-                />
-                <Button
-                  type="button"
-                  size="xs"
-                  onClick={handleAddOption}
-                  disabled={!newOptionLabel.trim()}
-                  className="gap-1 font-semibold"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  {t("editor.inspector.add")}
-                </Button>
-              </div>
-
-              {/* Options list */}
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {options.map((opt, idx) => (
-                  <div
-                    key={opt._key || idx}
-                    className="flex items-center gap-2 p-1.5 rounded-lg border bg-card text-xs"
-                  >
-                    <div className="flex flex-col gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => handleMoveOption(idx, "up")}
-                        disabled={idx === 0}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        title={t("editor.formEditor.moveUp")}
-                      >
-                        <ChevronUp className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleMoveOption(idx, "down")}
-                        disabled={idx === options.length - 1}
-                        className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        title={t("editor.formEditor.moveDown")}
-                      >
-                        <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    <Input
-                      value={opt.label}
-                      onChange={(e) =>
-                        handleUpdateOption(idx, "label", e.target.value)
-                      }
-                      placeholder={t("editor.inspector.optionLabel")}
-                      className="text-xs flex-1 h-7"
-                    />
-
-                    <Input
-                      value={opt.value}
-                      onChange={(e) =>
-                        handleUpdateOption(idx, "value", e.target.value)
-                      }
-                      placeholder={t("editor.inspector.optionValue")}
-                      className="text-xs w-28 h-7 font-mono text-muted-foreground"
-                      title={t("editor.inspector.optionValueTitle")}
-                    />
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      onClick={() => handleRemoveOption(idx)}
-                      className="text-muted-foreground hover:text-destructive shrink-0"
-                      title={t("editor.inspector.removeOption")}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t flex items-center justify-end gap-2 bg-muted/10 shrink-0">
+      }
+      subtitle={t("editor.inspector.subtitle")}
+      maxWidth="xl"
+      footer={
+        <>
           <Button variant="outline" size="sm" onClick={onClose}>
             {t("common.cancel")}
           </Button>
@@ -702,8 +282,410 @@ export function FieldInspector({
             <Check className="w-4 h-4" />
             {t("editor.inspector.applyChanges")}
           </Button>
+        </>
+      }
+    >
+      <div className="space-y-4 text-foreground">
+        {error && (
+          <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Label */}
+        <div className="space-y-1.5">
+          <Label htmlFor="field-label" className="text-xs font-semibold">
+            {t("editor.inspector.label")}{" "}
+            <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="field-label"
+            value={draft.label}
+            onChange={(e) => handleLabelChange(e.target.value)}
+            placeholder="e.g. Technician Name, Fluid Level, Inspection Date"
+            className="text-sm"
+            autoFocus
+          />
         </div>
+
+        {/* Field ID / Key */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="field-id" className="text-xs font-semibold">
+              {t("editor.inspector.fieldKeyId")}{" "}
+              <span className="text-destructive">*</span>
+            </Label>
+            <span className="text-[10px] text-muted-foreground">
+              {t("editor.inspector.usedInternally")}
+            </span>
+          </div>
+          <Input
+            id="field-id"
+            value={draft.id}
+            onChange={(e) => {
+              setIsIdManuallyEdited(true);
+              setDraft((prev) =>
+                prev ? { ...prev, id: e.target.value } : null,
+              );
+            }}
+            placeholder="e.g. technician_name"
+            className="font-mono text-xs"
+          />
+        </div>
+
+        {/* Placeholder & Helper Text (for inputs) */}
+        {draft.type !== "heading" && draft.type !== "notes" && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {draft.type !== "checkbox" &&
+              draft.type !== "signature" &&
+              draft.type !== "photo" &&
+              draft.type !== "video" && (
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="field-placeholder"
+                    className="text-xs font-semibold"
+                  >
+                    {t("editor.inspector.placeholderText")}
+                  </Label>
+                  <Input
+                    id="field-placeholder"
+                    value={draft.placeholder || ""}
+                    onChange={(e) =>
+                      setDraft((prev) =>
+                        prev ? { ...prev, placeholder: e.target.value } : null,
+                      )
+                    }
+                    placeholder={t("editor.inspector.placeholderExample")}
+                    className="text-xs"
+                  />
+                </div>
+              )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="field-helper" className="text-xs font-semibold">
+                {t("editor.inspector.helperSubtext")}
+              </Label>
+              <Input
+                id="field-helper"
+                value={draft.helperText || ""}
+                onChange={(e) =>
+                  setDraft((prev) =>
+                    prev ? { ...prev, helperText: e.target.value } : null,
+                  )
+                }
+                placeholder={t("editor.inspector.helperExample")}
+                className="text-xs"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Toggles: Required & IsIdentifier */}
+        {draft.type !== "heading" && draft.type !== "notes" && (
+          <div className="pt-2 border-t space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+              <div className="space-y-0.5 pr-4">
+                <span className="text-xs font-semibold">
+                  {t("editor.inspector.required")}
+                </span>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("editor.inspector.requiredFieldDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={draft.required || false}
+                onCheckedChange={(checked) =>
+                  setDraft((prev) =>
+                    prev ? { ...prev, required: checked } : null,
+                  )
+                }
+              />
+            </div>
+
+            {/* Allow Multiple Files toggle for photo and video */}
+            {(draft.type === "photo" || draft.type === "video") && (
+              <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/20">
+                <div className="space-y-0.5 pr-4">
+                  <span className="text-xs font-semibold">
+                    {t("editor.inspector.allowMultipleFiles")}
+                  </span>
+                  <p className="text-[11px] text-muted-foreground">
+                    {t("editor.inspector.allowMultipleFilesDesc", {
+                      type: draft.type,
+                    })}
+                  </p>
+                </div>
+                <Switch
+                  checked={draft.allowMultiple || false}
+                  onCheckedChange={(checked) =>
+                    setDraft((prev) =>
+                      prev ? { ...prev, allowMultiple: checked } : null,
+                    )
+                  }
+                />
+              </div>
+            )}
+
+            {/* IsIdentifier toggle */}
+            {canBeIdentifier && (
+              <div className="flex items-start justify-between p-3 rounded-xl border bg-blue-500/5 border-blue-500/20">
+                <div className="space-y-1 pr-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-blue-600 dark:text-blue-400">
+                      {t("editor.inspector.useAsFileIdentifier")}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {t("editor.inspector.fileIdentifierDesc", {
+                      example: "Inspection_Truck-10_2026-09-04_1430.pdf",
+                    })}
+                  </p>
+                </div>
+                <Switch
+                  checked={draft.isIdentifier || false}
+                  onCheckedChange={(checked) =>
+                    setDraft((prev) =>
+                      prev ? { ...prev, isIdentifier: checked } : null,
+                    )
+                  }
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Default Value Settings */}
+        {draft.type === "date" && (
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label className="text-xs font-semibold">
+              {t("editor.inspector.defaultDateValue")}
+            </Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="xs"
+                variant={
+                  draft.defaultValue === "today" ? "secondary" : "outline"
+                }
+                onClick={() =>
+                  setDraft((prev) =>
+                    prev ? { ...prev, defaultValue: "today" } : null,
+                  )
+                }
+              >
+                {t("editor.inspector.defaultToToday")}
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={!draft.defaultValue ? "secondary" : "outline"}
+                onClick={() =>
+                  setDraft((prev) =>
+                    prev ? { ...prev, defaultValue: undefined } : null,
+                  )
+                }
+              >
+                {t("editor.inspector.leaveBlank")}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {draft.type === "datetime" && (
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label className="text-xs font-semibold">
+              {t("editor.inspector.defaultTimestampValue")}
+            </Label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="xs"
+                variant={draft.defaultValue === "now" ? "secondary" : "outline"}
+                onClick={() =>
+                  setDraft((prev) =>
+                    prev ? { ...prev, defaultValue: "now" } : null,
+                  )
+                }
+              >
+                {t("editor.inspector.defaultToNow")}
+              </Button>
+              <Button
+                type="button"
+                size="xs"
+                variant={!draft.defaultValue ? "secondary" : "outline"}
+                onClick={() =>
+                  setDraft((prev) =>
+                    prev ? { ...prev, defaultValue: undefined } : null,
+                  )
+                }
+              >
+                {t("editor.inspector.leaveBlank")}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {draft.type === "number" && (
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label className="text-xs font-semibold">
+              {t("editor.inspector.optionalBounds")}
+            </Label>
+            <div className="grid grid-cols-2 gap-3">
+              <Input
+                type="number"
+                placeholder={t("editor.inspector.minValue")}
+                value={draft.validation?.min ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const min =
+                    raw !== "" && !Number.isNaN(Number(raw))
+                      ? Number(raw)
+                      : undefined;
+                  setDraft((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          validation: { ...prev.validation, min },
+                        }
+                      : null,
+                  );
+                }}
+                className="text-xs"
+              />
+              <Input
+                type="number"
+                placeholder={t("editor.inspector.maxValue")}
+                value={draft.validation?.max ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const max =
+                    raw !== "" && !Number.isNaN(Number(raw))
+                      ? Number(raw)
+                      : undefined;
+                  setDraft((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          validation: { ...prev.validation, max },
+                        }
+                      : null,
+                  );
+                }}
+                className="text-xs"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Options Manager for choices */}
+        {hasOptions && (
+          <div className="space-y-3 pt-3 border-t">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xs font-semibold">
+                  {t("editor.inspector.choiceOptions")}
+                </h4>
+                <p className="text-[11px] text-muted-foreground">
+                  {t("editor.inspector.choiceOptionsDesc")}
+                </p>
+              </div>
+              <span className="text-[10px] font-mono text-muted-foreground">
+                {t("editor.inspector.optionsCount", {
+                  count: options.length,
+                })}
+              </span>
+            </div>
+
+            {/* Add option row */}
+            <div className="flex items-center gap-2">
+              <Input
+                value={newOptionLabel}
+                onChange={(e) => setNewOptionLabel(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddOption();
+                  }
+                }}
+                placeholder={t("editor.inspector.addOptionLabel")}
+                className="text-xs flex-1"
+              />
+              <Button
+                type="button"
+                size="xs"
+                onClick={handleAddOption}
+                disabled={!newOptionLabel.trim()}
+                className="gap-1 font-semibold"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {t("editor.inspector.add")}
+              </Button>
+            </div>
+
+            {/* Options list */}
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {options.map((opt, idx) => (
+                <div
+                  key={opt._key || idx}
+                  className="flex items-center gap-2 p-1.5 rounded-lg border bg-card text-xs"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveOption(idx, "up")}
+                      disabled={idx === 0}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      title={t("editor.formEditor.moveUp")}
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveOption(idx, "down")}
+                      disabled={idx === options.length - 1}
+                      className="text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      title={t("editor.formEditor.moveDown")}
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <Input
+                    value={opt.label}
+                    onChange={(e) =>
+                      handleUpdateOption(idx, "label", e.target.value)
+                    }
+                    placeholder={t("editor.inspector.optionLabel")}
+                    className="text-xs flex-1 h-7"
+                  />
+
+                  <Input
+                    value={opt.value}
+                    onChange={(e) =>
+                      handleUpdateOption(idx, "value", e.target.value)
+                    }
+                    placeholder={t("editor.inspector.optionValue")}
+                    className="text-xs w-28 h-7 font-mono text-muted-foreground"
+                    title={t("editor.inspector.optionValueTitle")}
+                  />
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => handleRemoveOption(idx)}
+                    className="text-muted-foreground hover:text-destructive shrink-0"
+                    title={t("editor.inspector.removeOption")}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-    </div>
+    </AppDialog>
   );
 }

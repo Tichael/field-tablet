@@ -3,7 +3,6 @@ import { syncManager } from "../../lib/sync/sync-manager";
 import type { FileInfo } from "../../lib/storage/adapter";
 import {
   Folder,
-  ChevronLeft,
   FileText,
   Image as ImageIcon,
   FileVideo,
@@ -12,6 +11,8 @@ import {
 import { DocumentViewer } from "./DocumentViewer";
 import { useConfigStore } from "../../store/config-store";
 import { useTranslation } from "react-i18next";
+import { AppHeader } from "../layout/AppHeader";
+import { EmptyState } from "../ui/empty-state";
 
 interface DocumentListProps {
   basePath?: string;
@@ -122,19 +123,15 @@ export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <div className="flex items-center p-4 border-b bg-muted/10 shadow-sm">
-        <button
-          onClick={navigateUp}
-          className="p-2 mr-3 rounded-full hover:bg-muted transition-colors"
-        >
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        <h1 className="text-xl font-semibold tracking-tight">
-          {currentPath === ""
+      <AppHeader
+        onBack={navigateUp}
+        title={
+          currentPath === ""
             ? t("documents.title")
-            : currentPath.split("/").pop()}
-        </h1>
-      </div>
+            : currentPath.split("/").pop()
+        }
+        subtitle={currentPath || undefined}
+      />
 
       <div className="flex-1 overflow-auto p-6">
         {loading ? (
@@ -144,13 +141,15 @@ export function DocumentList({ basePath = "", onClose }: DocumentListProps) {
             </div>
           </div>
         ) : files.length === 0 ? (
-          <div className="flex flex-col justify-center items-center h-full text-muted-foreground">
-            <Folder className="w-16 h-16 opacity-20 mb-4" />
-            <p>
-              {currentPath === ""
-                ? t("documents.noSyncFolders")
-                : t("documents.folderEmpty")}
-            </p>
+          <div className="flex items-center justify-center h-full">
+            <EmptyState
+              icon={Folder}
+              title={
+                currentPath === ""
+                  ? t("documents.noSyncFolders")
+                  : t("documents.folderEmpty")
+              }
+            />
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
