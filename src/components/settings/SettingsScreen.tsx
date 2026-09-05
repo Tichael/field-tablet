@@ -95,16 +95,7 @@ export function SettingsScreen() {
   }
 
   return (
-    <div className="p-6 sm:p-8 bg-background border rounded-xl shadow-sm max-w-2xl mx-auto space-y-8">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {t("settings.title")}
-        </h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          {t("settings.subtitle")}
-        </p>
-      </div>
-
+    <div className="p-6 sm:p-8 bg-background border rounded-xl shadow-sm max-w-2xl mx-auto space-y-6">
       <div className="space-y-6">
         {/* Sync Status */}
         <div className="bg-muted/50 p-4 rounded-lg border space-y-2">

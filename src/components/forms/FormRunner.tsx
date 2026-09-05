@@ -680,7 +680,7 @@ export function FormRunner({
       <AppHeader
         onBack={handleClose}
         title={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="truncate">{template.title}</span>
             {initialSubmission && (
               <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border shrink-0">
@@ -754,7 +754,7 @@ export function FormRunner({
       >
         {/* Section Jump Bar */}
         {template.sections.length > 1 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <div className="max-w-4xl mx-auto flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {template.sections.map((section, idx) => {
               const isActive = section.id === activeSection.id;
               const sectionHasError = section.fields.some((f) =>

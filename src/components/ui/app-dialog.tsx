@@ -13,6 +13,7 @@ export interface AppDialogProps {
   footer?: React.ReactNode;
   maxWidth?: "sm" | "md" | "lg" | "xl" | "2xl";
   className?: string;
+  closeOnBackdropClick?: boolean;
 }
 
 export function AppDialog({
@@ -24,8 +25,31 @@ export function AppDialog({
   footer,
   maxWidth = "lg",
   className,
+  closeOnBackdropClick = true,
 }: AppDialogProps) {
   const { t } = useTranslation();
+  const titleId = React.useId();
+  const subtitleId = React.useId();
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -41,6 +65,13 @@ export function AppDialog({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby={titleId}
+      aria-describedby={subtitle ? subtitleId : undefined}
+      onClick={(e) => {
+        if (closeOnBackdropClick && e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150 text-foreground"
     >
       <div
@@ -54,19 +85,25 @@ export function AppDialog({
         <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-muted/20 shrink-0">
           <div className="min-w-0 flex-1 pr-2">
             {typeof title === "string" ? (
-              <h3 className="font-bold text-lg truncate text-foreground">
+              <h3
+                id={titleId}
+                className="font-bold text-lg truncate text-foreground"
+              >
                 {title}
               </h3>
             ) : (
-              title
+              <div id={titleId}>{title}</div>
             )}
             {subtitle &&
               (typeof subtitle === "string" ? (
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                <p
+                  id={subtitleId}
+                  className="text-xs text-muted-foreground mt-0.5 truncate"
+                >
                   {subtitle}
                 </p>
               ) : (
-                subtitle
+                <div id={subtitleId}>{subtitle}</div>
               ))}
           </div>
           <Button

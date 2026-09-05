@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AppHeader } from "../layout/AppHeader";
+import { AppDialog } from "../ui/app-dialog";
 
 interface ConfigEditorScreenProps {
   onClose: () => void;
@@ -631,6 +632,34 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
             </div>
           )}
 
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <Label htmlFor="saveAsName" className="font-semibold text-sm">
+                    {t("editor.config.configFilenameLabel")}
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    {t("editor.config.subtitle")}
+                  </p>
+                </div>
+                <Input
+                  id="saveAsName"
+                  value={saveAsName}
+                  onChange={(e) => setSaveAsName(e.target.value)}
+                  placeholder="app-config.json"
+                  disabled={isConfigured && isConnected === false}
+                  className="sm:w-64 font-mono text-xs"
+                />
+              </div>
+              {isConfigured && isConnected === false && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-2">
+                  {t("editor.config.offlineWarning")}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Tabs defaultValue="theme" className="w-full">
             <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
               <TabsTrigger value="theme">
@@ -1159,108 +1188,39 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
             </TabsContent>
           </Tabs>
 
-          {isBrowserOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-              <div className="bg-background rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col overflow-hidden border">
-                <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
-                  <div>
-                    <h3 className="font-semibold text-lg">
-                      {browserMode === "form"
-                        ? t("editor.config.selectFolderToLinkTitle")
-                        : t("editor.config.selectFolderToSyncTitle")}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {browserMode === "form"
-                        ? t("editor.config.selectFolderToLinkDesc")
-                        : t("editor.config.selectFolderToSyncDesc")}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setBrowserOpen(false);
-                    }}
-                  >
-                    {t("common.cancel")}
-                  </Button>
-                </div>
-                <div className="flex-1 overflow-hidden p-3 sm:p-4">
-                  <GenericFileBrowser
-                    onFolderSelect={
-                      browserMode === "form"
-                        ? handleAddFormFolder
-                        : handleAddSyncFolder
-                    }
-                    onFileSelect={() => {}}
-                    allowCreateFolder={true}
-                    allowSelectRoot={false}
-                    existingFolders={
-                      browserMode === "form"
-                        ? getFormFoldersList(formData)
-                        : formData.syncFolders || []
-                    }
-                  />
-                </div>
-              </div>
+          <AppDialog
+            isOpen={isBrowserOpen}
+            onClose={() => setBrowserOpen(false)}
+            title={
+              browserMode === "form"
+                ? t("editor.config.selectFolderToLinkTitle")
+                : t("editor.config.selectFolderToSyncTitle")
+            }
+            subtitle={
+              browserMode === "form"
+                ? t("editor.config.selectFolderToLinkDesc")
+                : t("editor.config.selectFolderToSyncDesc")
+            }
+            maxWidth="2xl"
+          >
+            <div className="h-[65vh] -mx-4 -my-4 sm:-mx-6 sm:-my-6">
+              <GenericFileBrowser
+                onFolderSelect={
+                  browserMode === "form"
+                    ? handleAddFormFolder
+                    : handleAddSyncFolder
+                }
+                onFileSelect={() => {}}
+                allowCreateFolder={true}
+                allowSelectRoot={false}
+                existingFolders={
+                  browserMode === "form"
+                    ? getFormFoldersList(formData)
+                    : formData.syncFolders || []
+                }
+              />
             </div>
-          )}
-
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="saveAsName">
-                  {t("editor.config.configFilenameLabel")}
-                </Label>
-                <Input
-                  id="saveAsName"
-                  value={saveAsName}
-                  onChange={(e) => setSaveAsName(e.target.value)}
-                  placeholder="app-config.json"
-                  disabled={isConfigured && isConnected === false}
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  size="lg"
-                  onClick={handleCancel}
-                  disabled={isSaving || isSyncing}
-                >
-                  {t("common.cancel")}
-                </Button>
-                <Button
-                  className="flex-1"
-                  size="lg"
-                  onClick={handleSave}
-                  disabled={
-                    isSaving ||
-                    isSyncing ||
-                    !saveAsName.trim() ||
-                    (isConfigured && isConnected === false) ||
-                    checkingConnection
-                  }
-                  title={
-                    isConfigured && isConnected === false
-                      ? t("editor.config.offlineWarning")
-                      : undefined
-                  }
-                >
-                  {isSaving || isSyncing
-                    ? t("editor.config.savingConfig")
-                    : checkingConnection
-                      ? t("common.loading")
-                      : t("editor.config.saveConfig")}
-                </Button>
-              </div>
-              {isConfigured && isConnected === false && (
-                <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
-                  {t("editor.config.offlineWarning")}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+          </AppDialog>
         </div>
       </div>
     </div>

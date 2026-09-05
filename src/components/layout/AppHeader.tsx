@@ -46,12 +46,12 @@ export function AppHeader({
     >
       <div
         className={cn(
-          "w-full px-4 sm:px-6 flex items-center justify-between gap-3",
+          "w-full px-4 sm:px-6 flex items-center justify-between gap-3 relative",
           heightClass,
         )}
       >
         {/* Left / Start Section */}
-        <div className="flex items-center gap-3 min-w-0 flex-1 sm:flex-initial">
+        <div className="flex items-center gap-3 min-w-0 flex-1 sm:flex-initial z-10">
           {onBack && (
             <Button
               variant="ghost"
@@ -72,6 +72,7 @@ export function AppHeader({
               {title &&
                 (typeof title === "string" ? (
                   <h1
+                    title={title}
                     className={cn(
                       "font-bold truncate tracking-tight text-foreground",
                       isCompact ? "text-base" : "text-lg sm:text-xl",
@@ -96,14 +97,14 @@ export function AppHeader({
 
         {/* Center Section (optional view switchers, pagination, etc.) */}
         {center && (
-          <div className="hidden md:flex items-center justify-center shrink-0">
-            {center}
+          <div className="hidden md:flex items-center justify-center absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="pointer-events-auto">{center}</div>
           </div>
         )}
 
         {/* Right / Actions Section */}
         {actions && (
-          <div className="flex items-center gap-2 shrink-0">{actions}</div>
+          <div className="flex items-center gap-2 shrink-0 z-10">{actions}</div>
         )}
       </div>
 

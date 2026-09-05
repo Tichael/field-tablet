@@ -549,7 +549,7 @@ export function FormEditor({
         size="compact"
         onBack={handleClose}
         title={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
             <span className="font-bold text-base truncate text-foreground">
               {template.title || t("editor.formEditor.untitledForm")}
             </span>
@@ -618,6 +618,7 @@ export function FormEditor({
                 onClick={() => setViewMode("builder")}
                 className="text-xs px-2"
                 title={t("editor.formEditor.builder")}
+                aria-label={t("editor.formEditor.builder")}
               >
                 <Sliders className="w-3.5 h-3.5" />
               </Button>
@@ -627,6 +628,7 @@ export function FormEditor({
                 onClick={() => setViewMode("preview")}
                 className="text-xs px-2"
                 title={t("editor.formEditor.preview")}
+                aria-label={t("editor.formEditor.preview")}
               >
                 <Eye className="w-3.5 h-3.5" />
               </Button>

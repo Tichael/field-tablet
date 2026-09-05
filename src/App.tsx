@@ -33,13 +33,6 @@ function App() {
   const isSettingsOpen = useAppStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const needsPermission = useAppStore((state) => state.needsPermission);
-  const isSyncing = useAppStore((state) => state.isSyncing);
-  const lastSyncTime = useAppStore((state) => state.lastSyncTime);
-  const syncError = useAppStore((state) => state.error);
-  const pendingUploadsCount = useAppStore((state) => state.pendingUploadsCount);
-  const hasSyncStatus = Boolean(
-    isSyncing || pendingUploadsCount > 0 || syncError || lastSyncTime,
-  );
   const { config, loadConfig } = useConfigStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -282,6 +275,7 @@ function App() {
           )
         }
         title={isSettingsOpen ? t("settings.title") : undefined}
+        subtitle={isSettingsOpen ? t("settings.subtitle") : undefined}
         onBack={
           isSettingsOpen && !isEditingConfig
             ? () => setSettingsOpen(false)
@@ -289,15 +283,18 @@ function App() {
         }
         backLabel={t("header.backToApp")}
         actions={
-          !isEditingConfig && !isSettingsOpen ? (
-            <Button
-              onClick={() => setSettingsOpen(true)}
-              variant="outline"
-              size="sm"
-            >
-              {t("header.settings")}
-            </Button>
-          ) : undefined
+          <div className="flex items-center gap-2">
+            <SyncIndicator />
+            {!isEditingConfig && !isSettingsOpen && (
+              <Button
+                onClick={() => setSettingsOpen(true)}
+                variant="outline"
+                size="sm"
+              >
+                {t("header.settings")}
+              </Button>
+            )}
+          </div>
         }
       />
       <main className="max-w-4xl mx-auto p-4 sm:p-6">
@@ -305,13 +302,6 @@ function App() {
           <SettingsScreen />
         ) : (
           <div className="space-y-6">
-            {/* Top-right sync status pill */}
-            {hasSyncStatus && (
-              <div className="flex justify-end">
-                <SyncIndicator />
-              </div>
-            )}
-
             {/* Forms dashboard grid if templates exist */}
             {dashboardForms.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
