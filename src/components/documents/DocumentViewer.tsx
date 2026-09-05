@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { syncManager } from "../../lib/sync/sync-manager";
 import {
-  X,
   ExternalLink,
   ZoomIn,
   ZoomOut,
@@ -10,6 +9,7 @@ import {
   FileQuestion,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { AppHeader } from "../layout/AppHeader";
 import { Capacitor } from "@capacitor/core";
 // @ts-ignore - plugin missing types or dynamic load
 import { FileOpener } from "@capacitor-community/file-opener";
@@ -379,86 +379,74 @@ export function DocumentViewer({ filePath, onClose }: DocumentViewerProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
-      <div className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-sm shrink-0">
-        <h2
-          className="text-lg font-semibold truncate flex-1 pr-4"
-          title={filePath}
-        >
-          {filePath.split("/").pop()}
-        </h2>
+      <AppHeader
+        onBack={onClose}
+        backLabel={t("common.back")}
+        title={filePath.split("/").pop()}
+        actions={
+          <div className="flex items-center gap-3">
+            {numPages && (
+              <div className="flex items-center bg-background border rounded-lg overflow-hidden shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={pageNumber <= 1}
+                  onClick={() => changePage(-1)}
+                  className="h-8 px-2 rounded-none hover:bg-muted"
+                  title={t("documents.previousPage")}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                <span className="px-2.5 py-1 text-xs font-mono font-medium min-w-[3.5rem] text-center border-x">
+                  {pageNumber} / {numPages}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={pageNumber >= numPages}
+                  onClick={() => changePage(1)}
+                  className="h-8 px-2 rounded-none hover:bg-muted"
+                  title={t("documents.nextPage")}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
 
-        <div className="flex items-center gap-3">
-          {numPages && (
-            <div className="flex items-center bg-background border rounded-lg overflow-hidden shadow-sm">
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pageNumber <= 1}
-                onClick={() => changePage(-1)}
-                className="h-8 px-2 rounded-none hover:bg-muted"
-                title={t("documents.previousPage")}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="px-2.5 py-1 text-xs font-mono font-medium min-w-[3.5rem] text-center border-x">
-                {pageNumber} / {numPages}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pageNumber >= numPages}
-                onClick={() => changePage(1)}
-                className="h-8 px-2 rounded-none hover:bg-muted"
-                title={t("documents.nextPage")}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
-
-          {(isPDF || isImage) && (
-            <div className="flex items-center bg-background border rounded-lg overflow-hidden shadow-sm">
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleZoomOut}
-                className="h-8 w-8 rounded-none hover:bg-muted"
-                title={t("documents.zoomOut")}
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleZoomReset}
-                className="h-8 px-2.5 text-xs font-mono font-medium min-w-[3.5rem] rounded-none border-x hover:bg-muted"
-                title={t("documents.resetZoom")}
-              >
-                {Math.round(scale * 100)}%
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={handleZoomIn}
-                className="h-8 w-8 rounded-none hover:bg-muted"
-                title={t("documents.zoomIn")}
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </Button>
-            </div>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="rounded-full border bg-background shadow-sm hover:bg-muted"
-            title={t("documents.closeViewer")}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-      </div>
+            {(isPDF || isImage) && (
+              <div className="flex items-center bg-background border rounded-lg overflow-hidden shadow-sm">
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleZoomOut}
+                  className="h-8 w-8 rounded-none hover:bg-muted"
+                  title={t("documents.zoomOut")}
+                >
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleZoomReset}
+                  className="h-8 px-2.5 text-xs font-mono font-medium min-w-[3.5rem] rounded-none border-x hover:bg-muted"
+                  title={t("documents.resetZoom")}
+                >
+                  {Math.round(scale * 100)}%
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleZoomIn}
+                  className="h-8 w-8 rounded-none hover:bg-muted"
+                  title={t("documents.zoomIn")}
+                >
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            )}
+          </div>
+        }
+      />
 
       <div className="flex-1 overflow-hidden relative">
         {error ? (

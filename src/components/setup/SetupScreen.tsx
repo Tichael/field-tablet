@@ -193,12 +193,13 @@ export function SetupScreen() {
           <div className="relative flex items-center justify-center shrink-0">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setStep(1)}
-              className="absolute left-0 gap-1 text-muted-foreground hover:text-foreground"
+              className="absolute left-0 rounded-full text-muted-foreground hover:text-foreground"
+              title={t("common.back")}
+              aria-label={t("common.back")}
             >
-              <ChevronLeft className="w-4 h-4" />
-              <span>{t("common.back")}</span>
+              <ChevronLeft className="w-5 h-5" />
             </Button>
             <div className="text-center">
               <h1 className="text-2xl font-bold tracking-tight">

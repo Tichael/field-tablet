@@ -13,8 +13,8 @@ import { FieldPalette } from "./FieldPalette";
 import { FieldInspector } from "./FieldInspector";
 import { TemplateSaveDialog } from "./TemplateSaveDialog";
 import { FormRunner } from "../FormRunner";
+import { AppHeader } from "../../layout/AppHeader";
 import {
-  ChevronLeft,
   Plus,
   Save,
   Eye,
@@ -545,51 +545,38 @@ export function FormEditor({
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
       {/* 1. Header Toolbar */}
-      <header className="flex items-center justify-between p-3 sm:p-4 border-b bg-muted/20 shadow-xs shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="rounded-full shrink-0"
-            title={t("common.back")}
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="font-bold text-base sm:text-lg truncate text-foreground">
-                {template.title || t("editor.formEditor.untitledForm")}
-              </h1>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
-                v{template.version || 1}
+      <AppHeader
+        size="compact"
+        onBack={handleClose}
+        title={
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-base truncate text-foreground">
+              {template.title || t("editor.formEditor.untitledForm")}
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
+              v{template.version || 1}
+            </span>
+            {template.category && (
+              <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded font-semibold bg-secondary text-secondary-foreground border border-border/40">
+                {template.category}
               </span>
-              {template.category && (
-                <span className="hidden sm:inline-block text-[10px] px-2 py-0.5 rounded font-semibold bg-secondary text-secondary-foreground border border-border/40">
-                  {template.category}
-                </span>
-              )}
-              {isDirty && (
-                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic">
-                  {t("editor.formEditor.unsaved")}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {template.folderPath
-                ? t("editor.formEditor.destinationPath", {
-                    path: template.folderPath,
-                  })
-                : t("editor.formEditor.formEditorTitle")}
-            </p>
+            )}
+            {isDirty && (
+              <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium italic">
+                {t("editor.formEditor.unsaved")}
+              </span>
+            )}
           </div>
-        </div>
-
-        {/* Mode Switcher & Save Action */}
-        <div className="flex items-center gap-2">
-          {/* Mode Switcher */}
-          <div className="flex items-center bg-muted/50 p-1 rounded-xl border">
+        }
+        subtitle={
+          template.folderPath
+            ? t("editor.formEditor.destinationPath", {
+                path: template.folderPath,
+              })
+            : t("editor.formEditor.formEditorTitle")
+        }
+        center={
+          <div className="flex items-center bg-muted/50 p-0.5 rounded-lg border">
             <Button
               variant={viewMode === "builder" ? "secondary" : "ghost"}
               size="xs"
@@ -621,17 +608,40 @@ export function FormEditor({
               <span>{t("editor.formEditor.split")}</span>
             </Button>
           </div>
-
-          <Button
-            size="sm"
-            onClick={() => setSaveDialogOpen(true)}
-            className="gap-1.5 font-semibold shadow-xs"
-          >
-            <Save className="w-4 h-4" />
-            <span>{t("editor.formEditor.saveTemplate")}</span>
-          </Button>
-        </div>
-      </header>
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <div className="flex md:hidden items-center bg-muted/50 p-0.5 rounded-lg border">
+              <Button
+                variant={viewMode === "builder" ? "secondary" : "ghost"}
+                size="xs"
+                onClick={() => setViewMode("builder")}
+                className="text-xs px-2"
+                title={t("editor.formEditor.builder")}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant={viewMode === "preview" ? "secondary" : "ghost"}
+                size="xs"
+                onClick={() => setViewMode("preview")}
+                className="text-xs px-2"
+                title={t("editor.formEditor.preview")}
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setSaveDialogOpen(true)}
+              className="gap-1.5 font-semibold shadow-xs"
+            >
+              <Save className="w-4 h-4" />
+              <span>{t("editor.formEditor.saveTemplate")}</span>
+            </Button>
+          </div>
+        }
+      />
 
       {/* 2. Main Work Area */}
       <div className="flex-1 overflow-hidden flex flex-row">

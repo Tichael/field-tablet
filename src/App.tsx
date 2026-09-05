@@ -19,6 +19,8 @@ import { DocumentViewer } from "./components/documents/DocumentViewer";
 import { SyncIndicator } from "./components/ui/SyncIndicator";
 import { FormRunner } from "./components/forms/FormRunner";
 import { FormsBrowser } from "./components/forms/FormsBrowser";
+import { AppHeader } from "./components/layout/AppHeader";
+import { EmptyState } from "./components/ui/empty-state";
 import type { FormTemplate, FormSubmission } from "./types/form";
 import { formService } from "./lib/forms/form-service";
 
@@ -31,6 +33,13 @@ function App() {
   const isSettingsOpen = useAppStore((state) => state.isSettingsOpen);
   const setSettingsOpen = useAppStore((state) => state.setSettingsOpen);
   const needsPermission = useAppStore((state) => state.needsPermission);
+  const isSyncing = useAppStore((state) => state.isSyncing);
+  const lastSyncTime = useAppStore((state) => state.lastSyncTime);
+  const syncError = useAppStore((state) => state.error);
+  const pendingUploadsCount = useAppStore((state) => state.pendingUploadsCount);
+  const hasSyncStatus = Boolean(
+    isSyncing || pendingUploadsCount > 0 || syncError || lastSyncTime,
+  );
   const { config, loadConfig } = useConfigStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -255,43 +264,54 @@ function App() {
 
   return (
     <div className="min-h-screen bg-muted/20">
-      <header className="bg-primary text-primary-foreground dark:bg-card dark:text-card-foreground border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            {config.branding.logoBase64 && (
-              <img
-                src={config.branding.logoBase64}
-                alt="App Logo"
-                className="h-8 object-contain"
-              />
-            )}
-            <h1 className="text-xl font-semibold tracking-tight">
-              {config.branding.appTitle || t("header.fieldTabletApp")}
-            </h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <SyncIndicator />
-            {!isEditingConfig && (
-              <Button
-                onClick={() => setSettingsOpen(!isSettingsOpen)}
-                variant={isSettingsOpen ? "secondary" : "outline"}
-                className={
-                  isSettingsOpen
-                    ? ""
-                    : "text-primary-foreground border-primary-foreground/30 hover:bg-primary-foreground/10 dark:text-foreground dark:border-border dark:hover:bg-accent"
-                }
-              >
-                {isSettingsOpen ? t("header.backToApp") : t("header.settings")}
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-      <main className="max-w-7xl mx-auto py-8 sm:px-6 lg:px-8">
+      <AppHeader
+        start={
+          isSettingsOpen ? undefined : (
+            <div className="flex items-center gap-3">
+              {config.branding.logoBase64 && (
+                <img
+                  src={config.branding.logoBase64}
+                  alt="App Logo"
+                  className="h-8 object-contain"
+                />
+              )}
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
+                {config.branding.appTitle || t("header.fieldTabletApp")}
+              </h1>
+            </div>
+          )
+        }
+        title={isSettingsOpen ? t("settings.title") : undefined}
+        onBack={
+          isSettingsOpen && !isEditingConfig
+            ? () => setSettingsOpen(false)
+            : undefined
+        }
+        backLabel={t("header.backToApp")}
+        actions={
+          !isEditingConfig && !isSettingsOpen ? (
+            <Button
+              onClick={() => setSettingsOpen(true)}
+              variant="outline"
+              size="sm"
+            >
+              {t("header.settings")}
+            </Button>
+          ) : undefined
+        }
+      />
+      <main className="max-w-4xl mx-auto p-4 sm:p-6">
         {isSettingsOpen ? (
           <SettingsScreen />
         ) : (
-          <div className="px-4 py-6 sm:px-0 max-w-4xl mx-auto space-y-6">
+          <div className="space-y-6">
+            {/* Top-right sync status pill */}
+            {hasSyncStatus && (
+              <div className="flex justify-end">
+                <SyncIndicator />
+              </div>
+            )}
+
             {/* Forms dashboard grid if templates exist */}
             {dashboardForms.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -377,25 +397,15 @@ function App() {
                 )}
               </div>
             ) : (
-              <div className="border border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center bg-card/50 shadow-xs space-y-3">
-                <FileText className="w-10 h-10 text-muted-foreground/50" />
-                <div className="space-y-1">
-                  <h3 className="font-semibold text-base text-foreground">
-                    {t("dashboard.noFormsConfigured")}
-                  </h3>
-                  <p className="text-xs text-muted-foreground max-w-sm">
-                    {t("dashboard.noFormsDescription")}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSettingsOpen(true)}
-                  className="mt-2"
-                >
-                  {t("dashboard.configureFormsInSettings")}
-                </Button>
-              </div>
+              <EmptyState
+                icon={FileText}
+                title={t("dashboard.noFormsConfigured")}
+                description={t("dashboard.noFormsDescription")}
+                action={{
+                  label: t("dashboard.configureFormsInSettings"),
+                  onClick: () => setSettingsOpen(true),
+                }}
+              />
             )}
 
             {/* Bottom row: Large document button */}

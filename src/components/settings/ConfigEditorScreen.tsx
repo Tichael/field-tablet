@@ -45,8 +45,10 @@ import {
   Edit3,
   Copy,
   Loader2,
+  Save,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AppHeader } from "../layout/AppHeader";
 
 interface ConfigEditorScreenProps {
   onClose: () => void;
@@ -578,418 +580,392 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            {t("editor.config.title")}
-          </h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("editor.config.subtitle")}
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col h-screen bg-background">
+      <AppHeader
+        onBack={handleCancel}
+        title={t("editor.config.title")}
+        subtitle={t("editor.config.subtitle")}
+        actions={
+          <Button
+            size="sm"
+            onClick={handleSave}
+            disabled={
+              isSaving ||
+              isSyncing ||
+              !saveAsName.trim() ||
+              (isConfigured && isConnected === false) ||
+              checkingConnection
+            }
+            className="gap-1.5 font-semibold"
+          >
+            {isSaving || isSyncing ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{t("editor.config.savingConfig")}</span>
+              </>
+            ) : checkingConnection ? (
+              <span>{t("common.loading")}</span>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                <span>{t("editor.config.saveConfig")}</span>
+              </>
+            )}
+          </Button>
+        }
+      />
 
-      {isConfigured && isConnected === false && (
-        <div className="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in duration-150">
-          <AlertCircle className="w-5 h-5 shrink-0" />
-          <div className="text-sm">
-            <p className="font-semibold">
-              {t("editor.config.networkShareDisconnectedTitle")}
-            </p>
-            <p className="text-xs mt-0.5">
-              {t("editor.config.networkShareDisconnectedDesc")}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <Tabs defaultValue="theme" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
-          <TabsTrigger value="theme">
-            {t("editor.config.themeAndLayout")}
-          </TabsTrigger>
-          <TabsTrigger value="branding">
-            {t("editor.config.branding")}
-          </TabsTrigger>
-          <TabsTrigger value="sync">
-            {t("editor.config.syncFolders")}
-          </TabsTrigger>
-          <TabsTrigger value="forms">
-            {t("editor.config.formsAndFolders")}
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="theme">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("editor.config.themeColorsTitle")}</CardTitle>
-              <CardDescription>
-                {t("editor.config.themeColorsDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="primaryColor">
-                  {t("editor.config.primaryColor")}
-                </Label>
-                <div className="flex gap-3 items-center">
-                  <Input
-                    id="primaryColor"
-                    type="color"
-                    className="w-16 h-10 p-1 cursor-pointer"
-                    value={formData.theme.primaryColor}
-                    onChange={(e) =>
-                      handleThemeChange("primaryColor", e.target.value)
-                    }
-                  />
-                  <Input
-                    type="text"
-                    value={formData.theme.primaryColor}
-                    onChange={(e) =>
-                      handleThemeChange("primaryColor", e.target.value)
-                    }
-                    className="font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="darkMode">{t("editor.config.darkMode")}</Label>
-                <Select
-                  value={formData.theme.darkMode}
-                  onValueChange={(val) => {
-                    if (val) handleThemeChange("darkMode", val);
-                  }}
-                >
-                  <SelectTrigger id="darkMode">
-                    <SelectValue placeholder={t("editor.config.darkMode")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system">
-                      {t("editor.config.darkModeAuto")}
-                    </SelectItem>
-                    <SelectItem value="light">
-                      {t("editor.config.darkModeLight")}
-                    </SelectItem>
-                    <SelectItem value="dark">
-                      {t("editor.config.darkModeDark")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="appLanguage">
-                  {t("editor.config.appLanguageTitle")}
-                </Label>
-                <Select
-                  value={formData.language || "en"}
-                  onValueChange={(val: any) => {
-                    if (val) handleLanguageChange(val);
-                  }}
-                >
-                  <SelectTrigger id="appLanguage">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SUPPORTED_LANGUAGES.map((l) => (
-                      <SelectItem key={l.code} value={l.code}>
-                        {l.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {t("editor.config.appLanguageDesc")}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="max-w-3xl mx-auto space-y-6">
+          {isConfigured && isConnected === false && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 p-4 rounded-xl flex items-center gap-3 animate-in fade-in duration-150">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-semibold">
+                  {t("editor.config.networkShareDisconnectedTitle")}
+                </p>
+                <p className="text-xs mt-0.5">
+                  {t("editor.config.networkShareDisconnectedDesc")}
                 </p>
               </div>
+            </div>
+          )}
 
-              <div className="space-y-2">
-                <Label htmlFor="pdfPageSize">
-                  {t("editor.config.pdfPageSizeTitle")}
-                </Label>
-                <Select
-                  value={formData.pdfPageSize || "a4"}
-                  onValueChange={(val) => {
-                    if (val === "a4" || val === "letter")
-                      handlePdfPageSizeChange(val);
-                  }}
-                >
-                  <SelectTrigger id="pdfPageSize">
-                    <SelectValue
-                      placeholder={t("editor.config.pdfPageSizeTitle")}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="a4">
-                      {t("editor.config.pdfPageSizeA4")}
-                    </SelectItem>
-                    <SelectItem value="letter">
-                      {t("editor.config.pdfPageSizeLetter")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {t("editor.config.pdfPageSizeDesc")}
-                </p>
-              </div>
+          <Tabs defaultValue="theme" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+              <TabsTrigger value="theme">
+                {t("editor.config.themeAndLayout")}
+              </TabsTrigger>
+              <TabsTrigger value="branding">
+                {t("editor.config.branding")}
+              </TabsTrigger>
+              <TabsTrigger value="sync">
+                {t("editor.config.syncFolders")}
+              </TabsTrigger>
+              <TabsTrigger value="forms">
+                {t("editor.config.formsAndFolders")}
+              </TabsTrigger>
+            </TabsList>
 
-              <div className="space-y-2">
-                <Label htmlFor="photoQuality">
-                  {t("editor.config.photoQualityTitle")}
-                </Label>
-                <Select
-                  value={formData.media?.photoQuality || "2mp"}
-                  onValueChange={(val: any) => {
-                    handlePhotoQualityChange(val);
-                  }}
-                >
-                  <SelectTrigger id="photoQuality">
-                    <SelectValue
-                      placeholder={t("editor.config.photoQualityTitle")}
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2mp">
-                      {t("editor.config.photoQuality2mp")}
-                    </SelectItem>
-                    <SelectItem value="5mp">
-                      {t("editor.config.photoQuality5mp")}
-                    </SelectItem>
-                    <SelectItem value="10mp">
-                      {t("editor.config.photoQuality10mp")}
-                    </SelectItem>
-                    <SelectItem value="original">
-                      {t("editor.config.photoQualityOriginal")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  {t("editor.config.photoQualityDesc")}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            <TabsContent value="theme">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("editor.config.themeColorsTitle")}</CardTitle>
+                  <CardDescription>
+                    {t("editor.config.themeColorsDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="primaryColor">
+                      {t("editor.config.primaryColor")}
+                    </Label>
+                    <div className="flex gap-3 items-center">
+                      <Input
+                        id="primaryColor"
+                        type="color"
+                        className="w-16 h-10 p-1 cursor-pointer"
+                        value={formData.theme.primaryColor}
+                        onChange={(e) =>
+                          handleThemeChange("primaryColor", e.target.value)
+                        }
+                      />
+                      <Input
+                        type="text"
+                        value={formData.theme.primaryColor}
+                        onChange={(e) =>
+                          handleThemeChange("primaryColor", e.target.value)
+                        }
+                        className="font-mono"
+                      />
+                    </div>
+                  </div>
 
-        <TabsContent value="branding">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("editor.config.brandingTitle")}</CardTitle>
-              <CardDescription>
-                {t("editor.config.brandingDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="appTitle">
-                  {t("editor.config.inAppTitle")}
-                </Label>
-                <Input
-                  id="appTitle"
-                  value={formData.branding.appTitle}
-                  onChange={(e) =>
-                    handleBrandingChange("appTitle", e.target.value)
-                  }
-                  placeholder={t("editor.config.inAppTitlePlaceholder")}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label htmlFor="logoUpload">
-                  {t("editor.config.companyLogo")}
-                </Label>
-                {formData.branding.logoBase64 ? (
-                  <div className="flex flex-col gap-3 items-start border rounded-md p-4">
-                    <img
-                      src={formData.branding.logoBase64}
-                      alt={t("editor.config.logoPreviewAlt")}
-                      className="max-h-24 object-contain rounded"
-                    />
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleRemoveImage}
+                  <div className="space-y-2">
+                    <Label htmlFor="darkMode">
+                      {t("editor.config.darkMode")}
+                    </Label>
+                    <Select
+                      value={formData.theme.darkMode}
+                      onValueChange={(val) => {
+                        if (val) handleThemeChange("darkMode", val);
+                      }}
                     >
-                      {t("editor.config.removeImage")}
-                    </Button>
+                      <SelectTrigger id="darkMode">
+                        <SelectValue
+                          placeholder={t("editor.config.darkMode")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="system">
+                          {t("editor.config.darkModeAuto")}
+                        </SelectItem>
+                        <SelectItem value="light">
+                          {t("editor.config.darkModeLight")}
+                        </SelectItem>
+                        <SelectItem value="dark">
+                          {t("editor.config.darkModeDark")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <Input
-                    id="logoUpload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                  />
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {t("editor.config.logoDesc")}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="sync">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("editor.config.syncFoldersTabTitle")}</CardTitle>
-              <CardDescription>
-                {t("editor.config.syncFoldersTabDesc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {folderNotice && (
-                <div
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
-                    folderNotice.type === "warning"
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{folderNotice.message}</span>
-                  </div>
-                  <button
-                    onClick={() => setFolderNotice(null)}
-                    className="text-muted-foreground hover:text-foreground p-1 text-xs"
-                    title={t("common.dismiss")}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label>{t("editor.config.foldersToSync")}</Label>
-                {!formData.syncFolders || formData.syncFolders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground italic">
-                    {t("editor.config.noSyncFolders")}
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {formData.syncFolders.map((folder) => (
-                      <li
-                        key={folder}
-                        className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Folder className="w-4 h-4 text-blue-500 shrink-0" />
-                          <span className="font-mono text-sm truncate">
-                            /{folder}
-                          </span>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveSyncFolder(folder)}
-                          className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
-                          title={t("editor.config.removeFolderTitle", {
-                            folder,
-                          })}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                <Button
-                  variant="outline"
-                  className="w-full mt-2"
-                  onClick={() => {
-                    setBrowserMode("sync");
-                    setBrowserOpen(true);
-                  }}
-                >
-                  <FolderPlus className="w-4 h-4 mr-2" />{" "}
-                  {t("editor.config.addDocumentFolder")}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="forms">
-          <Card>
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <CardTitle>
-                  {t("editor.config.formsAndFoldersTabTitle")}
-                </CardTitle>
-                <CardDescription>
-                  {t("editor.config.formsAndFoldersTabDesc")}
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  size="sm"
-                  onClick={handleCreateNewForm}
-                  className="gap-1.5 font-semibold text-xs"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{t("editor.config.createNewForm")}</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setBrowserMode("form");
-                    setBrowserOpen(true);
-                  }}
-                  className="gap-1.5 text-xs"
-                >
-                  <FolderPlus className="w-3.5 h-3.5" />
-                  <span>{t("editor.config.linkExistingFolder")}</span>
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {folderNotice && (
-                <div
-                  className={cn(
-                    "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
-                    folderNotice.type === "warning"
-                      ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                      : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{folderNotice.message}</span>
-                  </div>
-                  <button
-                    onClick={() => setFolderNotice(null)}
-                    className="text-muted-foreground hover:text-foreground p-1 text-xs"
-                    title={t("common.dismiss")}
-                  >
-                    ✕
-                  </button>
-                </div>
-              )}
-
-              {currentFormFolders.length === 0 ? (
-                <div className="border border-dashed rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-muted/10">
-                  <FolderPlus className="w-10 h-10 text-muted-foreground/50" />
-                  <div className="space-y-1">
-                    <h4 className="font-semibold text-sm">
-                      {t("editor.config.noFormsConfigured")}
-                    </h4>
-                    <p className="text-xs text-muted-foreground max-w-sm">
-                      {t("editor.config.noFormsConfiguredDesc")}
+                  <div className="space-y-2">
+                    <Label htmlFor="appLanguage">
+                      {t("editor.config.appLanguageTitle")}
+                    </Label>
+                    <Select
+                      value={formData.language || "en"}
+                      onValueChange={(val: any) => {
+                        if (val) handleLanguageChange(val);
+                      }}
+                    >
+                      <SelectTrigger id="appLanguage">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_LANGUAGES.map((l) => (
+                          <SelectItem key={l.code} value={l.code}>
+                            {l.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t("editor.config.appLanguageDesc")}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+
+                  <div className="space-y-2">
+                    <Label htmlFor="pdfPageSize">
+                      {t("editor.config.pdfPageSizeTitle")}
+                    </Label>
+                    <Select
+                      value={formData.pdfPageSize || "a4"}
+                      onValueChange={(val) => {
+                        if (val === "a4" || val === "letter")
+                          handlePdfPageSizeChange(val);
+                      }}
+                    >
+                      <SelectTrigger id="pdfPageSize">
+                        <SelectValue
+                          placeholder={t("editor.config.pdfPageSizeTitle")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="a4">
+                          {t("editor.config.pdfPageSizeA4")}
+                        </SelectItem>
+                        <SelectItem value="letter">
+                          {t("editor.config.pdfPageSizeLetter")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t("editor.config.pdfPageSizeDesc")}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="photoQuality">
+                      {t("editor.config.photoQualityTitle")}
+                    </Label>
+                    <Select
+                      value={formData.media?.photoQuality || "2mp"}
+                      onValueChange={(val: any) => {
+                        handlePhotoQualityChange(val);
+                      }}
+                    >
+                      <SelectTrigger id="photoQuality">
+                        <SelectValue
+                          placeholder={t("editor.config.photoQualityTitle")}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="2mp">
+                          {t("editor.config.photoQuality2mp")}
+                        </SelectItem>
+                        <SelectItem value="5mp">
+                          {t("editor.config.photoQuality5mp")}
+                        </SelectItem>
+                        <SelectItem value="10mp">
+                          {t("editor.config.photoQuality10mp")}
+                        </SelectItem>
+                        <SelectItem value="original">
+                          {t("editor.config.photoQualityOriginal")}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {t("editor.config.photoQualityDesc")}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="branding">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("editor.config.brandingTitle")}</CardTitle>
+                  <CardDescription>
+                    {t("editor.config.brandingDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="appTitle">
+                      {t("editor.config.inAppTitle")}
+                    </Label>
+                    <Input
+                      id="appTitle"
+                      value={formData.branding.appTitle}
+                      onChange={(e) =>
+                        handleBrandingChange("appTitle", e.target.value)
+                      }
+                      placeholder={t("editor.config.inAppTitlePlaceholder")}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label htmlFor="logoUpload">
+                      {t("editor.config.companyLogo")}
+                    </Label>
+                    {formData.branding.logoBase64 ? (
+                      <div className="flex flex-col gap-3 items-start border rounded-md p-4">
+                        <img
+                          src={formData.branding.logoBase64}
+                          alt={t("editor.config.logoPreviewAlt")}
+                          className="max-h-24 object-contain rounded"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleRemoveImage}
+                        >
+                          {t("editor.config.removeImage")}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Input
+                        id="logoUpload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                      />
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {t("editor.config.logoDesc")}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="sync">
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {t("editor.config.syncFoldersTabTitle")}
+                  </CardTitle>
+                  <CardDescription>
+                    {t("editor.config.syncFoldersTabDesc")}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {folderNotice && (
+                    <div
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
+                        folderNotice.type === "warning"
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                          : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{folderNotice.message}</span>
+                      </div>
+                      <button
+                        onClick={() => setFolderNotice(null)}
+                        className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                        title={t("common.dismiss")}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>{t("editor.config.foldersToSync")}</Label>
+                    {!formData.syncFolders ||
+                    formData.syncFolders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic">
+                        {t("editor.config.noSyncFolders")}
+                      </p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {formData.syncFolders.map((folder) => (
+                          <li
+                            key={folder}
+                            className="flex items-center justify-between p-2.5 border rounded-lg bg-muted/20"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Folder className="w-4 h-4 text-blue-500 shrink-0" />
+                              <span className="font-mono text-sm truncate">
+                                /{folder}
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveSyncFolder(folder)}
+                              className="text-destructive hover:text-destructive/90 hover:bg-destructive/10 shrink-0"
+                              title={t("editor.config.removeFolderTitle", {
+                                folder,
+                              })}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => {
+                        setBrowserMode("sync");
+                        setBrowserOpen(true);
+                      }}
+                    >
+                      <FolderPlus className="w-4 h-4 mr-2" />{" "}
+                      {t("editor.config.addDocumentFolder")}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="forms">
+              <Card>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle>
+                      {t("editor.config.formsAndFoldersTabTitle")}
+                    </CardTitle>
+                    <CardDescription>
+                      {t("editor.config.formsAndFoldersTabDesc")}
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     <Button
                       size="sm"
                       onClick={handleCreateNewForm}
-                      className="gap-1.5 text-xs font-semibold"
+                      className="gap-1.5 font-semibold text-xs"
                     >
                       <Plus className="w-3.5 h-3.5" />
-                      <span>{t("editor.config.createFirstForm")}</span>
+                      <span>{t("editor.config.createNewForm")}</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -1001,228 +977,292 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                       className="gap-1.5 text-xs"
                     >
                       <FolderPlus className="w-3.5 h-3.5" />
-                      <span>{t("editor.config.linkFolder")}</span>
+                      <span>{t("editor.config.linkExistingFolder")}</span>
                     </Button>
                   </div>
-                </div>
-              ) : loadingTemplates ? (
-                <div className="border rounded-xl p-8 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/10">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t("editor.config.loadingFormTemplates")}</span>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {currentFormFolders.map((folder) => {
-                    const tmpl = loadedTemplates[folder];
-                    return (
-                      <div
-                        key={folder}
-                        className="border rounded-xl p-4 bg-card shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/40 transition-colors"
-                      >
-                        <div className="space-y-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-sm text-foreground truncate">
-                              {tmpl ? tmpl.title : folder}
-                            </span>
-                            {tmpl?.version && (
-                              <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
-                                v{tmpl.version}
-                              </span>
-                            )}
-                            {tmpl?.category && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border/40 font-medium">
-                                {tmpl.category}
-                              </span>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
-                            <Folder className="w-3.5 h-3.5 text-primary shrink-0" />
-                            <span className="truncate">/{folder}</span>
-                          </div>
-
-                          {tmpl ? (
-                            <p className="text-xs text-muted-foreground">
-                              {tmpl.sections.length === 1
-                                ? t("editor.config.sectionCountSingular", {
-                                    count: tmpl.sections.length,
-                                  })
-                                : t("editor.config.sectionCountPlural", {
-                                    count: tmpl.sections.length,
-                                  })}{" "}
-                              •{" "}
-                              {(() => {
-                                const fieldCount = tmpl.sections.reduce(
-                                  (acc, s) => acc + s.fields.length,
-                                  0,
-                                );
-                                return fieldCount === 1
-                                  ? t("editor.config.fieldCountSingular", {
-                                      count: fieldCount,
-                                    })
-                                  : t("editor.config.fieldCountPlural", {
-                                      count: fieldCount,
-                                    });
-                              })()}
-                              {tmpl.description ? ` — ${tmpl.description}` : ""}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-amber-600 dark:text-amber-400">
-                              {t("editor.config.noFormJsonFound")}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditForm(folder)}
-                            className="gap-1 text-xs"
-                            title={t("editor.config.editTemplateTooltip")}
-                          >
-                            <Edit3 className="w-3.5 h-3.5 text-primary" />
-                            <span>
-                              {tmpl
-                                ? t("editor.config.editForm")
-                                : t("editor.config.createTemplate")}
-                            </span>
-                          </Button>
-
-                          {tmpl && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDuplicateForm(folder)}
-                              className="text-xs px-2"
-                              title={t("editor.config.duplicateFormTooltip")}
-                            >
-                              <Copy className="w-3.5 h-3.5 text-muted-foreground" />
-                            </Button>
-                          )}
-
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleUnlinkFormFolder(folder)}
-                            className="text-destructive hover:bg-destructive/10 text-xs px-2"
-                            title={t("editor.config.unlinkFolderTooltip")}
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </Button>
-                        </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {folderNotice && (
+                    <div
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg text-xs font-medium border animate-in fade-in duration-150",
+                        folderNotice.type === "warning"
+                          ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                          : "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0" />
+                        <span>{folderNotice.message}</span>
                       </div>
-                    );
-                  })}
+                      <button
+                        onClick={() => setFolderNotice(null)}
+                        className="text-muted-foreground hover:text-foreground p-1 text-xs"
+                        title={t("common.dismiss")}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  {currentFormFolders.length === 0 ? (
+                    <div className="border border-dashed rounded-xl p-8 text-center flex flex-col items-center justify-center space-y-3 bg-muted/10">
+                      <FolderPlus className="w-10 h-10 text-muted-foreground/50" />
+                      <div className="space-y-1">
+                        <h4 className="font-semibold text-sm">
+                          {t("editor.config.noFormsConfigured")}
+                        </h4>
+                        <p className="text-xs text-muted-foreground max-w-sm">
+                          {t("editor.config.noFormsConfiguredDesc")}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={handleCreateNewForm}
+                          className="gap-1.5 text-xs font-semibold"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{t("editor.config.createFirstForm")}</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setBrowserMode("form");
+                            setBrowserOpen(true);
+                          }}
+                          className="gap-1.5 text-xs"
+                        >
+                          <FolderPlus className="w-3.5 h-3.5" />
+                          <span>{t("editor.config.linkFolder")}</span>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : loadingTemplates ? (
+                    <div className="border rounded-xl p-8 flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/10">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>{t("editor.config.loadingFormTemplates")}</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {currentFormFolders.map((folder) => {
+                        const tmpl = loadedTemplates[folder];
+                        return (
+                          <div
+                            key={folder}
+                            className="border rounded-xl p-4 bg-card shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-primary/40 transition-colors"
+                          >
+                            <div className="space-y-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-foreground truncate">
+                                  {tmpl ? tmpl.title : folder}
+                                </span>
+                                {tmpl?.version && (
+                                  <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-semibold">
+                                    v{tmpl.version}
+                                  </span>
+                                )}
+                                {tmpl?.category && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground border border-border/40 font-medium">
+                                    {tmpl.category}
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                                <Folder className="w-3.5 h-3.5 text-primary shrink-0" />
+                                <span className="truncate">/{folder}</span>
+                              </div>
+
+                              {tmpl ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {tmpl.sections.length === 1
+                                    ? t("editor.config.sectionCountSingular", {
+                                        count: tmpl.sections.length,
+                                      })
+                                    : t("editor.config.sectionCountPlural", {
+                                        count: tmpl.sections.length,
+                                      })}{" "}
+                                  •{" "}
+                                  {(() => {
+                                    const fieldCount = tmpl.sections.reduce(
+                                      (acc, s) => acc + s.fields.length,
+                                      0,
+                                    );
+                                    return fieldCount === 1
+                                      ? t("editor.config.fieldCountSingular", {
+                                          count: fieldCount,
+                                        })
+                                      : t("editor.config.fieldCountPlural", {
+                                          count: fieldCount,
+                                        });
+                                  })()}
+                                  {tmpl.description
+                                    ? ` — ${tmpl.description}`
+                                    : ""}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                  {t("editor.config.noFormJsonFound")}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditForm(folder)}
+                                className="gap-1 text-xs"
+                                title={t("editor.config.editTemplateTooltip")}
+                              >
+                                <Edit3 className="w-3.5 h-3.5 text-primary" />
+                                <span>
+                                  {tmpl
+                                    ? t("editor.config.editForm")
+                                    : t("editor.config.createTemplate")}
+                                </span>
+                              </Button>
+
+                              {tmpl && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDuplicateForm(folder)}
+                                  className="text-xs px-2"
+                                  title={t(
+                                    "editor.config.duplicateFormTooltip",
+                                  )}
+                                >
+                                  <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                                </Button>
+                              )}
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleUnlinkFormFolder(folder)}
+                                className="text-destructive hover:bg-destructive/10 text-xs px-2"
+                                title={t("editor.config.unlinkFolderTooltip")}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+
+          {isBrowserOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-background rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col overflow-hidden border">
+                <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
+                  <div>
+                    <h3 className="font-semibold text-lg">
+                      {browserMode === "form"
+                        ? t("editor.config.selectFolderToLinkTitle")
+                        : t("editor.config.selectFolderToSyncTitle")}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {browserMode === "form"
+                        ? t("editor.config.selectFolderToLinkDesc")
+                        : t("editor.config.selectFolderToSyncDesc")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setBrowserOpen(false);
+                    }}
+                  >
+                    {t("common.cancel")}
+                  </Button>
                 </div>
+                <div className="flex-1 overflow-hidden p-3 sm:p-4">
+                  <GenericFileBrowser
+                    onFolderSelect={
+                      browserMode === "form"
+                        ? handleAddFormFolder
+                        : handleAddSyncFolder
+                    }
+                    onFileSelect={() => {}}
+                    allowCreateFolder={true}
+                    allowSelectRoot={false}
+                    existingFolders={
+                      browserMode === "form"
+                        ? getFormFoldersList(formData)
+                        : formData.syncFolders || []
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="saveAsName">
+                  {t("editor.config.configFilenameLabel")}
+                </Label>
+                <Input
+                  id="saveAsName"
+                  value={saveAsName}
+                  onChange={(e) => setSaveAsName(e.target.value)}
+                  placeholder="app-config.json"
+                  disabled={isConfigured && isConnected === false}
+                />
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  size="lg"
+                  onClick={handleCancel}
+                  disabled={isSaving || isSyncing}
+                >
+                  {t("common.cancel")}
+                </Button>
+                <Button
+                  className="flex-1"
+                  size="lg"
+                  onClick={handleSave}
+                  disabled={
+                    isSaving ||
+                    isSyncing ||
+                    !saveAsName.trim() ||
+                    (isConfigured && isConnected === false) ||
+                    checkingConnection
+                  }
+                  title={
+                    isConfigured && isConnected === false
+                      ? t("editor.config.offlineWarning")
+                      : undefined
+                  }
+                >
+                  {isSaving || isSyncing
+                    ? t("editor.config.savingConfig")
+                    : checkingConnection
+                      ? t("common.loading")
+                      : t("editor.config.saveConfig")}
+                </Button>
+              </div>
+              {isConfigured && isConnected === false && (
+                <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
+                  {t("editor.config.offlineWarning")}
+                </p>
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
-
-      {isBrowserOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-background rounded-xl shadow-2xl w-full max-w-2xl h-[85vh] flex flex-col overflow-hidden border">
-            <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
-              <div>
-                <h3 className="font-semibold text-lg">
-                  {browserMode === "form"
-                    ? t("editor.config.selectFolderToLinkTitle")
-                    : t("editor.config.selectFolderToSyncTitle")}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {browserMode === "form"
-                    ? t("editor.config.selectFolderToLinkDesc")
-                    : t("editor.config.selectFolderToSyncDesc")}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setBrowserOpen(false);
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-            </div>
-            <div className="flex-1 overflow-hidden p-3 sm:p-4">
-              <GenericFileBrowser
-                onFolderSelect={
-                  browserMode === "form"
-                    ? handleAddFormFolder
-                    : handleAddSyncFolder
-                }
-                onFileSelect={() => {}}
-                allowCreateFolder={true}
-                allowSelectRoot={false}
-                existingFolders={
-                  browserMode === "form"
-                    ? getFormFoldersList(formData)
-                    : formData.syncFolders || []
-                }
-              />
-            </div>
-          </div>
         </div>
-      )}
-
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="saveAsName">
-              {t("editor.config.configFilenameLabel")}
-            </Label>
-            <Input
-              id="saveAsName"
-              value={saveAsName}
-              onChange={(e) => setSaveAsName(e.target.value)}
-              placeholder="app-config.json"
-              disabled={isConfigured && isConnected === false}
-            />
-          </div>
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              size="lg"
-              onClick={handleCancel}
-              disabled={isSaving || isSyncing}
-            >
-              {t("common.cancel")}
-            </Button>
-            <Button
-              className="flex-1"
-              size="lg"
-              onClick={handleSave}
-              disabled={
-                isSaving ||
-                isSyncing ||
-                !saveAsName.trim() ||
-                (isConfigured && isConnected === false) ||
-                checkingConnection
-              }
-              title={
-                isConfigured && isConnected === false
-                  ? t("editor.config.offlineWarning")
-                  : undefined
-              }
-            >
-              {isSaving || isSyncing
-                ? t("editor.config.savingConfig")
-                : checkingConnection
-                  ? t("common.loading")
-                  : t("editor.config.saveConfig")}
-            </Button>
-          </div>
-          {isConfigured && isConnected === false && (
-            <p className="text-xs text-center text-amber-600 dark:text-amber-400 font-medium">
-              {t("editor.config.offlineWarning")}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      </div>
     </div>
   );
 }

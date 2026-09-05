@@ -30,8 +30,11 @@ import {
   FileText,
   Check,
   Clock,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { AppHeader } from "../layout/AppHeader";
+import { EmptyState } from "../ui/empty-state";
 
 interface FormRunnerProps {
   template: FormTemplate;
@@ -655,24 +658,13 @@ export function FormRunner({
           isPreview ? "h-full" : "h-screen",
         )}
       >
-        <header className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-xs">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleClose}
-            className="rounded-full"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-lg font-bold">{template.title || "Form"}</h1>
-          <div className="w-9" />
-        </header>
-        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground">
-          <FileText className="w-12 h-12 mb-3 opacity-30" />
-          <p className="font-semibold text-base">
-            {t("forms.runner.noSectionsTitle")}
-          </p>
-          <p className="text-xs mt-1">{t("forms.runner.noSectionsDesc")}</p>
+        <AppHeader onBack={handleClose} title={template.title || "Form"} />
+        <div className="flex-1 flex items-center justify-center p-8">
+          <EmptyState
+            icon={FileText}
+            title={t("forms.runner.noSectionsTitle")}
+            description={t("forms.runner.noSectionsDesc")}
+          />
         </div>
       </div>
     );
@@ -685,43 +677,29 @@ export function FormRunner({
         isPreview ? "h-full min-h-0" : "min-h-screen",
       )}
     >
-      {/* Top Tablet Header */}
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-md px-4 py-3 shadow-xs">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="rounded-full shrink-0"
-              title={t("common.close")}
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold truncate tracking-tight">
-                  {template.title}
-                </h1>
-                {initialSubmission && (
-                  <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border shrink-0">
-                    {t("forms.runner.editing")}
-                  </span>
-                )}
-                {isPreview && (
-                  <span className="text-[10px] uppercase tracking-wider font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 shrink-0">
-                    {t("forms.runner.preview")}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground truncate">
-                {template.folderPath ||
-                  (isPreview ? t("forms.runner.previewingTemplate") : "")}
-              </p>
-            </div>
+      <AppHeader
+        onBack={handleClose}
+        title={
+          <div className="flex items-center gap-2">
+            <span className="truncate">{template.title}</span>
+            {initialSubmission && (
+              <span className="text-[11px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground border shrink-0">
+                {t("forms.runner.editing")}
+              </span>
+            )}
+            {isPreview && (
+              <span className="text-[10px] uppercase tracking-wider font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-500/30 shrink-0">
+                {t("forms.runner.preview")}
+              </span>
+            )}
           </div>
-
-          <div className="flex items-center gap-2 shrink-0">
+        }
+        subtitle={
+          template.folderPath ||
+          (isPreview ? t("forms.runner.previewingTemplate") : undefined)
+        }
+        actions={
+          <div className="flex items-center gap-2">
             {lastExportedPdfPath && onViewPdf && (
               <Button
                 variant="outline"
@@ -749,15 +727,6 @@ export function FormRunner({
               </Button>
             )}
             <Button
-              variant="outline"
-              size="sm"
-              onClick={handleClose}
-              disabled={isSaving}
-              className="px-3"
-            >
-              {t("common.close")}
-            </Button>
-            <Button
               size="sm"
               onClick={() => handleSave("completed")}
               disabled={isSaving}
@@ -781,11 +750,11 @@ export function FormRunner({
               )}
             </Button>
           </div>
-        </div>
-
-        {/* Section Jump Bar (if multiple sections) */}
+        }
+      >
+        {/* Section Jump Bar */}
         {template.sections.length > 1 && (
-          <div className="max-w-4xl mx-auto flex items-center gap-2 mt-3 overflow-x-auto pb-1 no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             {template.sections.map((section, idx) => {
               const isActive = section.id === activeSection.id;
               const sectionHasError = section.fields.some((f) =>
@@ -797,7 +766,7 @@ export function FormRunner({
                   key={section.id}
                   onClick={() => setActiveSectionId(section.id)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer",
                     isActive
                       ? "bg-primary text-primary-foreground shadow-xs"
                       : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -818,7 +787,7 @@ export function FormRunner({
             })}
           </div>
         )}
-      </header>
+      </AppHeader>
 
       {/* Main Form Fields Container */}
       <main className="flex-1 max-w-4xl w-full mx-auto p-4 sm:p-6 space-y-6 pb-28">
@@ -896,7 +865,7 @@ export function FormRunner({
         </div>
 
         {/* Section Navigation Buttons */}
-        {template.sections.length > 1 ? (
+        {template.sections.length > 1 && (
           <div className="flex items-center justify-between pt-2">
             {template.sections.findIndex((s) => s.id === activeSection.id) >
             0 ? (
@@ -909,15 +878,17 @@ export function FormRunner({
                   setActiveSectionId(template.sections[currIdx - 1].id);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
+                className="gap-1"
               >
-                {t("forms.runner.previousSection")}
+                <ChevronLeft className="w-4 h-4" />
+                <span>{t("forms.runner.previousSection")}</span>
               </Button>
             ) : (
               <div />
             )}
 
             {template.sections.findIndex((s) => s.id === activeSection.id) <
-            template.sections.length - 1 ? (
+              template.sections.length - 1 && (
               <Button
                 onClick={() => {
                   const currIdx = template.sections.findIndex(
@@ -926,82 +897,12 @@ export function FormRunner({
                   setActiveSectionId(template.sections[currIdx + 1].id);
                   window.scrollTo({ top: 0, behavior: "smooth" });
                 }}
+                className="gap-1"
               >
-                {t("forms.runner.nextSection")}
-              </Button>
-            ) : (
-              <div className="flex items-center gap-2">
-                {lastExportedPdfPath && onViewPdf && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => onViewPdf(lastExportedPdfPath)}
-                    className="gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
-                  >
-                    <FileText className="w-4 h-4 text-red-500" />
-                    <span>{t("forms.runner.viewPdf")}</span>
-                  </Button>
-                )}
-                <Button
-                  onClick={() => handleSave("completed")}
-                  disabled={isSaving}
-                  className="font-semibold shadow-xs min-w-[100px]"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                      <span>{t("forms.runner.saving")}</span>
-                    </>
-                  ) : justSaved ? (
-                    <>
-                      <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
-                      <span>{t("forms.runner.saved")}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4 mr-1.5" />
-                      <span>{t("common.save")}</span>
-                    </>
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-end gap-2 pt-2">
-            {lastExportedPdfPath && onViewPdf && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onViewPdf(lastExportedPdfPath)}
-                className="gap-1.5 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20"
-              >
-                <FileText className="w-4 h-4 text-red-500" />
-                <span>{t("forms.runner.viewPdf")}</span>
+                <span>{t("forms.runner.nextSection")}</span>
+                <ChevronRight className="w-4 h-4" />
               </Button>
             )}
-            <Button
-              onClick={() => handleSave("completed")}
-              disabled={isSaving}
-              className="font-semibold shadow-xs min-w-[120px]"
-            >
-              {isSaving ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
-                  <span>{t("forms.runner.saving")}</span>
-                </>
-              ) : justSaved ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 mr-1.5 text-emerald-400" />
-                  <span>{t("forms.runner.saved")}</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-1.5" />
-                  <span>{t("forms.runner.saveForm")}</span>
-                </>
-              )}
-            </Button>
           </div>
         )}
       </main>

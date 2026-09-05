@@ -7,8 +7,8 @@ import { Label } from "../../ui/label";
 import { useTranslation } from "react-i18next";
 import { sanitizeFilenamePart } from "../../../lib/forms/pdf-generator";
 import { GenericFileBrowser } from "../../documents/GenericFileBrowser";
+import { AppDialog } from "../../ui/app-dialog";
 import {
-  X,
   Save,
   Loader2,
   FolderCheck,
@@ -128,32 +128,45 @@ export function TemplateSaveDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in duration-150 text-foreground">
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b flex items-center justify-between bg-muted/20 shrink-0">
-          <div>
-            <h3 className="font-bold text-lg">
-              {t("editor.saveDialog.title")}
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {t("editor.saveDialog.subtitle")}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="rounded-full"
-            title={t("common.close")}
-            disabled={isSaving}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+    <>
+      <AppDialog
+        isOpen={isOpen}
+        onClose={onClose}
+        title={t("editor.saveDialog.title")}
+        subtitle={t("editor.saveDialog.subtitle")}
+        maxWidth="lg"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClose}
+              disabled={isSaving}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleConfirmSave}
+              disabled={isSaving || !title.trim() || !targetFolder}
+              className="gap-1.5 font-semibold"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>{t("editor.saveDialog.savingTemplate")}</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  <span>{t("editor.saveDialog.saveTemplateButton")}</span>
+                </>
+              )}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
           {error && (
             <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-start gap-2 whitespace-pre-line">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -276,74 +289,29 @@ export function TemplateSaveDialog({
             </div>
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t flex items-center justify-end gap-2 bg-muted/10 shrink-0">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isSaving}
-          >
-            {t("common.cancel")}
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleConfirmSave}
-            disabled={isSaving || !title.trim() || !targetFolder}
-            className="gap-1.5 font-semibold"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>{t("editor.saveDialog.savingTemplate")}</span>
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4" />
-                <span>{t("editor.saveDialog.saveTemplateButton")}</span>
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
+      </AppDialog>
 
       {/* Directory Browser Modal */}
-      {isBrowserOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-background rounded-xl shadow-2xl w-full max-w-xl h-[80vh] flex flex-col overflow-hidden border">
-            <div className="p-4 border-b flex justify-between items-center bg-muted/20 shrink-0">
-              <div>
-                <h4 className="font-semibold text-base">
-                  {t("editor.saveDialog.selectDestinationFolder")}
-                </h4>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {t("editor.saveDialog.selectDestinationFolderSubtitle")}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsBrowserOpen(false)}
-              >
-                {t("common.cancel")}
-              </Button>
-            </div>
-            <div className="flex-1 overflow-hidden p-3 sm:p-4">
-              <GenericFileBrowser
-                onFolderSelect={(path) => {
-                  setFolderPath(path);
-                  setIsFolderManuallyEdited(true);
-                  setIsBrowserOpen(false);
-                }}
-                onFileSelect={() => {}}
-                allowCreateFolder={true}
-                allowSelectRoot={false}
-              />
-            </div>
-          </div>
+      <AppDialog
+        isOpen={isBrowserOpen}
+        onClose={() => setIsBrowserOpen(false)}
+        title={t("editor.saveDialog.selectDestinationFolder")}
+        subtitle={t("editor.saveDialog.selectDestinationFolderSubtitle")}
+        maxWidth="xl"
+      >
+        <div className="h-[60vh] -mx-4 -my-4 sm:-mx-6 sm:-my-6">
+          <GenericFileBrowser
+            onFolderSelect={(path) => {
+              setFolderPath(path);
+              setIsFolderManuallyEdited(true);
+              setIsBrowserOpen(false);
+            }}
+            onFileSelect={() => {}}
+            allowCreateFolder={true}
+            allowSelectRoot={false}
+          />
         </div>
-      )}
-    </div>
+      </AppDialog>
+    </>
   );
 }
