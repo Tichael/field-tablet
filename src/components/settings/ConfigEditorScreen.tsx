@@ -142,11 +142,6 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   >({});
   const [loadingTemplates, setLoadingTemplates] = useState(false);
 
-  const currentFormFolders = useMemo(
-    () => getFormFoldersList(formData),
-    [formData],
-  );
-
   const loadTemplatesForFolders = useCallback(async (folders: string[]) => {
     setLoadingTemplates(true);
     const results: Record<string, FormTemplate | null> = {};
@@ -158,13 +153,43 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         results[folder] = null;
       }
     }
+    try {
+      const discovered = await formService.discoverForms(folders);
+      for (const d of discovered) {
+        if (!results[d.folderPath]) {
+          results[d.folderPath] = d;
+        }
+      }
+    } catch {
+      // ignore
+    }
     setLoadedTemplates(results);
     setLoadingTemplates(false);
   }, []);
 
+  const currentFormFolders = useMemo(() => {
+    const list = getFormFoldersList(formData);
+    const paths = new Set<string>();
+    list.forEach((f) => paths.add(f));
+    Object.keys(loadedTemplates).forEach((f) => paths.add(f));
+
+    // Filter out parent container folders if their child forms are already discovered
+    return Array.from(paths).filter((folder) => {
+      const isContainerWithChildren =
+        loadedTemplates[folder] === null &&
+        Array.from(paths).some(
+          (other) =>
+            other !== folder &&
+            other.startsWith(`${folder}/`) &&
+            loadedTemplates[other] !== null,
+        );
+      return !isContainerWithChildren;
+    });
+  }, [formData, loadedTemplates]);
+
   useEffect(() => {
-    loadTemplatesForFolders(currentFormFolders);
-  }, [currentFormFolders, loadTemplatesForFolders]);
+    loadTemplatesForFolders(getFormFoldersList(formData));
+  }, [formData, loadTemplatesForFolders]);
 
   const handleCreateNewForm = () => {
     setTemplateToEdit(null);
@@ -208,10 +233,52 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
   };
 
   const handleUnlinkFormFolder = (folderToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      formFolders: getFormFoldersList(prev).filter((f) => f !== folderToRemove),
-    }));
+    setFormData((prev) => {
+      const currentList = getFormFoldersList(prev);
+      const nextList: string[] = [];
+
+      for (const f of currentList) {
+        if (f === folderToRemove || f.startsWith(`${folderToRemove}/`)) {
+          // If unlinking f or a parent of f, skip f
+          continue;
+        }
+        if (folderToRemove.startsWith(`${f}/`)) {
+          // Unlinking a child of container folder f:
+          // Keep all other discovered siblings under f as explicit folders
+          const siblingFolders = Object.keys(loadedTemplates).filter(
+            (other) =>
+              other !== folderToRemove &&
+              other.startsWith(`${f}/`) &&
+              loadedTemplates[other] !== null,
+          );
+          for (const sib of siblingFolders) {
+            if (!nextList.includes(sib)) {
+              nextList.push(sib);
+            }
+          }
+          // Remove the broad parent f
+          continue;
+        }
+        nextList.push(f);
+      }
+
+      return {
+        ...prev,
+        formFolders: nextList,
+      };
+    });
+
+    setLoadedTemplates((prev) => {
+      const next = { ...prev };
+      delete next[folderToRemove];
+      Object.keys(next).forEach((k) => {
+        if (k.startsWith(`${folderToRemove}/`)) {
+          delete next[k];
+        }
+      });
+      return next;
+    });
+
     setFolderNotice({
       type: "info",
       message: `Unlinked "/${folderToRemove}". Files on the storage share were not deleted.`,
@@ -224,14 +291,19 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     const cleanFolder = saved.folderPath.trim().replace(/^\/+|\/+$/g, "");
 
     setFormData((prev) => {
-      const currentList = getFormFoldersList(prev);
-      if (!currentList.includes(cleanFolder)) {
-        return {
-          ...prev,
-          formFolders: [...currentList, cleanFolder],
-        };
+      let currentList = getFormFoldersList(prev);
+      const prevFolder =
+        saved.legacyFolderPaths?.[saved.legacyFolderPaths.length - 1];
+      if (prevFolder && prevFolder !== cleanFolder) {
+        currentList = currentList.filter((f) => f !== prevFolder);
       }
-      return prev;
+      if (!currentList.includes(cleanFolder)) {
+        currentList = [...currentList, cleanFolder];
+      }
+      return {
+        ...prev,
+        formFolders: currentList,
+      };
     });
 
     setLoadedTemplates((prev) => ({
@@ -323,7 +395,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
   // Live preview effect: apply changes as user adjusts settings
   useEffect(() => {
-    applyTheme(formData.theme);
+    return applyTheme(formData.theme);
   }, [formData.theme]);
 
   // On unmount, restore the original saved theme if the editor was closed without saving

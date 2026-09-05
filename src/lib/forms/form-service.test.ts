@@ -655,5 +655,79 @@ describe("FormService", () => {
       expect(pdfs.map((p) => p.name)).toContain("Old_Sub_1.pdf");
       expect(pdfs.map((p) => p.name)).toContain("Current_Sub_2.pdf");
     });
+
+    it("should filter out relocated forms and folders with _MOVED_TO.txt in discoverForms", async () => {
+      // Create initial form in OldForms/Report
+      await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "OldForms/Report",
+      });
+
+      // Relocate form to NewForms/Report
+      const original = await formService.loadTemplate("OldForms/Report");
+      expect(original).toBeDefined();
+      await formService.saveTemplate(original!, "NewForms/Report");
+
+      // Now discoverForms under parent folders containing both
+      const discovered = await formService.discoverForms([
+        "OldForms",
+        "NewForms",
+      ]);
+
+      // Should only discover the active one in NewForms/Report, not the moved ghost in OldForms/Report
+      expect(discovered.length).toBe(1);
+      expect(discovered[0].folderPath).toBe("NewForms/Report");
+      expect(discovered[0].legacyFolderPaths).toContain("OldForms/Report");
+    });
+
+    it("should re-slug template ID when saving template with default new-field-form or new-form ID", async () => {
+      const newTemplate = formService.createEmptyTemplate(
+        "Warehouse Safety Audit",
+        "Safety/Warehouse",
+      );
+      const editorCreatedTemplate: FormTemplate = {
+        ...newTemplate,
+        id: "new-field-form",
+        title: "Warehouse Safety Audit",
+      };
+
+      const saved = await formService.saveTemplate(editorCreatedTemplate);
+      expect(saved.id).toBe("warehouse_safety_audit");
+    });
+
+    it("should not create move notice when relocating from a nonexistent folder", async () => {
+      const template = {
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "NonexistentFolder",
+      };
+
+      const saved = await formService.saveTemplate(template, "ActualFolder");
+      expect(saved.folderPath).toBe("ActualFolder");
+      // NonexistentFolder did not exist so _MOVED_TO.txt should not be written
+      await expect(
+        mockAdapter.readFileText("NonexistentFolder/_MOVED_TO.txt"),
+      ).rejects.toThrow();
+    });
+
+    it("should create move notice when relocating even if legacyFolderPaths already contains previousFolder", async () => {
+      // Save initial template in FolderA
+      const t1 = await formService.saveTemplate({
+        ...TEST_REPORT_TEMPLATE,
+        folderPath: "FolderA",
+      });
+
+      // Move from FolderA to FolderB
+      const t2 = await formService.saveTemplate(t1, "FolderB");
+      expect(t2.legacyFolderPaths).toContain("FolderA");
+
+      // Now move back from FolderB to FolderA
+      const t3 = await formService.saveTemplate(t2, "FolderA");
+      expect(t3.folderPath).toBe("FolderA");
+      expect(t3.legacyFolderPaths).toContain("FolderB");
+
+      // Verify move notice was written in FolderB
+      const noticeB = await mockAdapter.readFileText("FolderB/_MOVED_TO.txt");
+      expect(noticeB).toContain("/FolderA");
+    });
   });
 });

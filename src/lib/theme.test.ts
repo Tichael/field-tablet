@@ -75,6 +75,10 @@ describe("theme utility", () => {
       expect(parseHex("#fff")).toEqual([255, 255, 255]);
       expect(parseHex("#0f172a")).toEqual([15, 23, 42]);
       expect(parseHex("invalid")).toBeNull();
+      expect(parseHex("#12345z")).toBeNull();
+      expect(parseHex("#xyz")).toBeNull();
+      expect(parseHex("#12")).toBeNull();
+      expect(parseHex("#1234567")).toBeNull();
     });
 
     it("calculates luminance", () => {

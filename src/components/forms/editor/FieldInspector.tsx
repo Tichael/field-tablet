@@ -23,6 +23,10 @@ interface FieldInspectorProps {
   existingFieldIds: string[];
 }
 
+interface EditorOption extends FormFieldOption {
+  _key?: string;
+}
+
 export function FieldInspector({
   field,
   isOpen,
@@ -31,7 +35,7 @@ export function FieldInspector({
   existingFieldIds,
 }: FieldInspectorProps) {
   const [draft, setDraft] = useState<FormField | null>(null);
-  const [options, setOptions] = useState<FormFieldOption[]>([]);
+  const [options, setOptions] = useState<EditorOption[]>([]);
   const [newOptionLabel, setNewOptionLabel] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isIdManuallyEdited, setIsIdManuallyEdited] = useState(false);
@@ -48,10 +52,21 @@ export function FieldInspector({
       setDraft(JSON.parse(JSON.stringify(field)));
       setOptions(
         field.options
-          ? JSON.parse(JSON.stringify(field.options))
+          ? field.options.map((o) => ({
+              ...JSON.parse(JSON.stringify(o)),
+              _key: Math.random().toString(36).slice(2, 9),
+            }))
           : [
-              { label: "Option 1", value: "option_1" },
-              { label: "Option 2", value: "option_2" },
+              {
+                label: "Option 1",
+                value: "option_1",
+                _key: Math.random().toString(36).slice(2, 9),
+              },
+              {
+                label: "Option 2",
+                value: "option_2",
+                _key: Math.random().toString(36).slice(2, 9),
+              },
             ],
       );
       setError(null);
@@ -99,7 +114,14 @@ export function FieldInspector({
       valueSlug = `${valueSlug}_${counter}`;
     }
 
-    setOptions((prev) => [...prev, { label: trimmed, value: valueSlug }]);
+    setOptions((prev) => [
+      ...prev,
+      {
+        label: trimmed,
+        value: valueSlug,
+        _key: Math.random().toString(36).slice(2, 9),
+      },
+    ]);
     setNewOptionLabel("");
   };
 
@@ -215,7 +237,9 @@ export function FieldInspector({
       id: cleanId,
       label: draft.label.trim(),
       isIdentifier: canBeIdentifier ? draft.isIdentifier : undefined,
-      options: hasOptions ? options : undefined,
+      options: hasOptions
+        ? options.map(({ _key, ...opt }) => opt)
+        : undefined,
     };
 
     onSave(finalField);
@@ -489,9 +513,10 @@ export function FieldInspector({
                   placeholder="Min value"
                   value={draft.validation?.min ?? ""}
                   onChange={(e) => {
+                    const raw = e.target.value;
                     const min =
-                      e.target.value !== ""
-                        ? Number(e.target.value)
+                      raw !== "" && !Number.isNaN(Number(raw))
+                        ? Number(raw)
                         : undefined;
                     setDraft((prev) =>
                       prev
@@ -509,9 +534,10 @@ export function FieldInspector({
                   placeholder="Max value"
                   value={draft.validation?.max ?? ""}
                   onChange={(e) => {
+                    const raw = e.target.value;
                     const max =
-                      e.target.value !== ""
-                        ? Number(e.target.value)
+                      raw !== "" && !Number.isNaN(Number(raw))
+                        ? Number(raw)
                         : undefined;
                     setDraft((prev) =>
                       prev
@@ -573,7 +599,7 @@ export function FieldInspector({
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 {options.map((opt, idx) => (
                   <div
-                    key={idx}
+                    key={opt._key || idx}
                     className="flex items-center gap-2 p-1.5 rounded-lg border bg-card text-xs"
                   >
                     <div className="flex flex-col gap-0.5">

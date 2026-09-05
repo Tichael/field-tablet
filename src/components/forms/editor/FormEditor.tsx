@@ -6,10 +6,6 @@ import type {
   FormFieldType,
 } from "../../../types/form";
 import { formService } from "../../../lib/forms/form-service";
-import {
-  useConfigStore,
-  getFormFoldersList,
-} from "../../../store/config-store";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { FieldPalette } from "./FieldPalette";
@@ -104,6 +100,17 @@ export function FormEditor({
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [isDirty]);
+
+  // On narrow screens where split mode is hidden, switch away from split to builder
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024 && viewMode === "split") {
+        setViewMode("builder");
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [viewMode]);
 
   // Collect all field IDs across the form
   const allFieldIds = useMemo(() => {
@@ -459,39 +466,6 @@ export function FormEditor({
     targetFolder: string,
   ) => {
     const saved = await formService.saveTemplate(finalTemplate, targetFolder);
-
-    // Auto-register destination direct folder into config if not already tracked
-    const currentConfig = useConfigStore.getState().config;
-    if (currentConfig) {
-      const currentFolders = getFormFoldersList(currentConfig);
-      const cleanTarget = targetFolder.trim().replace(/^\/+|\/+$/g, "");
-
-      // If the template moved from a previous folder, replace old folder with new one
-      const previousFolder =
-        finalTemplate.legacyFolderPaths?.[
-          finalTemplate.legacyFolderPaths.length - 1
-        ];
-      let updatedFolders = currentFolders;
-      if (previousFolder && previousFolder !== cleanTarget) {
-        updatedFolders = updatedFolders.filter((f) => f !== previousFolder);
-      }
-
-      if (!updatedFolders.includes(cleanTarget)) {
-        updatedFolders = [...updatedFolders, cleanTarget];
-      }
-
-      if (JSON.stringify(updatedFolders) !== JSON.stringify(currentFolders)) {
-        try {
-          await useConfigStore.getState().saveConfig({
-            ...currentConfig,
-            formFolders: updatedFolders,
-          });
-        } catch (err) {
-          console.warn("Could not auto-register form folder into config:", err);
-        }
-      }
-    }
-
     setTemplate(saved);
     setIsDirty(false);
     onSaved(saved);

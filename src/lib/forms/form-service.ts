@@ -24,6 +24,13 @@ export class FormService {
 
       // 1. Check if cleanFolder itself contains form.json
       try {
+        // Skip if marked as relocated via _MOVED_TO.txt
+        const isMoved = await adapter
+          .readFileText(`${cleanFolder}/_MOVED_TO.txt`)
+          .then(() => true)
+          .catch(() => false);
+        if (isMoved) continue;
+
         const directContent = await adapter.readFileText(
           `${cleanFolder}/form.json`,
         );
@@ -43,6 +50,12 @@ export class FormService {
         const subItems = await adapter.listLocalFiles(cleanFolder);
         for (const item of subItems) {
           if (item.isDirectory && item.name !== "Filled Forms") {
+            const isSubMoved = await adapter
+              .readFileText(`${item.path}/_MOVED_TO.txt`)
+              .then(() => true)
+              .catch(() => false);
+            if (isSubMoved) continue;
+
             const templatePath = `${item.path}/form.json`;
             try {
               const content = await adapter.readFileText(templatePath);
@@ -62,9 +75,20 @@ export class FormService {
       }
     }
 
+    // Exclude any template whose folderPath is in another template's legacyFolderPaths
+    const allLegacyPaths = new Set<string>();
+    for (const t of discovered) {
+      if (t.legacyFolderPaths) {
+        t.legacyFolderPaths.forEach((p) => allLegacyPaths.add(p));
+      }
+    }
+    const validDiscovered = discovered.filter(
+      (t) => !allLegacyPaths.has(t.folderPath),
+    );
+
     // Sort alphabetically by title
-    discovered.sort((a, b) => a.title.localeCompare(b.title));
-    return discovered;
+    validDiscovered.sort((a, b) => a.title.localeCompare(b.title));
+    return validDiscovered;
   }
 
   /**
@@ -284,9 +308,11 @@ export class FormService {
 
     const cleanTitle = template.title.trim();
     const slug =
-      template.id ||
-      sanitizeFilenamePart(cleanTitle).toLowerCase() ||
-      "custom-form";
+      template.id &&
+      template.id !== "new-field-form" &&
+      template.id !== "new-form"
+        ? template.id
+        : sanitizeFilenamePart(cleanTitle).toLowerCase() || "custom-form";
 
     // Track folder move in legacyFolderPaths and leave a notice in old folder
     const previousFolder = template.folderPath
@@ -295,16 +321,12 @@ export class FormService {
     let legacyFolderPaths = template.legacyFolderPaths
       ? [...template.legacyFolderPaths]
       : [];
-    if (
-      previousFolder &&
-      previousFolder !== destinationFolder &&
-      !legacyFolderPaths.includes(previousFolder)
-    ) {
-      legacyFolderPaths.push(previousFolder);
+    if (previousFolder && previousFolder !== destinationFolder) {
+      if (!legacyFolderPaths.includes(previousFolder)) {
+        legacyFolderPaths.push(previousFolder);
+      }
       // Attempt to write notice file in previous folder
-      this.writeMoveNotice(previousFolder, destinationFolder).catch(
-        console.warn,
-      );
+      await this.writeMoveNotice(previousFolder, destinationFolder);
     }
 
     const savedTemplate: FormTemplate = {
@@ -340,9 +362,16 @@ export class FormService {
     if (!cleanOld || !cleanNew || cleanOld === cleanNew) return;
 
     try {
-      await adapter.createDirectory(cleanOld);
-      const noticeText = `NOTICE:\nThis form template was relocated to:\n/${cleanNew}\n\nPlease check the new folder for current templates, submissions, and PDF copies.\n`;
-      await adapter.saveFile(`${cleanOld}/_MOVED_TO.txt`, noticeText);
+      // Only write notice if the old folder already exists and has/had a form.json
+      const hasOldForm = await adapter
+        .readFileText(`${cleanOld}/form.json`)
+        .then(() => true)
+        .catch(() => false);
+      if (hasOldForm) {
+        await adapter.createDirectory(cleanOld);
+        const noticeText = `NOTICE:\nThis form template was relocated to:\n/${cleanNew}\n\nPlease check the new folder for current templates, submissions, and PDF copies.\n`;
+        await adapter.saveFile(`${cleanOld}/_MOVED_TO.txt`, noticeText);
+      }
     } catch (e) {
       console.warn(`Could not write move notice in /${cleanOld}:`, e);
     }

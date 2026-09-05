@@ -11,7 +11,7 @@ import { SetupScreen } from "./components/setup/SetupScreen";
 import { SettingsScreen } from "./components/settings/SettingsScreen";
 import { Button } from "./components/ui/button";
 
-import { Folder, ChevronRight } from "lucide-react";
+import { Folder, ChevronRight, FileText } from "lucide-react";
 import { applyTheme } from "./lib/theme";
 import { DocumentList } from "./components/documents/DocumentList";
 import { DocumentViewer } from "./components/documents/DocumentViewer";
@@ -41,6 +41,8 @@ function App() {
   const [activeSubmission, setActiveSubmission] = useState<
     FormSubmission | undefined
   >(undefined);
+  const [returnToFormOnHistoryClose, setReturnToFormOnHistoryClose] =
+    useState<FormTemplate | null>(null);
   const [isFormsBrowserOpen, setFormsBrowserOpen] = useState(false);
   const [formsBrowserFolder, setFormsBrowserFolder] = useState<
     string | undefined
@@ -187,16 +189,19 @@ function App() {
   if (activeFormTemplate) {
     return (
       <FormRunner
+        key={`${activeFormTemplate.folderPath || activeFormTemplate.id}_${activeSubmission?.id || "new"}`}
         template={activeFormTemplate}
         initialSubmission={activeSubmission}
         onClose={() => {
           setActiveFormTemplate(null);
           setActiveSubmission(undefined);
+          setReturnToFormOnHistoryClose(null);
           loadDashboardForms();
         }}
         onViewPdf={(path) => setViewingPdfPath(path)}
         onOpenHistory={() => {
           const currentForm = activeFormTemplate;
+          setReturnToFormOnHistoryClose(currentForm);
           setActiveFormTemplate(null);
           setActiveSubmission(undefined);
           setFormsBrowserInitialForm(currentForm);
@@ -216,11 +221,17 @@ function App() {
           setFormsBrowserOpen(false);
           setFormsBrowserFolder(undefined);
           setFormsBrowserInitialForm(undefined);
-          loadDashboardForms();
+          if (returnToFormOnHistoryClose) {
+            setActiveFormTemplate(returnToFormOnHistoryClose);
+            setReturnToFormOnHistoryClose(null);
+          } else {
+            loadDashboardForms();
+          }
         }}
         onSelectForm={(tmpl, sub) => {
           setFormsBrowserOpen(false);
           setFormsBrowserInitialForm(undefined);
+          setReturnToFormOnHistoryClose(null);
           setActiveFormTemplate(tmpl);
           setActiveSubmission(sub);
         }}
@@ -275,7 +286,7 @@ function App() {
         ) : (
           <div className="px-4 py-6 sm:px-0 max-w-4xl mx-auto space-y-6">
             {/* Forms dashboard grid if templates exist */}
-            {dashboardForms.length > 0 && (
+            {dashboardForms.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {visibleForms.map((form) => (
                   <div
@@ -354,6 +365,26 @@ function App() {
                     </div>
                   </div>
                 )}
+              </div>
+            ) : (
+              <div className="border border-dashed rounded-xl p-8 flex flex-col items-center justify-center text-center bg-card/50 shadow-xs space-y-3">
+                <FileText className="w-10 h-10 text-muted-foreground/50" />
+                <div className="space-y-1">
+                  <h3 className="font-semibold text-base text-foreground">
+                    No Forms Configured
+                  </h3>
+                  <p className="text-xs text-muted-foreground max-w-sm">
+                    Configure form folders or create new forms using the visual form editor in Settings.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSettingsOpen(true)}
+                  className="mt-2"
+                >
+                  Configure Forms in Settings
+                </Button>
               </div>
             )}
 

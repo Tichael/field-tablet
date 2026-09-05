@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import type {
   FormTemplate,
   FormSubmission,
@@ -110,6 +110,16 @@ export function FormRunner({
   // Track if user has modified anything
   const [isDirty, setIsDirty] = useState(false);
 
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
+
   // Prevent accidental data loss on browser refresh / navigation when dirty
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -176,6 +186,25 @@ export function FormRunner({
             }
           }
         }
+
+        // Custom regex pattern validation
+        if (
+          field.validation?.pattern &&
+          val !== undefined &&
+          val !== null &&
+          val !== ""
+        ) {
+          try {
+            const regex = new RegExp(field.validation.pattern);
+            if (!regex.test(String(val))) {
+              if (!missing.includes(field.id)) {
+                missing.push(field.id);
+              }
+            }
+          } catch {
+            // ignore invalid regex pattern in template definition
+          }
+        }
       }
     }
     setValidationErrors(missing);
@@ -201,7 +230,8 @@ export function FormRunner({
     if (isPreview) {
       setIsDirty(false);
       setJustSaved(true);
-      setTimeout(() => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
         setJustSaved(false);
       }, 2500);
       return;
@@ -256,7 +286,8 @@ export function FormRunner({
       setLastExportedPdfPath(result.pdfPath);
       setIsDirty(false);
       setJustSaved(true);
-      setTimeout(() => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
         setJustSaved(false);
       }, 3500);
     } catch (e) {
@@ -578,7 +609,12 @@ export function FormRunner({
 
   if (!activeSection) {
     return (
-      <div className="flex flex-col h-screen bg-background text-foreground">
+      <div
+        className={cn(
+          "flex flex-col bg-background text-foreground",
+          isPreview ? "h-full" : "h-screen",
+        )}
+      >
         <header className="flex items-center justify-between p-4 border-b bg-muted/10 shadow-xs">
           <Button
             variant="ghost"
@@ -605,7 +641,12 @@ export function FormRunner({
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background text-foreground">
+    <div
+      className={cn(
+        "flex flex-col bg-background text-foreground",
+        isPreview ? "h-full min-h-0" : "min-h-screen",
+      )}
+    >
       {/* Top Tablet Header */}
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur-md px-4 py-3 shadow-xs">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-3">

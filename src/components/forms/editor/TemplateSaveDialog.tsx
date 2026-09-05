@@ -40,6 +40,7 @@ export function TemplateSaveDialog({
     return sanitizeFilenamePart(template.title) || "Custom Form";
   });
 
+  const [isFolderManuallyEdited, setIsFolderManuallyEdited] = useState(false);
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +54,10 @@ export function TemplateSaveDialog({
 
     if (template.folderPath) {
       setFolderPath(template.folderPath.trim().replace(/^\/+|\/+$/g, ""));
+      setIsFolderManuallyEdited(true);
     } else {
       setFolderPath(sanitizeFilenamePart(template.title) || "Custom Form");
+      setIsFolderManuallyEdited(false);
     }
     setError(null);
   }, [isOpen, template]);
@@ -104,26 +107,12 @@ export function TemplateSaveDialog({
         }
       }
 
-      // Track previous folder path in legacyFolderPaths if moved
-      let legacyFolderPaths = template.legacyFolderPaths
-        ? [...template.legacyFolderPaths]
-        : [];
-      if (
-        cleanOriginal &&
-        cleanOriginal !== cleanTarget &&
-        !legacyFolderPaths.includes(cleanOriginal)
-      ) {
-        legacyFolderPaths.push(cleanOriginal);
-      }
-
       const updatedTemplate: FormTemplate = {
         ...template,
         title: title.trim(),
         description: description.trim() || undefined,
         category: category.trim() || undefined,
-        folderPath: targetFolder,
-        legacyFolderPaths:
-          legacyFolderPaths.length > 0 ? legacyFolderPaths : undefined,
+        folderPath: template.folderPath || targetFolder,
       };
 
       await onSave(updatedTemplate, targetFolder);
@@ -162,8 +151,8 @@ export function TemplateSaveDialog({
         {/* Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
           {error && (
-            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-start gap-2 whitespace-pre-line">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{error}</span>
             </div>
           )}
@@ -179,7 +168,7 @@ export function TemplateSaveDialog({
               onChange={(e) => {
                 const newTitle = e.target.value;
                 setTitle(newTitle);
-                if (!template.folderPath) {
+                if (!template.folderPath && !isFolderManuallyEdited) {
                   setFolderPath(
                     sanitizeFilenamePart(newTitle) || "Custom Form",
                   );
@@ -234,7 +223,10 @@ export function TemplateSaveDialog({
                 <Input
                   id="save-folder"
                   value={folderPath}
-                  onChange={(e) => setFolderPath(e.target.value)}
+                  onChange={(e) => {
+                    setFolderPath(e.target.value);
+                    setIsFolderManuallyEdited(true);
+                  }}
                   placeholder="e.g. Daily Reports or Safety/Inspections"
                   className="font-mono text-xs pl-6"
                 />
@@ -335,6 +327,7 @@ export function TemplateSaveDialog({
               <GenericFileBrowser
                 onFolderSelect={(path) => {
                   setFolderPath(path);
+                  setIsFolderManuallyEdited(true);
                   setIsBrowserOpen(false);
                 }}
                 onFileSelect={() => {}}
