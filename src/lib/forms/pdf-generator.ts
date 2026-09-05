@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { FormTemplate, FormSubmission } from "../../types/form";
 import type { AppConfig } from "../../store/config-store";
+import { formatBytes } from "./media-utils";
 
 export interface GeneratePdfOptions {
   template: FormTemplate;
@@ -302,7 +303,148 @@ export async function generateFormSubmissionPdf({
         continue;
       }
 
-      // Format Textual / Option Values
+      // Handle Photo Field
+      if (field.type === "photo") {
+        const photoList: any[] = Array.isArray(val) ? val : val ? [val] : [];
+        const labelText = field.required ? `${field.label} *` : field.label;
+
+        checkPageBreak(photoList.length > 0 ? 55 : 16);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(labelText, margin, y + 4);
+        y += 7;
+
+        if (photoList.length === 0) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text("[No photos attached]", margin, y + 2);
+          y += 8;
+        } else {
+          for (let pi = 0; pi < photoList.length; pi++) {
+            const p = photoList[pi];
+            const imgSrc =
+              p.dataUrl ||
+              (typeof p === "string" && p.startsWith("data:image") ? p : null);
+            const photoName = p.name || p.filename || `Photo ${pi + 1}`;
+            const photoSize = p.size ? ` (${formatBytes(p.size)})` : "";
+
+            if (imgSrc) {
+              checkPageBreak(52);
+              try {
+                doc.setDrawColor(226, 232, 240);
+                doc.setFillColor(255, 255, 255);
+                doc.roundedRect(margin, y, 70, 44, 1.5, 1.5, "FD");
+
+                doc.addImage(
+                  imgSrc,
+                  "JPEG",
+                  margin + 1,
+                  y + 1,
+                  68,
+                  42,
+                  undefined,
+                  "FAST",
+                );
+
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(7.5);
+                doc.setTextColor(100, 116, 139);
+                doc.text(`${photoName}${photoSize}`, margin + 74, y + 10);
+                doc.text(
+                  `File: ${p.filename || photoName}`,
+                  margin + 74,
+                  y + 16,
+                );
+
+                y += 48;
+              } catch {
+                doc.setFont("helvetica", "italic");
+                doc.setFontSize(8);
+                doc.setTextColor(148, 163, 184);
+                doc.text(`[Photo: ${photoName}${photoSize}]`, margin, y + 4);
+                y += 10;
+              }
+            } else {
+              checkPageBreak(16);
+              doc.setFillColor(248, 250, 252);
+              doc.setDrawColor(226, 232, 240);
+              doc.roundedRect(margin, y, contentWidth, 12, 1, 1, "FD");
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(8);
+              doc.setTextColor(51, 65, 85);
+              doc.text(
+                `Attached Photo: ${photoName}${photoSize} — Stored in submission folder`,
+                margin + 4,
+                y + 7.5,
+              );
+              y += 15;
+            }
+          }
+        }
+        continue;
+      }
+
+      // Handle Video Field
+      if (field.type === "video") {
+        const videoList: any[] = Array.isArray(val) ? val : val ? [val] : [];
+        const labelText = field.required ? `${field.label} *` : field.label;
+
+        checkPageBreak(videoList.length > 0 ? 26 : 16);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(30, 41, 59);
+        doc.text(labelText, margin, y + 4);
+        y += 7;
+
+        if (videoList.length === 0) {
+          doc.setFont("helvetica", "italic");
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text("[No video attached]", margin, y + 2);
+          y += 8;
+        } else {
+          for (let vi = 0; vi < videoList.length; vi++) {
+            const v = videoList[vi];
+            const videoName = v.name || v.filename || `Video ${vi + 1}`;
+            const videoSize = v.size ? formatBytes(v.size) : "Unknown size";
+            const videoPath =
+              v.path ||
+              (submission.instanceFolderPath
+                ? `${submission.instanceFolderPath}/${v.filename || videoName}`
+                : v.filename || videoName);
+
+            checkPageBreak(22);
+            doc.setFillColor(248, 250, 252);
+            doc.setDrawColor(203, 213, 225);
+            doc.roundedRect(margin, y, contentWidth, 18, 1.5, 1.5, "FD");
+
+            // Blue accent indicator
+            doc.setFillColor(59, 130, 246);
+            doc.rect(margin, y, 2.5, 18, "F");
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8.5);
+            doc.setTextColor(15, 23, 42);
+            doc.text(`[VIDEO] ${videoName} (${videoSize})`, margin + 6, y + 6);
+
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7.5);
+            doc.setTextColor(71, 85, 105);
+            doc.text(`Path on Share: /${videoPath}`, margin + 6, y + 11);
+            doc.setTextColor(100, 116, 139);
+            doc.text(
+              "Co-located in this submission folder. Open in app or play with media player.",
+              margin + 6,
+              y + 15.5,
+            );
+
+            y += 22;
+          }
+        }
+        continue;
+      }
       let displayVal = "-";
       if (val !== undefined && val !== null && val !== "") {
         if (field.type === "checkbox") {

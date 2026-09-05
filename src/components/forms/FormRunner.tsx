@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { SignaturePad } from "./SignaturePad";
+import { MediaAttachmentField } from "./MediaAttachmentField";
 import {
   ChevronLeft,
   AlertCircle,
@@ -156,6 +157,14 @@ export function FormRunner({
             }
           } else if (field.type === "checkbox-group") {
             if (!Array.isArray(val) || val.length === 0) {
+              missing.push(field.id);
+            }
+          } else if (field.type === "photo" || field.type === "video") {
+            if (
+              val === undefined ||
+              val === null ||
+              (Array.isArray(val) && val.length === 0)
+            ) {
               missing.push(field.id);
             }
           } else if (
@@ -584,6 +593,27 @@ export function FormRunner({
             <SignaturePad
               value={val}
               onChange={(sig) => handleFieldChange(field.id, sig)}
+            />
+          </div>
+        );
+
+      case "photo":
+      case "video":
+        return (
+          <div
+            id={field.id}
+            className={cn(
+              hasError &&
+                "p-1 rounded-xl border border-destructive ring-1 ring-destructive/20",
+            )}
+          >
+            <MediaAttachmentField
+              field={field}
+              value={val}
+              onChange={(newVal) => handleFieldChange(field.id, newVal)}
+              hasError={hasError}
+              disabled={isSaving}
+              onViewMedia={onViewPdf}
             />
           </div>
         );

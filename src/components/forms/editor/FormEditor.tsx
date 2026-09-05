@@ -38,6 +38,8 @@ import {
   FileText,
   Sliders,
   Columns,
+  Camera,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -315,6 +317,24 @@ export function FormEditor({
           required: true,
         };
         break;
+      case "photo":
+        newField = {
+          id: `photo_${timestamp}`,
+          type: "photo",
+          label: "Site / Inspection Photo",
+          helperText: "Capture photo with camera or choose from gallery",
+          allowMultiple: true,
+        };
+        break;
+      case "video":
+        newField = {
+          id: `video_${timestamp}`,
+          type: "video",
+          label: "Video Recording",
+          helperText: "Record video or attach video file",
+          allowMultiple: false,
+        };
+        break;
       case "heading":
         newField = {
           id: `head_${timestamp}`,
@@ -495,6 +515,10 @@ export function FormEditor({
         return <ListChecks className="w-4 h-4 text-amber-500" />;
       case "signature":
         return <PenTool className="w-4 h-4 text-purple-500" />;
+      case "photo":
+        return <Camera className="w-4 h-4 text-emerald-500" />;
+      case "video":
+        return <Video className="w-4 h-4 text-blue-500" />;
       case "heading":
         return <Heading className="w-4 h-4 text-muted-foreground" />;
       case "notes":
@@ -812,6 +836,11 @@ export function FormEditor({
                                 {field.isIdentifier && (
                                   <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
                                     File Identifier
+                                  </span>
+                                )}
+                                {field.allowMultiple && (
+                                  <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                                    Multi-File
                                   </span>
                                 )}
                               </div>

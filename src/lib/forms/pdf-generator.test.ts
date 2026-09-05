@@ -383,5 +383,100 @@ describe("pdf-generator", () => {
       expect(pdfText).toContain("Field Inspection Pro | Daily Report");
       expect(pdfText).not.toContain("•");
     });
+
+    it("should render photo attachments and video reference cards with SMB share paths in PDF", async () => {
+      const mediaTemplate: FormTemplate = {
+        id: "site-inspection",
+        title: "Site Inspection",
+        version: 1,
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        folderPath: "Inspections/Site Inspection",
+        sections: [
+          {
+            id: "media_section",
+            title: "Inspection Media",
+            fields: [
+              {
+                id: "damage_photo",
+                type: "photo",
+                label: "Damage Photo",
+                allowMultiple: true,
+              },
+              {
+                id: "engine_video",
+                type: "video",
+                label: "Engine Test Video",
+              },
+            ],
+          },
+        ],
+      };
+
+      const tinyJpeg =
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+
+      const submission: FormSubmission = {
+        id: "Site_Inspection_Unit1_2026-09-05_100000",
+        templateId: mediaTemplate.id,
+        templateTitle: mediaTemplate.title,
+        templateVersion: 1,
+        folderPath: mediaTemplate.folderPath,
+        instanceFolderPath:
+          "Inspections/Site Inspection/Filled Forms/Site_Inspection_Unit1_2026-09-05_100000",
+        createdAt: "2026-09-05T10:00:00.000Z",
+        updatedAt: "2026-09-05T10:00:00.000Z",
+        status: "completed",
+        values: {
+          damage_photo: [
+            {
+              id: "photo_1",
+              name: "crack_detail.jpg",
+              filename: "Damage_Photo_1.jpg",
+              path: "Inspections/Site Inspection/Filled Forms/Site_Inspection_Unit1_2026-09-05_100000/Damage_Photo_1.jpg",
+              type: "photo",
+              mimeType: "image/jpeg",
+              size: 204800,
+              uploadedAt: "2026-09-05T10:00:00.000Z",
+              dataUrl: tinyJpeg,
+            },
+          ],
+          engine_video: {
+            id: "video_1",
+            name: "engine_rev.mp4",
+            filename: "Engine_Test_Video_1.mp4",
+            path: "Inspections/Site Inspection/Filled Forms/Site_Inspection_Unit1_2026-09-05_100000/Engine_Test_Video_1.mp4",
+            type: "video",
+            mimeType: "video/mp4",
+            size: 15728640, // 15 MB
+            uploadedAt: "2026-09-05T10:00:00.000Z",
+          },
+        },
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: mediaTemplate,
+        submission,
+        config: sampleConfig,
+        exportDate: new Date(2026, 8, 5, 10, 0, 0),
+      });
+
+      expect(result.filename).toBe(
+        "Site_Inspection_2026-09-05_100000.pdf",
+      );
+      const pdfRaw = atob(result.base64);
+      expect(pdfRaw.startsWith("%PDF")).toBe(true);
+
+      // Verify video reference card and SMB path are printed
+      expect(pdfRaw).toContain("[VIDEO] engine_rev.mp4");
+      expect(pdfRaw).toContain("15 MB");
+      expect(pdfRaw).toContain(
+        "Path on Share: /Inspections/Site Inspection/Filled Forms/Site_Inspection_Unit1_2026-09-05_100000/Engine_Test_Video_1.mp4",
+      );
+
+      // Verify photo filename appears
+      expect(pdfRaw).toContain("Damage_Photo_1.jpg");
+    });
   });
 });

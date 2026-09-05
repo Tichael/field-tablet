@@ -1,5 +1,5 @@
 import { syncManager } from "../sync/sync-manager";
-import type { FormTemplate, FormSubmission } from "../../types/form";
+import type { FormTemplate, FormSubmission, FormAttachment } from "../../types/form";
 import type { AppConfig } from "../../store/config-store";
 import {
   generateFormSubmissionPdf,
@@ -422,7 +422,7 @@ export class FormService {
       .replace(/^\/+|\/+$/g, "");
     const filledFormsDir = `${cleanFolderPath}/Filled Forms`;
 
-    // Ensure the folder and Filled Forms directory exist
+    // Ensure template folder and Filled Forms directory exist
     await adapter.createDirectory(cleanFolderPath);
     await adapter.createDirectory(filledFormsDir);
 
@@ -439,17 +439,81 @@ export class FormService {
     const now = new Date();
     const isoNow = now.toISOString();
 
-    // Generate dated PDF snapshot
+    // Determine instance directory: <FormFolder>/Filled Forms/<SubmissionId>
+    const instanceFolder =
+      submission.instanceFolderPath || `${filledFormsDir}/${submission.id}`;
+    await adapter.createDirectory(instanceFolder);
+
+    // Save and co-locate attachments inside instanceFolder
+    const updatedValues = { ...submission.values };
+    const allAttachments: FormAttachment[] = [];
+
+    for (const section of template.sections) {
+      for (const field of section.fields) {
+        if (field.type === "photo" || field.type === "video") {
+          const val = updatedValues[field.id];
+          if (!val) continue;
+
+          const rawList: FormAttachment[] = Array.isArray(val) ? val : [val];
+          const processedList: FormAttachment[] = [];
+
+          for (let i = 0; i < rawList.length; i++) {
+            const att = { ...rawList[i] };
+            const cleanLabel =
+              sanitizeFilenamePart(field.label) ||
+              (field.type === "photo" ? "Photo" : "Video");
+            const ext =
+              att.type === "video"
+                ? att.name?.split(".").pop() || "mp4"
+                : att.name?.split(".").pop() || "jpg";
+
+            // Format human-readable filename e.g. Damage_Inspection_1.jpg, Engine_Sound_1.mp4
+            const targetFilename =
+              att.filename || `${cleanLabel}_${i + 1}.${ext}`;
+            const targetPath = `${instanceFolder}/${targetFilename}`;
+
+            // If attachment has new dataUrl (pending upload), write binary to disk
+            if (att.dataUrl) {
+              const commaIdx = att.dataUrl.indexOf(",");
+              const base64 =
+                commaIdx >= 0 ? att.dataUrl.slice(commaIdx + 1) : att.dataUrl;
+              await adapter.saveFile(targetPath, base64, { isBase64: true });
+            }
+
+            // Clean attachment record without large in-memory dataUrl for storage
+            const savedAtt: FormAttachment = {
+              ...att,
+              filename: targetFilename,
+              path: targetPath,
+              dataUrl: undefined,
+            };
+
+            processedList.push(savedAtt);
+            allAttachments.push(savedAtt);
+          }
+
+          updatedValues[field.id] = Array.isArray(val)
+            ? processedList
+            : processedList[0];
+        }
+      }
+    }
+
+    // Generate dated PDF snapshot (with photos embedded using in-memory dataUrls where available)
     const pdfResult = await generateFormSubmissionPdf({
       template,
-      submission,
+      submission: {
+        ...submission,
+        instanceFolderPath: instanceFolder,
+        values: submission.values, // keeps in-memory dataUrl for PDF rendering
+      },
       config,
       exportDate: now,
     });
 
-    const pdfPath = `${filledFormsDir}/${pdfResult.filename}`;
+    const pdfPath = `${instanceFolder}/${pdfResult.filename}`;
 
-    // Write binary PDF to disk / remote
+    // Write binary PDF to disk / remote inside instance folder
     await adapter.saveFile(pdfPath, pdfResult.base64, { isBase64: true });
 
     // Update submission record with this new PDF export
@@ -468,12 +532,15 @@ export class FormService {
       templateTitle: template.title,
       templateVersion: template.version || 1,
       folderPath: cleanFolderPath,
+      instanceFolderPath: instanceFolder,
       updatedAt: isoNow,
+      values: updatedValues,
       pdfExports: updatedPdfExports,
+      attachments: allAttachments.length > 0 ? allAttachments : undefined,
     };
 
-    // Save submission JSON
-    const subJsonPath = `${filledFormsDir}/${submission.id}.json`;
+    // Save submission JSON into instance folder
+    const subJsonPath = `${instanceFolder}/${submission.id}.json`;
     await adapter.saveFile(
       subJsonPath,
       JSON.stringify(updatedSubmission, null, 2),
@@ -503,50 +570,58 @@ export class FormService {
     for (const folder of foldersToScan) {
       const filledFormsDir = `${folder}/Filled Forms`;
       try {
-        let files = await adapter.listLocalFiles(filledFormsDir);
-        // If Filled Forms is empty or does not exist, check the folder itself
-        if (files.length === 0) {
-          try {
-            files = await adapter.listLocalFiles(folder);
-          } catch {
-            // ignore
-          }
-        }
+        const entries = await adapter.listLocalFiles(filledFormsDir);
 
-        const jsonFiles = files.filter(
-          (f) =>
-            !f.isDirectory &&
-            f.name.endsWith(".json") &&
-            f.name !== "form.json",
-        );
-        const pdfFiles = files.filter(
-          (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
-        );
-
-        for (const file of jsonFiles) {
-          try {
-            const text = await adapter.readFileText(file.path);
-            const sub = JSON.parse(text) as FormSubmission;
-
-            // If pdfExports is empty or missing, populate from discovered PDFs
-            if (!sub.pdfExports || sub.pdfExports.length === 0) {
-              const matching = pdfFiles.filter((p) =>
-                p.name.startsWith(sub.id),
+        for (const entry of entries) {
+          if (entry.isDirectory) {
+            try {
+              const instanceFiles = await adapter.listLocalFiles(entry.path);
+              const jsonFiles = instanceFiles.filter(
+                (f) => !f.isDirectory && f.name.endsWith(".json"),
               );
-              if (matching.length > 0) {
-                sub.pdfExports = matching.map((p) => ({
-                  path: p.path,
-                  filename: p.name,
-                  exportedAt: sub.updatedAt || sub.createdAt,
-                }));
-              }
-            }
+              const pdfFiles = instanceFiles.filter(
+                (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+              );
 
-            if (!submissionMap.has(sub.id)) {
-              submissionMap.set(sub.id, sub);
+              for (const file of jsonFiles) {
+                try {
+                  const text = await adapter.readFileText(file.path);
+                  const sub = JSON.parse(text) as FormSubmission;
+                  sub.instanceFolderPath = entry.path;
+
+                  // Populate pdfExports from discovered PDFs if empty
+                  if (!sub.pdfExports || sub.pdfExports.length === 0) {
+                    sub.pdfExports = pdfFiles.map((p) => ({
+                      path: p.path,
+                      filename: p.name,
+                      exportedAt: sub.updatedAt || sub.createdAt,
+                    }));
+                  }
+
+                  if (!submissionMap.has(sub.id)) {
+                    submissionMap.set(sub.id, sub);
+                  }
+                } catch (e) {
+                  console.warn(`Failed to parse instance submission file ${file.path}:`, e);
+                }
+              }
+            } catch (e) {
+              console.warn(`Failed to read instance directory ${entry.path}:`, e);
             }
-          } catch (e) {
-            console.warn(`Failed to parse submission file ${file.path}:`, e);
+          } else if (
+            !entry.isDirectory &&
+            entry.name.endsWith(".json") &&
+            entry.name !== "form.json"
+          ) {
+            try {
+              const text = await adapter.readFileText(entry.path);
+              const sub = JSON.parse(text) as FormSubmission;
+              if (!submissionMap.has(sub.id)) {
+                submissionMap.set(sub.id, sub);
+              }
+            } catch (e) {
+              console.warn(`Failed to parse flat submission file ${entry.path}:`, e);
+            }
           }
         }
       } catch {
@@ -580,24 +655,32 @@ export class FormService {
     for (const folder of foldersToScan) {
       const filledFormsDir = `${folder}/Filled Forms`;
       try {
-        let files = await adapter.listLocalFiles(filledFormsDir);
-        if (files.length === 0) {
-          try {
-            files = await adapter.listLocalFiles(folder);
-          } catch {
-            // ignore
-          }
-        }
+        const entries = await adapter.listLocalFiles(filledFormsDir);
+        for (const entry of entries) {
+          if (entry.isDirectory) {
+            try {
+              const files = await adapter.listLocalFiles(entry.path);
+              const pdfs = files
+                .filter(
+                  (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+                )
+                .map((f) => ({ name: f.name, path: f.path }));
 
-        const pdfs = files
-          .filter(
-            (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
-          )
-          .map((f) => ({ name: f.name, path: f.path }));
-
-        for (const pdf of pdfs) {
-          if (!pdfMap.has(pdf.name)) {
-            pdfMap.set(pdf.name, pdf);
+              for (const pdf of pdfs) {
+                if (!pdfMap.has(pdf.name)) {
+                  pdfMap.set(pdf.name, pdf);
+                }
+              }
+            } catch {
+              // ignore
+            }
+          } else if (
+            !entry.isDirectory &&
+            entry.name.toLowerCase().endsWith(".pdf")
+          ) {
+            if (!pdfMap.has(entry.name)) {
+              pdfMap.set(entry.name, { name: entry.name, path: entry.path });
+            }
           }
         }
       } catch {

@@ -271,7 +271,7 @@ describe("FormService", () => {
 
       // Verify submission JSON was saved
       const savedJson1 = await mockAdapter.readFileText(
-        `Reports/Daily Report/Filled Forms/${subId}.json`,
+        `Reports/Daily Report/Filled Forms/${subId}/${subId}.json`,
       );
       const parsedJson1 = JSON.parse(savedJson1);
       expect(parsedJson1.pdfExports.length).toBe(1);
@@ -305,7 +305,7 @@ describe("FormService", () => {
 
       // Verify the submission JSON now records both PDF exports
       const savedJson2 = await mockAdapter.readFileText(
-        `Reports/Daily Report/Filled Forms/${subId}.json`,
+        `Reports/Daily Report/Filled Forms/${subId}/${subId}.json`,
       );
       const parsedJson2 = JSON.parse(savedJson2);
       expect(parsedJson2.pdfExports.length).toBe(2);
@@ -728,6 +728,171 @@ describe("FormService", () => {
       // Verify move notice was written in FolderB
       const noticeB = await mockAdapter.readFileText("FolderB/_MOVED_TO.txt");
       expect(noticeB).toContain("/FolderA");
+    });
+  });
+
+  describe("Photo & Video Attachments & Per-Instance Folder Persistence", () => {
+    const mediaTemplate: FormTemplate = {
+      id: "equipment-inspection",
+      title: "Equipment Inspection",
+      version: 1,
+      createdAt: "2026-09-05T00:00:00.000Z",
+      updatedAt: "2026-09-05T00:00:00.000Z",
+      folderPath: "Inspections/Equipment",
+      sections: [
+        {
+          id: "sec_media",
+          title: "Media Attachments",
+          fields: [
+            {
+              id: "unit_id",
+              type: "text",
+              label: "Unit ID",
+              isIdentifier: true,
+            },
+            {
+              id: "damage_photo",
+              type: "photo",
+              label: "Damage Photo",
+              allowMultiple: true,
+            },
+            {
+              id: "engine_sound",
+              type: "video",
+              label: "Engine Sound",
+            },
+          ],
+        },
+      ],
+    };
+
+    const testConfig: AppConfig = {
+      theme: { primaryColor: "#000", darkMode: "light" },
+      branding: { appTitle: "Test App" },
+      pdfPageSize: "a4",
+    };
+
+    it("should co-locate submission JSON, dated PDF, and binary attachments in an instance folder", async () => {
+      const subId = formService.generateSubmissionId(
+        mediaTemplate.title,
+        "Truck-99",
+        new Date(2026, 8, 5, 8, 30, 0),
+      );
+
+      const fakePhotoBase64 = "dGVzdC1waG90by1ieXRlcw==";
+      const fakeVideoBase64 = "dGVzdC12aWRlby1ieXRlcw==";
+
+      const submission: FormSubmission = {
+        id: subId,
+        templateId: mediaTemplate.id,
+        templateTitle: mediaTemplate.title,
+        templateVersion: 1,
+        folderPath: mediaTemplate.folderPath,
+        createdAt: "2026-09-05T08:30:00.000Z",
+        updatedAt: "2026-09-05T08:30:00.000Z",
+        status: "completed",
+        values: {
+          unit_id: "Truck-99",
+          damage_photo: [
+            {
+              id: "att_photo_1",
+              name: "scratch.jpg",
+              filename: "",
+              path: "",
+              type: "photo",
+              mimeType: "image/jpeg",
+              size: 2048,
+              uploadedAt: "2026-09-05T08:30:00.000Z",
+              dataUrl: `data:image/jpeg;base64,${fakePhotoBase64}`,
+            },
+          ],
+          engine_sound: {
+            id: "att_video_1",
+            name: "rev_test.mp4",
+            filename: "",
+            path: "",
+            type: "video",
+            mimeType: "video/mp4",
+            size: 5120,
+            uploadedAt: "2026-09-05T08:30:00.000Z",
+            dataUrl: `data:video/mp4;base64,${fakeVideoBase64}`,
+          },
+        },
+        pdfExports: [],
+      };
+
+      const saveResult = await formService.saveSubmissionAndExportPdf(
+        mediaTemplate,
+        submission,
+        testConfig,
+      );
+
+      const expectedInstanceDir = `Inspections/Equipment/Filled Forms/${subId}`;
+      expect(saveResult.submission.instanceFolderPath).toBe(expectedInstanceDir);
+
+      // 1. Verify JSON is in instance folder
+      const jsonText = await mockAdapter.readFileText(
+        `${expectedInstanceDir}/${subId}.json`,
+      );
+      const savedJson = JSON.parse(jsonText);
+      expect(savedJson.instanceFolderPath).toBe(expectedInstanceDir);
+      expect(savedJson.attachments.length).toBe(2);
+
+      // Verify bulky dataUrl is stripped from JSON
+      expect(savedJson.values.damage_photo[0].dataUrl).toBeUndefined();
+      expect(savedJson.values.engine_sound.dataUrl).toBeUndefined();
+
+      // 2. Verify binary attachments are co-located in instance folder
+      const savedPhotoFile = mockAdapter.getRawFile(
+        `${expectedInstanceDir}/Damage_Photo_1.jpg`,
+      );
+      expect(savedPhotoFile).toBeDefined();
+      expect(savedPhotoFile?.content).toBe(fakePhotoBase64);
+      expect(savedPhotoFile?.isBase64).toBe(true);
+
+      const savedVideoFile = mockAdapter.getRawFile(
+        `${expectedInstanceDir}/Engine_Sound_1.mp4`,
+      );
+      expect(savedVideoFile).toBeDefined();
+      expect(savedVideoFile?.content).toBe(fakeVideoBase64);
+      expect(savedVideoFile?.isBase64).toBe(true);
+
+      // 3. Verify dated PDF is co-located in instance folder
+      expect(saveResult.pdfPath).toBe(
+        `${expectedInstanceDir}/${saveResult.filename}`,
+      );
+      const savedPdf = mockAdapter.getRawFile(saveResult.pdfPath);
+      expect(savedPdf).toBeDefined();
+
+      // 4. Verify listSubmissions reads the instance folder submission
+      const subs = await formService.listSubmissions("Inspections/Equipment");
+      expect(subs.length).toBe(1);
+      expect(subs[0].id).toBe(subId);
+      expect(subs[0].instanceFolderPath).toBe(expectedInstanceDir);
+      expect(subs[0].attachments?.length).toBe(2);
+
+      // 5. Subsequent update saves inside the SAME instance folder with second dated PDF
+      const updateSub: FormSubmission = {
+        ...savedJson,
+        values: {
+          ...savedJson.values,
+          unit_id: "Truck-99-Updated",
+        },
+      };
+
+      const updateResult = await formService.saveSubmissionAndExportPdf(
+        mediaTemplate,
+        updateSub,
+        testConfig,
+      );
+
+      expect(updateResult.submission.instanceFolderPath).toBe(expectedInstanceDir);
+      expect(updateResult.pdfPath).not.toBe(saveResult.pdfPath);
+      expect(updateResult.submission.pdfExports.length).toBe(2);
+
+      // Verify both dated PDFs exist in that same instance folder
+      expect(mockAdapter.getRawFile(saveResult.pdfPath)).toBeDefined();
+      expect(mockAdapter.getRawFile(updateResult.pdfPath)).toBeDefined();
     });
   });
 });

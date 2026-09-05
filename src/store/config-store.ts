@@ -65,6 +65,12 @@ export function getFormFoldersList(config?: AppConfig | null): string[] {
   );
 }
 
+export type PhotoQuality = "2mp" | "5mp" | "10mp" | "original";
+
+export interface MediaConfig {
+  photoQuality?: PhotoQuality;
+}
+
 export interface AppConfig {
   theme: {
     primaryColor: string;
@@ -77,6 +83,7 @@ export interface AppConfig {
   syncFolders?: string[];
   formFolders?: FormFoldersConfig;
   pdfPageSize?: "a4" | "letter";
+  media?: MediaConfig;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -89,6 +96,9 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   formFolders: [],
   pdfPageSize: detectDefaultPdfPageSize(),
+  media: {
+    photoQuality: "2mp",
+  },
 };
 
 interface ConfigState {

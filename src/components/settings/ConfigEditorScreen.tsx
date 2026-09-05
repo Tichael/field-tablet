@@ -436,6 +436,18 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
     }));
   };
 
+  const handlePhotoQualityChange = (
+    value: "2mp" | "5mp" | "10mp" | "original",
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      media: {
+        ...prev.media,
+        photoQuality: value,
+      },
+    }));
+  };
+
   const handleBrandingChange = (
     key: keyof AppConfig["branding"],
     value: string | undefined,
@@ -636,6 +648,39 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   Applied across all generated form PDF snapshots.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="photoQuality">
+                  Form Photo Attachment Quality
+                </Label>
+                <Select
+                  value={formData.media?.photoQuality || "2mp"}
+                  onValueChange={(val: any) => {
+                    handlePhotoQualityChange(val);
+                  }}
+                >
+                  <SelectTrigger id="photoQuality">
+                    <SelectValue placeholder="Select photo quality limit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2mp">
+                      Standard (2 MP — ~1920×1080) — Fast sync & compact PDFs
+                    </SelectItem>
+                    <SelectItem value="5mp">
+                      High (5 MP — ~2560×1920) — Sharper details for labels & text
+                    </SelectItem>
+                    <SelectItem value="10mp">
+                      Ultra (10 MP — ~3648×2736) — Fine inspection & high detail
+                    </SelectItem>
+                    <SelectItem value="original">
+                      Original (Unlimited) — Full tablet camera resolution
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Limits camera photo resolution on tablets to optimize memory, storage, and SMB sync speeds.
                 </p>
               </div>
             </CardContent>
