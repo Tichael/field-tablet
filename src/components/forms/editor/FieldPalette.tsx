@@ -14,6 +14,8 @@ import {
   PenTool,
   Heading,
   HelpCircle,
+  Camera,
+  Video,
   X,
 } from "lucide-react";
 
@@ -29,7 +31,7 @@ interface PaletteItem {
   label: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
-  category: "inputs" | "datetime" | "choices" | "advanced" | "layout";
+  category: "inputs" | "datetime" | "choices" | "media" | "advanced" | "layout";
 }
 
 const PALETTE_ITEMS: PaletteItem[] = [
@@ -107,6 +109,22 @@ const PALETTE_ITEMS: PaletteItem[] = [
     description: "Multiple selectable checkboxes from a list",
     icon: ListChecks,
     category: "choices",
+  },
+
+  // Media & Attachments
+  {
+    type: "photo",
+    label: "Photo Attachment",
+    description: "Camera capture or image upload (embedded directly in PDF)",
+    icon: Camera,
+    category: "media",
+  },
+  {
+    type: "video",
+    label: "Video Attachment",
+    description: "Video recording or attachment (stored in submission folder)",
+    icon: Video,
+    category: "media",
   },
 
   // Advanced & Structure
@@ -264,6 +282,43 @@ export function FieldPalette({
                     >
                       <div className="flex items-center gap-2 mb-1.5">
                         <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span className="font-semibold text-xs sm:text-sm">
+                          {item.label}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground line-clamp-2">
+                        {item.description}
+                      </p>
+                    </button>
+                  );
+                },
+              )}
+            </div>
+          </div>
+
+          {/* Media & Attachments Section */}
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-1">
+              Media & Attachments
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {PALETTE_ITEMS.filter((i) => i.category === "media").map(
+                (item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.type}
+                      type="button"
+                      onClick={() => {
+                        onSelectType(item.type);
+                        onClose();
+                      }}
+                      className="flex flex-col text-left p-3.5 rounded-xl border bg-card hover:bg-muted/40 hover:border-primary/50 transition-all group focus:outline-none focus:ring-2 focus:ring-primary text-foreground cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                           <Icon className="w-4 h-4" />
                         </div>
                         <span className="font-semibold text-xs sm:text-sm">

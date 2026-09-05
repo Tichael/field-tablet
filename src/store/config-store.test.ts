@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { detectDefaultPdfPageSize, getFormFoldersList } from "./config-store";
+import {
+  detectDefaultPdfPageSize,
+  getFormFoldersList,
+  DEFAULT_CONFIG,
+} from "./config-store";
 import type { AppConfig } from "./config-store";
 
 describe("config-store getFormFoldersList", () => {
@@ -109,5 +113,11 @@ describe("config-store detectDefaultPdfPageSize", () => {
       configurable: true,
     });
     expect(detectDefaultPdfPageSize()).toBe("a4");
+  });
+});
+
+describe("config-store media configuration", () => {
+  it("should have 2mp default photoQuality in DEFAULT_CONFIG", () => {
+    expect(DEFAULT_CONFIG.media?.photoQuality).toBe("2mp");
   });
 });

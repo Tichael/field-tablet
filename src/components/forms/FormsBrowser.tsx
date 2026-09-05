@@ -13,8 +13,11 @@ import {
   Edit3,
   Loader2,
   Calendar,
+  Camera,
+  Video,
 } from "lucide-react";
 import { formatDateTime } from "../../lib/forms/pdf-generator";
+import { formatBytes } from "../../lib/forms/media-utils";
 import { cn } from "@/lib/utils";
 
 interface FormsBrowserProps {
@@ -251,6 +254,42 @@ export function FormsBrowser({
                         </div>
                       )}
                     </div>
+
+                    {/* Media Attachments list for this submission */}
+                    {sub.attachments && sub.attachments.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t">
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          Media Attachments ({sub.attachments.length})
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {sub.attachments.map((att) => (
+                            <button
+                              key={att.id || att.path}
+                              onClick={() => onViewPdf(att.path)}
+                              className="flex items-center justify-between p-2.5 rounded-lg border bg-muted/20 hover:bg-muted/50 hover:border-foreground/30 transition-all text-left text-foreground group"
+                              title={`Open ${att.name || att.filename}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0 pr-2">
+                                {att.type === "photo" ? (
+                                  <Camera className="w-4 h-4 text-emerald-500 shrink-0" />
+                                ) : (
+                                  <Video className="w-4 h-4 text-blue-500 shrink-0" />
+                                )}
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium truncate text-foreground">
+                                    {att.name || att.filename}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground font-mono">
+                                    {formatBytes(att.size)}
+                                  </p>
+                                </div>
+                              </div>
+                              <ExternalLink className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
