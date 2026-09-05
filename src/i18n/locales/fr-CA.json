@@ -1,4 +1,13 @@
 {
+  "_meta": {
+    "code": "fr-CA",
+    "label": "Français (Canada)"
+  },
+  "manifest": {
+    "name": "Tablette de terrain",
+    "shortName": "Tablette",
+    "description": "Tablette de terrain"
+  },
   "common": {
     "loading": "Chargement...",
     "save": "Enregistrer",
@@ -19,7 +28,9 @@
     "optional": "Facultatif",
     "required": "Obligatoire",
     "select": "Sélectionner",
-    "dismiss": "Ignorer"
+    "dismiss": "Ignorer",
+    "yes": "Oui",
+    "no": "Non"
   },
   "header": {
     "settings": "Paramètres",
@@ -219,6 +230,8 @@
       "completed": "Complété",
       "draft": "Brouillon",
       "submitted": "Soumis",
+      "synced": "Synchronisé",
+      "syncError": "Erreur de synchro",
       "lastUpdated": "Dernière mise à jour",
       "viewPdf": "Voir le PDF",
       "editSubmission": "Modifier la soumission",
@@ -467,7 +480,45 @@
       "errorOptionLabel": "Toutes les options doivent avoir un libellé.",
       "errorOptionValue": "Toutes les options doivent avoir une valeur.",
       "errorOptionDuplicate": "La valeur « {{value}} » est en double. Chaque option doit avoir une valeur unique.",
-      "errorMinMax": "La valeur minimale ne peut pas être supérieure à la valeur maximale."
+      "errorMinMax": "La valeur minimale ne peut pas être supérieure à la valeur maximale.",
+      "defaultOption1": "Option 1",
+      "defaultOption2": "Option 2"
+    },
+    "defaults": {
+      "textLabel": "Question texte",
+      "textPlaceholder": "Entrez les détails...",
+      "textareaLabel": "Résumé des travaux / Remarques",
+      "textareaPlaceholder": "Entrez des remarques détaillées...",
+      "numberLabel": "Mesure / Relevé",
+      "numberPlaceholder": "0,0",
+      "dateLabel": "Date d'inspection",
+      "timeLabel": "Heure d'inspection",
+      "datetimeLabel": "Date et heure de l'incident",
+      "selectLabel": "État / Statut",
+      "selectPass": "Satisfaisant / Réussi",
+      "selectAttention": "Nécessite une attention",
+      "selectFail": "Échec / Hors service",
+      "radioLabel": "Mode de fonctionnement",
+      "radioNormal": "Fonctionnement normal",
+      "radioMaintenance": "Réduit / Maintenance",
+      "radioShutdown": "Arrêt",
+      "checkboxLabel": "Inspection de sécurité effectuée et vérifiée",
+      "checksLabel": "Équipement de protection individuelle (ÉPI) vérifié",
+      "checkHardHat": "Casque de sécurité",
+      "checkGlasses": "Lunettes de sécurité",
+      "checkBoots": "Bottes à embout d'acier",
+      "checkHiVis": "Gilet haute visibilité",
+      "signatureLabel": "Signature de l'inspecteur / technicien",
+      "photoLabel": "Photo du site / d'inspection",
+      "photoHelper": "Prendre une photo avec l'appareil ou choisir dans la galerie",
+      "videoLabel": "Enregistrement vidéo",
+      "videoHelper": "Enregistrer une vidéo ou joindre un fichier vidéo",
+      "headingLabel": "Vérifications physiques de l'équipement",
+      "notesLabel": "Veuillez examiner attentivement toutes les informations ci-dessus avant de signer.",
+      "sectionGeneral": "Informations générales",
+      "fieldTitle": "Titre / Nom",
+      "fieldTitlePlaceholder": "Entrez le titre ou le nom...",
+      "fieldDate": "Date"
     },
     "saveDialog": {
       "title": "Enregistrer le modèle de formulaire",
@@ -507,6 +558,14 @@
     "noSignature": "[Aucune signature fournie]",
     "photoAttachments": "Photos jointes",
     "noPhotos": "[Aucune photo jointe]",
-    "pageOf": "Page {{current}} de {{total}}"
+    "pageOf": "Page {{current}} de {{total}}",
+    "noVideos": "[Aucune vidéo jointe]",
+    "unknownSize": "Taille inconnue",
+    "pathOnShare": "Emplacement sur le partage : /{{path}}",
+    "mediaCoLocatedNote": "Situé dans ce dossier de soumission. Ouvrir dans l'application ou lire avec un lecteur multimédia.",
+    "attachedPhotoStored": "Photo jointe : {{name}}{{size}} — Stockée dans le dossier de soumission",
+    "photoFallback": "[Photo : {{name}}{{size}}]",
+    "checkboxYes": "[X] Oui",
+    "checkboxNo": "[ ] Non"
   }
 }

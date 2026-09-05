@@ -59,6 +59,37 @@ export function FormsBrowser({
   const [submissions, setSubmissions] = useState<FormSubmission[]>([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
 
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "completed":
+        return {
+          label: t("forms.browser.completed"),
+          className: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
+        };
+      case "submitted":
+        return {
+          label: t("forms.browser.submitted"),
+          className: "bg-blue-500/10 text-blue-600 border-blue-500/20",
+        };
+      case "synced":
+        return {
+          label: t("forms.browser.synced"),
+          className: "bg-purple-500/10 text-purple-600 border-purple-500/20",
+        };
+      case "sync_error":
+        return {
+          label: t("forms.browser.syncError"),
+          className: "bg-destructive/10 text-destructive border-destructive/20",
+        };
+      case "draft":
+      default:
+        return {
+          label: t("forms.browser.draft"),
+          className: "bg-amber-500/10 text-amber-600 border-amber-500/20",
+        };
+    }
+  };
+
   // Load forms in selected folder
   const loadForms = useCallback(async () => {
     setLoading(true);
@@ -198,15 +229,11 @@ export function FormsBrowser({
                           </span>
                           <span
                             className={cn(
-                              "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold",
-                              sub.status === "completed"
-                                ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
-                                : "bg-amber-500/10 text-amber-600 border border-amber-500/20",
+                              "text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full font-bold border",
+                              getStatusBadge(sub.status).className,
                             )}
                           >
-                            {sub.status === "completed"
-                              ? t("forms.browser.completed")
-                              : t("forms.browser.draft")}
+                            {getStatusBadge(sub.status).label}
                           </span>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">

@@ -1,4 +1,13 @@
 {
+  "_meta": {
+    "code": "en",
+    "label": "English"
+  },
+  "manifest": {
+    "name": "Field Tablet",
+    "shortName": "FieldTablet",
+    "description": "Field Tablet Application"
+  },
   "common": {
     "loading": "Loading...",
     "save": "Save",
@@ -19,7 +28,9 @@
     "optional": "Optional",
     "required": "Required",
     "select": "Select",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "yes": "Yes",
+    "no": "No"
   },
   "header": {
     "settings": "Settings",
@@ -219,6 +230,8 @@
       "completed": "Completed",
       "draft": "Draft",
       "submitted": "Submitted",
+      "synced": "Synced",
+      "syncError": "Sync Error",
       "lastUpdated": "Last Updated",
       "viewPdf": "View PDF",
       "editSubmission": "Edit Submission",
@@ -467,7 +480,45 @@
       "errorOptionLabel": "All options must have a label.",
       "errorOptionValue": "All options must have a value.",
       "errorOptionDuplicate": "Option value \"{{value}}\" is duplicated. Each option must have a unique value.",
-      "errorMinMax": "Minimum value cannot be greater than maximum value."
+      "errorMinMax": "Minimum value cannot be greater than maximum value.",
+      "defaultOption1": "Option 1",
+      "defaultOption2": "Option 2"
+    },
+    "defaults": {
+      "textLabel": "Text Question",
+      "textPlaceholder": "Enter details...",
+      "textareaLabel": "Work Summary / Remarks",
+      "textareaPlaceholder": "Enter detailed remarks...",
+      "numberLabel": "Measurement / Reading",
+      "numberPlaceholder": "0.0",
+      "dateLabel": "Inspection Date",
+      "timeLabel": "Time of Inspection",
+      "datetimeLabel": "Incident Timestamp",
+      "selectLabel": "Condition / Status",
+      "selectPass": "Satisfactory / Pass",
+      "selectAttention": "Needs Attention",
+      "selectFail": "Failed / Out of Service",
+      "radioLabel": "Operational Mode",
+      "radioNormal": "Normal Operation",
+      "radioMaintenance": "Reduced / Maintenance",
+      "radioShutdown": "Shutdown",
+      "checkboxLabel": "Safety inspection completed and verified",
+      "checksLabel": "Personal Protective Equipment (PPE) Checked",
+      "checkHardHat": "Hard Hat",
+      "checkGlasses": "Safety Glasses",
+      "checkBoots": "Steel Toe Boots",
+      "checkHiVis": "High-Visibility Vest",
+      "signatureLabel": "Inspector / Technician Signature",
+      "photoLabel": "Site / Inspection Photo",
+      "photoHelper": "Capture photo with camera or choose from gallery",
+      "videoLabel": "Video Recording",
+      "videoHelper": "Record video or attach video file",
+      "headingLabel": "Equipment Physical Checks",
+      "notesLabel": "Please review all information above carefully before signing.",
+      "sectionGeneral": "General Information",
+      "fieldTitle": "Title / Name",
+      "fieldTitlePlaceholder": "Enter title or name...",
+      "fieldDate": "Date"
     },
     "saveDialog": {
       "title": "Save Form Template",
@@ -507,6 +558,14 @@
     "noSignature": "[No signature provided]",
     "photoAttachments": "Photo Attachments",
     "noPhotos": "[No photos attached]",
-    "pageOf": "Page {{current}} of {{total}}"
+    "pageOf": "Page {{current}} of {{total}}",
+    "noVideos": "[No video attached]",
+    "unknownSize": "Unknown size",
+    "pathOnShare": "Path on Share: /{{path}}",
+    "mediaCoLocatedNote": "Co-located in this submission folder. Open in app or play with media player.",
+    "attachedPhotoStored": "Attached Photo: {{name}}{{size}} — Stored in submission folder",
+    "photoFallback": "[Photo: {{name}}{{size}}]",
+    "checkboxYes": "[X] Yes",
+    "checkboxNo": "[ ] No"
   }
 }

@@ -4,7 +4,7 @@ import { syncManager } from "../../lib/sync/sync-manager";
 import { useAppStore } from "../../store/app-store";
 import {
   useConfigStore,
-  DEFAULT_CONFIG,
+  getDefaultConfig,
   type AppConfig,
 } from "../../store/config-store";
 import { Button } from "../ui/button";
@@ -133,14 +133,7 @@ export function SetupScreen() {
         }
 
         const currentLang = getAppLanguage();
-        const initialConfig: AppConfig = {
-          ...DEFAULT_CONFIG,
-          language: currentLang,
-          branding: {
-            ...DEFAULT_CONFIG.branding,
-            appTitle: t("header.fieldTabletApp"),
-          },
-        };
+        const initialConfig: AppConfig = getDefaultConfig(currentLang);
 
         await saveConfig(initialConfig, finalName);
         localStorage.setItem("openEditor", "true");

@@ -224,31 +224,31 @@ export function FormEditor({
         newField = {
           id: `text_${timestamp}`,
           type: "text",
-          label: "Text Question",
-          placeholder: "Enter details...",
+          label: t("editor.defaults.textLabel"),
+          placeholder: t("editor.defaults.textPlaceholder"),
         };
         break;
       case "textarea":
         newField = {
           id: `notes_${timestamp}`,
           type: "textarea",
-          label: "Work Summary / Remarks",
-          placeholder: "Enter detailed remarks...",
+          label: t("editor.defaults.textareaLabel"),
+          placeholder: t("editor.defaults.textareaPlaceholder"),
         };
         break;
       case "number":
         newField = {
           id: `num_${timestamp}`,
           type: "number",
-          label: "Measurement / Reading",
-          placeholder: "0.0",
+          label: t("editor.defaults.numberLabel"),
+          placeholder: t("editor.defaults.numberPlaceholder"),
         };
         break;
       case "date":
         newField = {
           id: `date_${timestamp}`,
           type: "date",
-          label: "Inspection Date",
+          label: t("editor.defaults.dateLabel"),
           defaultValue: "today",
           required: true,
         };
@@ -257,14 +257,14 @@ export function FormEditor({
         newField = {
           id: `time_${timestamp}`,
           type: "time",
-          label: "Time of Inspection",
+          label: t("editor.defaults.timeLabel"),
         };
         break;
       case "datetime":
         newField = {
           id: `datetime_${timestamp}`,
           type: "datetime",
-          label: "Incident Timestamp",
+          label: t("editor.defaults.datetimeLabel"),
           defaultValue: "now",
           required: true,
         };
@@ -273,11 +273,11 @@ export function FormEditor({
         newField = {
           id: `select_${timestamp}`,
           type: "select",
-          label: "Condition / Status",
+          label: t("editor.defaults.selectLabel"),
           options: [
-            { label: "Satisfactory / Pass", value: "pass" },
-            { label: "Needs Attention", value: "attention" },
-            { label: "Failed / Out of Service", value: "fail" },
+            { label: t("editor.defaults.selectPass"), value: "pass" },
+            { label: t("editor.defaults.selectAttention"), value: "attention" },
+            { label: t("editor.defaults.selectFail"), value: "fail" },
           ],
         };
         break;
@@ -285,11 +285,14 @@ export function FormEditor({
         newField = {
           id: `choice_${timestamp}`,
           type: "radio",
-          label: "Operational Mode",
+          label: t("editor.defaults.radioLabel"),
           options: [
-            { label: "Normal Operation", value: "normal" },
-            { label: "Reduced / Maintenance", value: "maintenance" },
-            { label: "Shutdown", value: "shutdown" },
+            { label: t("editor.defaults.radioNormal"), value: "normal" },
+            {
+              label: t("editor.defaults.radioMaintenance"),
+              value: "maintenance",
+            },
+            { label: t("editor.defaults.radioShutdown"), value: "shutdown" },
           ],
         };
         break;
@@ -297,7 +300,7 @@ export function FormEditor({
         newField = {
           id: `check_${timestamp}`,
           type: "checkbox",
-          label: "Safety inspection completed and verified",
+          label: t("editor.defaults.checkboxLabel"),
           required: true,
         };
         break;
@@ -305,12 +308,12 @@ export function FormEditor({
         newField = {
           id: `checks_${timestamp}`,
           type: "checkbox-group",
-          label: "Personal Protective Equipment (PPE) Checked",
+          label: t("editor.defaults.checksLabel"),
           options: [
-            { label: "Hard Hat", value: "hard_hat" },
-            { label: "Safety Glasses", value: "glasses" },
-            { label: "Steel Toe Boots", value: "boots" },
-            { label: "High-Visibility Vest", value: "hi_vis" },
+            { label: t("editor.defaults.checkHardHat"), value: "hard_hat" },
+            { label: t("editor.defaults.checkGlasses"), value: "glasses" },
+            { label: t("editor.defaults.checkBoots"), value: "boots" },
+            { label: t("editor.defaults.checkHiVis"), value: "hi_vis" },
           ],
         };
         break;
@@ -318,7 +321,7 @@ export function FormEditor({
         newField = {
           id: `signature_${timestamp}`,
           type: "signature",
-          label: "Inspector / Technician Signature",
+          label: t("editor.defaults.signatureLabel"),
           required: true,
         };
         break;
@@ -326,8 +329,8 @@ export function FormEditor({
         newField = {
           id: `photo_${timestamp}`,
           type: "photo",
-          label: "Site / Inspection Photo",
-          helperText: "Capture photo with camera or choose from gallery",
+          label: t("editor.defaults.photoLabel"),
+          helperText: t("editor.defaults.photoHelper"),
           allowMultiple: true,
         };
         break;
@@ -335,8 +338,8 @@ export function FormEditor({
         newField = {
           id: `video_${timestamp}`,
           type: "video",
-          label: "Video Recording",
-          helperText: "Record video or attach video file",
+          label: t("editor.defaults.videoLabel"),
+          helperText: t("editor.defaults.videoHelper"),
           allowMultiple: false,
         };
         break;
@@ -344,22 +347,21 @@ export function FormEditor({
         newField = {
           id: `head_${timestamp}`,
           type: "heading",
-          label: "Equipment Physical Checks",
+          label: t("editor.defaults.headingLabel"),
         };
         break;
       case "notes":
         newField = {
           id: `note_${timestamp}`,
           type: "notes",
-          label:
-            "Ensure all machinery is fully de-energized and locked out prior to commencing physical inspection.",
+          label: t("editor.defaults.notesLabel"),
         };
         break;
       default:
         newField = {
           id: `field_${timestamp}`,
           type,
-          label: "New Field",
+          label: t("editor.formEditor.addField"),
         };
     }
 

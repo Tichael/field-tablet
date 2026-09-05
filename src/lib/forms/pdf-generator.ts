@@ -412,7 +412,10 @@ export async function generateFormSubmissionPdf({
                 doc.setFontSize(8);
                 doc.setTextColor(148, 163, 184);
                 doc.text(
-                  `[Photo: ${p.filename || photoName}${photoSize}]`,
+                  t("pdf.photoFallback", {
+                    name: p.filename || photoName,
+                    size: photoSize,
+                  }),
                   margin,
                   y + 4,
                   {
@@ -430,7 +433,10 @@ export async function generateFormSubmissionPdf({
               doc.setFontSize(8);
               doc.setTextColor(51, 65, 85);
               doc.text(
-                `Attached Photo: ${photoName}${photoSize} — Stored in submission folder`,
+                t("pdf.attachedPhotoStored", {
+                  name: photoName,
+                  size: photoSize,
+                }),
                 margin + 4,
                 y + 7.5,
                 { maxWidth: contentWidth - 8 },
@@ -458,13 +464,15 @@ export async function generateFormSubmissionPdf({
           doc.setFont("helvetica", "italic");
           doc.setFontSize(8);
           doc.setTextColor(148, 163, 184);
-          doc.text("[No video attached]", margin, y + 2);
+          doc.text(t("pdf.noVideos"), margin, y + 2);
           y += 8;
         } else {
           for (let vi = 0; vi < videoList.length; vi++) {
             const v = videoList[vi];
             const videoName = v.name || v.filename || `Video ${vi + 1}`;
-            const videoSize = v.size ? formatBytes(v.size) : "Unknown size";
+            const videoSize = v.size
+              ? formatBytes(v.size)
+              : t("pdf.unknownSize");
             const videoPath =
               v.path ||
               (submission.instanceFolderPath
@@ -490,16 +498,18 @@ export async function generateFormSubmissionPdf({
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7.5);
             doc.setTextColor(71, 85, 105);
-            doc.text(`Path on Share: /${videoPath}`, margin + 6, y + 11, {
+            doc.text(
+              t("pdf.pathOnShare", { path: videoPath }),
+              margin + 6,
+              y + 11,
+              {
+                maxWidth: contentWidth - 10,
+              },
+            );
+            doc.setTextColor(100, 116, 139);
+            doc.text(t("pdf.mediaCoLocatedNote"), margin + 6, y + 15.5, {
               maxWidth: contentWidth - 10,
             });
-            doc.setTextColor(100, 116, 139);
-            doc.text(
-              "Co-located in this submission folder. Open in app or play with media player.",
-              margin + 6,
-              y + 15.5,
-              { maxWidth: contentWidth - 10 },
-            );
 
             y += 22;
           }
@@ -509,7 +519,10 @@ export async function generateFormSubmissionPdf({
       let displayVal = "-";
       if (val !== undefined && val !== null && val !== "") {
         if (field.type === "checkbox") {
-          displayVal = val === true || val === "true" ? "[X] Yes" : "[ ] No";
+          displayVal =
+            val === true || val === "true"
+              ? t("pdf.checkboxYes")
+              : t("pdf.checkboxNo");
         } else if (field.type === "checkbox-group" && Array.isArray(val)) {
           displayVal =
             val.length > 0

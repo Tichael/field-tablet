@@ -1,9 +1,75 @@
+import fs from "fs";
 import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
 import tailwindcss from "@tailwindcss/vite";
+
+declare module "vite-plugin-pwa" {
+  interface ManifestOptions {
+    translations?: Record<
+      string,
+      {
+        name?: string;
+        short_name?: string;
+        description?: string;
+      }
+    >;
+  }
+}
+
+function getManifestTranslations(): Record<
+  string,
+  { name: string; short_name: string; description: string }
+> {
+  const localesDir = path.resolve(__dirname, "src/i18n/locales");
+  const translations: Record<
+    string,
+    { name: string; short_name: string; description: string }
+  > = {};
+
+  try {
+    const files = fs.readdirSync(localesDir);
+    for (const file of files) {
+      if (!file.endsWith(".json")) continue;
+      const raw = fs.readFileSync(path.join(localesDir, file), "utf-8");
+      const content = JSON.parse(raw);
+      const code = content._meta?.code || path.basename(file, ".json");
+      if (code === "en") continue;
+
+      const name =
+        content.manifest?.name || content.header?.fieldTablet || "Field Tablet";
+      const shortName =
+        content.manifest?.shortName ||
+        (content.header?.fieldTablet
+          ? content.header.fieldTablet.replace(/\s+/g, "")
+          : "FieldTablet");
+      const description =
+        content.manifest?.description ||
+        content.header?.fieldTabletApp ||
+        content.header?.fieldTablet ||
+        "Field Tablet Application";
+
+      const entry = {
+        name,
+        short_name: shortName,
+        description,
+      };
+
+      translations[code] = entry;
+
+      const baseCode = code.split("-")[0];
+      if (baseCode && baseCode !== code && !translations[baseCode]) {
+        translations[baseCode] = entry;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load locale files for manifest translations:", e);
+  }
+
+  return translations;
+}
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -35,33 +101,7 @@ export default defineConfig({
         name: "Field Tablet",
         short_name: "FieldTablet",
         description: "Field Tablet Application",
-        name_localized: {
-          en: { value: "Field Tablet" },
-          fr: { value: "Tablette de terrain" },
-          "fr-CA": { value: "Tablette de terrain" },
-        },
-        short_name_localized: {
-          en: { value: "FieldTablet" },
-          fr: { value: "Tablette" },
-          "fr-CA": { value: "Tablette" },
-        },
-        description_localized: {
-          en: { value: "Field Tablet" },
-          fr: { value: "Tablette de terrain" },
-          "fr-CA": { value: "Tablette de terrain" },
-        },
-        translations: {
-          fr: {
-            name: "Tablette de terrain",
-            short_name: "Tablette",
-            description: "Tablette de terrain",
-          },
-          "fr-CA": {
-            name: "Tablette de terrain",
-            short_name: "Tablette",
-            description: "Tablette de terrain",
-          },
-        },
+        translations: getManifestTranslations(),
         theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",
@@ -87,7 +127,7 @@ export default defineConfig({
             purpose: "maskable",
           },
         ],
-      } as any,
+      },
     }),
   ],
   resolve: {

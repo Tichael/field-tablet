@@ -60,12 +60,12 @@ export function FieldInspector({
             }))
           : [
               {
-                label: "Option 1",
+                label: t("editor.inspector.defaultOption1"),
                 value: "option_1",
                 _key: Math.random().toString(36).slice(2, 9),
               },
               {
-                label: "Option 2",
+                label: t("editor.inspector.defaultOption2"),
                 value: "option_2",
                 _key: Math.random().toString(36).slice(2, 9),
               },
@@ -77,7 +77,7 @@ export function FieldInspector({
       setDraft(null);
       setOptions([]);
     }
-  }, [field, isOpen]);
+  }, [field, isOpen, t]);
 
   if (!isOpen || !draft) return null;
 

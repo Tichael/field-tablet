@@ -1,18 +1,10 @@
 import { create } from "zustand";
 import { get } from "idb-keyval";
 import { syncManager } from "../lib/sync/sync-manager";
-import { syncLanguageWithConfig } from "../i18n";
+import { syncLanguageWithConfig, detectDefaultAppLanguage } from "../i18n";
 import type { SupportedLanguage } from "../i18n";
 
-export function detectDefaultAppLanguage(): SupportedLanguage {
-  if (typeof navigator !== "undefined" && navigator.language) {
-    const lang = navigator.language.toLowerCase();
-    if (lang.startsWith("fr")) {
-      return "fr-CA";
-    }
-  }
-  return "en";
-}
+export { detectDefaultAppLanguage };
 
 export function detectDefaultPdfPageSize(): "a4" | "letter" {
   if (typeof navigator !== "undefined" && navigator.language) {
@@ -101,7 +93,19 @@ export interface AppConfig {
 
 export function detectDefaultAppTitle(lang?: SupportedLanguage): string {
   const language = lang || detectDefaultAppLanguage();
-  return language === "fr-CA" ? "Tablette de terrain" : "Field Tablet";
+  return language.startsWith("fr") ? "Tablette de terrain" : "Field Tablet";
+}
+
+export function isDefaultAppTitle(title?: string | null): boolean {
+  if (!title || !title.trim()) return true;
+  const trimmed = title.trim();
+  return (
+    trimmed === "Field Tablet" ||
+    trimmed === "Tablette de terrain" ||
+    trimmed === "Field Tablet App" ||
+    trimmed === "Application Tablette Terrain" ||
+    trimmed === "Application tablette de terrain"
+  );
 }
 
 export function getDefaultConfig(lang?: SupportedLanguage): AppConfig {

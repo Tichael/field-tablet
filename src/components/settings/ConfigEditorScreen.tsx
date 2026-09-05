@@ -5,6 +5,7 @@ import {
   useConfigStore,
   DEFAULT_CONFIG,
   detectDefaultAppTitle,
+  isDefaultAppTitle,
   getFormFoldersList,
 } from "../../store/config-store";
 import type { AppConfig } from "../../store/config-store";
@@ -69,18 +70,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
 
   const handleLanguageChange = (language: SupportedLanguage) => {
     setFormData((prev) => {
-      const prevLang = prev.language || "en";
-      const prevDefaultTitle = detectDefaultAppTitle(prevLang);
-      const isUntouchedTitle =
-        !prev.branding?.appTitle ||
-        prev.branding.appTitle.trim() === "" ||
-        prev.branding.appTitle === prevDefaultTitle ||
-        prev.branding.appTitle === "Field Tablet" ||
-        prev.branding.appTitle === "Tablette de terrain" ||
-        prev.branding.appTitle === "Field Tablet App" ||
-        prev.branding.appTitle === "Application Tablette Terrain" ||
-        prev.branding.appTitle === "Application tablette de terrain";
-
+      const isUntouchedTitle = isDefaultAppTitle(prev.branding?.appTitle);
       const newTitle = isUntouchedTitle
         ? detectDefaultAppTitle(language)
         : prev.branding.appTitle;
@@ -247,6 +237,7 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
         formService.createEmptyTemplate(
           t("editor.formEditor.untitledForm"),
           folder,
+          formData.language,
         ),
       );
     }

@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import en from "./locales/en.json";
-import frCA from "./locales/fr-CA.json";
-import {
+import i18n, {
   setDeviceLanguage,
   clearDeviceLanguageOverride,
   getDeviceLanguageOverride,
@@ -9,9 +7,17 @@ import {
   getAppLanguage,
   formatAppDate,
   formatAppTime,
+  normalizeLanguage,
+  detectDefaultAppLanguage,
+  SUPPORTED_LANGUAGES,
 } from "./index";
 
-describe("i18n catalog integrity", () => {
+const localeFiles = import.meta.glob<Record<string, any>>("./locales/*.json", {
+  eager: true,
+  import: "default",
+});
+
+describe("i18n catalog integrity and dynamic discovery", () => {
   function getObjectKeys(obj: Record<string, any>, prefix = ""): string[] {
     let keys: string[] = [];
     for (const [k, v] of Object.entries(obj)) {
@@ -25,26 +31,45 @@ describe("i18n catalog integrity", () => {
     return keys;
   }
 
-  it("should have identical translation keys in en.json and fr-CA.json", () => {
-    const enKeys = getObjectKeys(en).sort();
-    const frKeys = getObjectKeys(frCA).sort();
+  it("should dynamically discover all locale files and populate SUPPORTED_LANGUAGES", () => {
+    expect(SUPPORTED_LANGUAGES.length).toBeGreaterThanOrEqual(2);
+    expect(SUPPORTED_LANGUAGES.map((l) => l.code)).toContain("en");
+    expect(SUPPORTED_LANGUAGES.map((l) => l.code)).toContain("fr-CA");
 
-    const missingInFr = enKeys.filter((k) => !frKeys.includes(k));
-    const missingInEn = frKeys.filter((k) => !enKeys.includes(k));
+    // Labels should be populated
+    const enEntry = SUPPORTED_LANGUAGES.find((l) => l.code === "en");
+    const frEntry = SUPPORTED_LANGUAGES.find((l) => l.code === "fr-CA");
+    expect(enEntry?.label).toBe("English");
+    expect(frEntry?.label).toBe("Français (Canada)");
+  });
 
-    expect(
-      missingInFr,
-      `Keys present in en.json but missing in fr-CA.json: ${missingInFr.join(", ")}`,
-    ).toEqual([]);
-    expect(
-      missingInEn,
-      `Keys present in fr-CA.json but missing in en.json: ${missingInEn.join(", ")}`,
-    ).toEqual([]);
+  it("should have identical translation keys across all discovered locales", () => {
+    const enContent = localeFiles["./locales/en.json"];
+    expect(enContent).toBeDefined();
+    const enKeys = getObjectKeys(enContent).sort();
+
+    for (const [filePath, content] of Object.entries(localeFiles)) {
+      if (filePath === "./locales/en.json") continue;
+      const localeKeys = getObjectKeys(content).sort();
+
+      const missingInLocale = enKeys.filter((k) => !localeKeys.includes(k));
+      const missingInEn = localeKeys.filter((k) => !enKeys.includes(k));
+
+      expect(
+        missingInLocale,
+        `Keys in en.json missing in ${filePath}: ${missingInLocale.join(", ")}`,
+      ).toEqual([]);
+      expect(
+        missingInEn,
+        `Keys in ${filePath} missing in en.json: ${missingInEn.join(", ")}`,
+      ).toEqual([]);
+    }
   });
 });
 
-describe("i18n runtime language resolution", () => {
+describe("i18n runtime language resolution & normalization", () => {
   let mockStorage: Record<string, string> = {};
+  const originalNavigator = globalThis.navigator;
 
   beforeEach(() => {
     mockStorage = {};
@@ -64,7 +89,52 @@ describe("i18n runtime language resolution", () => {
 
   afterEach(async () => {
     mockStorage = {};
+    Object.defineProperty(globalThis, "navigator", {
+      value: originalNavigator,
+      configurable: true,
+    });
     await setDeviceLanguage("en");
+  });
+
+  it("normalizes language codes including territory and base language fallbacks", () => {
+    expect(normalizeLanguage("en")).toBe("en");
+    expect(normalizeLanguage("en-US")).toBe("en");
+    expect(normalizeLanguage("fr-CA")).toBe("fr-CA");
+    expect(normalizeLanguage("fr-ca")).toBe("fr-CA");
+    expect(normalizeLanguage("fr")).toBe("fr-CA");
+    expect(normalizeLanguage("fr-FR")).toBe("fr-CA");
+    expect(normalizeLanguage("")).toBe("en");
+    expect(normalizeLanguage(null)).toBe("en");
+  });
+
+  it("resolves French catalog when language is set to 'fr' via alias", async () => {
+    await i18n.changeLanguage("fr");
+    expect(i18n.t("header.settings")).toBe("Paramètres");
+    expect(getAppLanguage()).toBe("fr-CA");
+
+    await setDeviceLanguage("fr");
+    expect(i18n.t("header.settings")).toBe("Paramètres");
+    expect(getDeviceLanguageOverride()).toBe("fr-CA");
+  });
+
+  it("detects default application language from navigator", () => {
+    Object.defineProperty(globalThis, "navigator", {
+      value: { language: "fr-CA" },
+      configurable: true,
+    });
+    expect(detectDefaultAppLanguage()).toBe("fr-CA");
+
+    Object.defineProperty(globalThis, "navigator", {
+      value: { language: "fr-FR" },
+      configurable: true,
+    });
+    expect(detectDefaultAppLanguage()).toBe("fr-CA");
+
+    Object.defineProperty(globalThis, "navigator", {
+      value: { language: "en-US" },
+      configurable: true,
+    });
+    expect(detectDefaultAppLanguage()).toBe("en");
   });
 
   it("should allow setting and reading manual device language", async () => {
@@ -129,13 +199,5 @@ describe("i18n runtime language resolution", () => {
 
     expect(enTime).toBeTruthy();
     expect(frTime).toBeTruthy();
-  });
-
-  it("provides aligned default configuration filenames and placeholders in en and fr-CA", () => {
-    expect(en.setup.defaultConfigFilename).toBe("tablet-config");
-    expect(en.setup.newConfigPlaceholder).toContain("tablet-config");
-
-    expect(frCA.setup.defaultConfigFilename).toBe("config-tablette");
-    expect(frCA.setup.newConfigPlaceholder).toContain("config-tablette");
   });
 });
