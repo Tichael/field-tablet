@@ -145,6 +145,18 @@ class MockStorageAdapter implements StorageAdapter {
     return file.content;
   }
 
+  async readFileBase64(path: string): Promise<string> {
+    const cleanPath = path.trim().replace(/^\/+|\/+$/g, "");
+    const file = this.files.get(cleanPath);
+    if (!file) throw new Error(`File not found: ${cleanPath}`);
+    if (file.isBase64) return file.content;
+    const maybeBuffer = (globalThis as any).Buffer;
+    if (maybeBuffer) {
+      return maybeBuffer.from(file.content).toString("base64");
+    }
+    return btoa(file.content);
+  }
+
   clear() {
     this.files.clear();
     this.dirs.clear();
@@ -779,7 +791,8 @@ describe("FormService", () => {
         new Date(2026, 8, 5, 8, 30, 0),
       );
 
-      const fakePhotoBase64 = "dGVzdC1waG90by1ieXRlcw==";
+      const fakePhotoBase64 =
+        "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
       const fakeVideoBase64 = "dGVzdC12aWRlby1ieXRlcw==";
 
       const submission: FormSubmission = {
@@ -828,7 +841,9 @@ describe("FormService", () => {
       );
 
       const expectedInstanceDir = `Inspections/Equipment/Filled Forms/${subId}`;
-      expect(saveResult.submission.instanceFolderPath).toBe(expectedInstanceDir);
+      expect(saveResult.submission.instanceFolderPath).toBe(
+        expectedInstanceDir,
+      );
 
       // 1. Verify JSON is in instance folder
       const jsonText = await mockAdapter.readFileText(
@@ -844,14 +859,14 @@ describe("FormService", () => {
 
       // 2. Verify binary attachments are co-located in instance folder
       const savedPhotoFile = mockAdapter.getRawFile(
-        `${expectedInstanceDir}/Damage_Photo_1.jpg`,
+        `${expectedInstanceDir}/damage_photo_1.jpg`,
       );
       expect(savedPhotoFile).toBeDefined();
       expect(savedPhotoFile?.content).toBe(fakePhotoBase64);
       expect(savedPhotoFile?.isBase64).toBe(true);
 
       const savedVideoFile = mockAdapter.getRawFile(
-        `${expectedInstanceDir}/Engine_Sound_1.mp4`,
+        `${expectedInstanceDir}/engine_sound_1.mp4`,
       );
       expect(savedVideoFile).toBeDefined();
       expect(savedVideoFile?.content).toBe(fakeVideoBase64);
@@ -886,13 +901,20 @@ describe("FormService", () => {
         testConfig,
       );
 
-      expect(updateResult.submission.instanceFolderPath).toBe(expectedInstanceDir);
+      expect(updateResult.submission.instanceFolderPath).toBe(
+        expectedInstanceDir,
+      );
       expect(updateResult.pdfPath).not.toBe(saveResult.pdfPath);
       expect(updateResult.submission.pdfExports.length).toBe(2);
 
       // Verify both dated PDFs exist in that same instance folder
       expect(mockAdapter.getRawFile(saveResult.pdfPath)).toBeDefined();
-      expect(mockAdapter.getRawFile(updateResult.pdfPath)).toBeDefined();
+      const updatePdfFile = mockAdapter.getRawFile(updateResult.pdfPath);
+      expect(updatePdfFile).toBeDefined();
+
+      // Verify second PDF re-hydrated the photo from disk (filename appears in PDF)
+      const updatePdfRaw = atob(updatePdfFile!.content);
+      expect(updatePdfRaw).toContain("damage_photo_1.jpg");
     });
   });
 });

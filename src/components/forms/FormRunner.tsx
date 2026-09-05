@@ -94,6 +94,10 @@ export function FormRunner({
     string | undefined
   >(initialSubmission?.id);
 
+  const [instanceFolderPath, setInstanceFolderPath] = useState<
+    string | undefined
+  >(initialSubmission?.instanceFolderPath);
+
   const [currentPdfExports, setCurrentPdfExports] = useState<PdfExportRecord[]>(
     initialSubmission?.pdfExports || [],
   );
@@ -163,6 +167,7 @@ export function FormRunner({
             if (
               val === undefined ||
               val === null ||
+              val === "" ||
               (Array.isArray(val) && val.length === 0)
             ) {
               missing.push(field.id);
@@ -278,6 +283,8 @@ export function FormRunner({
         templateTitle: template.title,
         templateVersion: template.version || 1,
         folderPath: template.folderPath,
+        instanceFolderPath:
+          instanceFolderPath || initialSubmission?.instanceFolderPath,
         createdAt: initialSubmission?.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         status,
@@ -291,6 +298,8 @@ export function FormRunner({
         config,
       );
 
+      setInstanceFolderPath(result.submission.instanceFolderPath);
+      setValues(result.submission.values);
       setCurrentPdfExports(result.submission.pdfExports || []);
       setLastExportedPdfPath(result.pdfPath);
       setIsDirty(false);
@@ -613,7 +622,6 @@ export function FormRunner({
               onChange={(newVal) => handleFieldChange(field.id, newVal)}
               hasError={hasError}
               disabled={isSaving}
-              onViewMedia={onViewPdf}
             />
           </div>
         );

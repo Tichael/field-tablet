@@ -337,13 +337,38 @@ export async function generateFormSubmissionPdf({
                 doc.setFillColor(255, 255, 255);
                 doc.roundedRect(margin, y, 70, 44, 1.5, 1.5, "FD");
 
+                const maxW = 68;
+                const maxH = 42;
+                let imgW = maxW;
+                let imgH = maxH;
+                let imgX = margin + 1;
+                let imgY = y + 1;
+
+                try {
+                  const props = doc.getImageProperties(imgSrc);
+                  if (props && props.width && props.height) {
+                    const ratio = props.width / props.height;
+                    if (ratio > maxW / maxH) {
+                      imgW = maxW;
+                      imgH = maxW / ratio;
+                      imgY = y + 1 + (maxH - imgH) / 2;
+                    } else {
+                      imgH = maxH;
+                      imgW = maxH * ratio;
+                      imgX = margin + 1 + (maxW - imgW) / 2;
+                    }
+                  }
+                } catch {
+                  // Fallback to bounding box dimensions
+                }
+
                 doc.addImage(
                   imgSrc,
-                  "JPEG",
-                  margin + 1,
-                  y + 1,
-                  68,
-                  42,
+                  undefined as any,
+                  imgX,
+                  imgY,
+                  imgW,
+                  imgH,
                   undefined,
                   "FAST",
                 );
@@ -351,11 +376,14 @@ export async function generateFormSubmissionPdf({
                 doc.setFont("helvetica", "normal");
                 doc.setFontSize(7.5);
                 doc.setTextColor(100, 116, 139);
-                doc.text(`${photoName}${photoSize}`, margin + 74, y + 10);
+                doc.text(`${photoName}${photoSize}`, margin + 74, y + 10, {
+                  maxWidth: contentWidth - 76,
+                });
                 doc.text(
                   `File: ${p.filename || photoName}`,
                   margin + 74,
                   y + 16,
+                  { maxWidth: contentWidth - 76 },
                 );
 
                 y += 48;
@@ -363,7 +391,14 @@ export async function generateFormSubmissionPdf({
                 doc.setFont("helvetica", "italic");
                 doc.setFontSize(8);
                 doc.setTextColor(148, 163, 184);
-                doc.text(`[Photo: ${photoName}${photoSize}]`, margin, y + 4);
+                doc.text(
+                  `[Photo: ${p.filename || photoName}${photoSize}]`,
+                  margin,
+                  y + 4,
+                  {
+                    maxWidth: contentWidth,
+                  },
+                );
                 y += 10;
               }
             } else {
@@ -378,6 +413,7 @@ export async function generateFormSubmissionPdf({
                 `Attached Photo: ${photoName}${photoSize} — Stored in submission folder`,
                 margin + 4,
                 y + 7.5,
+                { maxWidth: contentWidth - 8 },
               );
               y += 15;
             }
@@ -427,17 +463,22 @@ export async function generateFormSubmissionPdf({
             doc.setFont("helvetica", "bold");
             doc.setFontSize(8.5);
             doc.setTextColor(15, 23, 42);
-            doc.text(`[VIDEO] ${videoName} (${videoSize})`, margin + 6, y + 6);
+            doc.text(`[VIDEO] ${videoName} (${videoSize})`, margin + 6, y + 6, {
+              maxWidth: contentWidth - 10,
+            });
 
             doc.setFont("helvetica", "normal");
             doc.setFontSize(7.5);
             doc.setTextColor(71, 85, 105);
-            doc.text(`Path on Share: /${videoPath}`, margin + 6, y + 11);
+            doc.text(`Path on Share: /${videoPath}`, margin + 6, y + 11, {
+              maxWidth: contentWidth - 10,
+            });
             doc.setTextColor(100, 116, 139);
             doc.text(
               "Co-located in this submission folder. Open in app or play with media player.",
               margin + 6,
               y + 15.5,
+              { maxWidth: contentWidth - 10 },
             );
 
             y += 22;

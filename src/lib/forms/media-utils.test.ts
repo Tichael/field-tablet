@@ -31,6 +31,24 @@ describe("media-utils", () => {
       const decoded = atob(result.base64);
       expect(decoded).toBe("hello world content");
     });
+
+    it("should handle larger binary payloads efficiently", async () => {
+      const largeArray = new Uint8Array(100 * 1024); // 100 KB
+      for (let i = 0; i < largeArray.length; i++) {
+        largeArray[i] = i % 256;
+      }
+      const blob = new Blob([largeArray], { type: "application/octet-stream" });
+      const file = new File([blob], "large.bin", {
+        type: "application/octet-stream",
+      });
+
+      const result = await fileToBase64(file);
+      expect(result.size).toBe(100 * 1024);
+      expect(result.base64.length).toBeGreaterThan(0);
+      const decoded = atob(result.base64);
+      expect(decoded.length).toBe(100 * 1024);
+      expect(decoded.charCodeAt(100)).toBe(100);
+    });
   });
 
   describe("optimizePhoto", () => {

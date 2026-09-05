@@ -669,7 +669,8 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                       Standard (2 MP — ~1920×1080) — Fast sync & compact PDFs
                     </SelectItem>
                     <SelectItem value="5mp">
-                      High (5 MP — ~2560×1920) — Sharper details for labels & text
+                      High (5 MP — ~2560×1920) — Sharper details for labels &
+                      text
                     </SelectItem>
                     <SelectItem value="10mp">
                       Ultra (10 MP — ~3648×2736) — Fine inspection & high detail
@@ -680,7 +681,8 @@ export function ConfigEditorScreen({ onClose }: ConfigEditorScreenProps) {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
-                  Limits camera photo resolution on tablets to optimize memory, storage, and SMB sync speeds.
+                  Limits camera photo resolution on tablets to optimize memory,
+                  storage, and SMB sync speeds.
                 </p>
               </div>
             </CardContent>

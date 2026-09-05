@@ -339,27 +339,32 @@ export function FieldInspector({
           {/* Placeholder & Helper Text (for inputs) */}
           {draft.type !== "heading" && draft.type !== "notes" && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {draft.type !== "checkbox" && draft.type !== "signature" && (
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="field-placeholder"
-                    className="text-xs font-semibold"
-                  >
-                    Placeholder Text
-                  </Label>
-                  <Input
-                    id="field-placeholder"
-                    value={draft.placeholder || ""}
-                    onChange={(e) =>
-                      setDraft((prev) =>
-                        prev ? { ...prev, placeholder: e.target.value } : null,
-                      )
-                    }
-                    placeholder="e.g. Enter details..."
-                    className="text-xs"
-                  />
-                </div>
-              )}
+              {draft.type !== "checkbox" &&
+                draft.type !== "signature" &&
+                draft.type !== "photo" &&
+                draft.type !== "video" && (
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="field-placeholder"
+                      className="text-xs font-semibold"
+                    >
+                      Placeholder Text
+                    </Label>
+                    <Input
+                      id="field-placeholder"
+                      value={draft.placeholder || ""}
+                      onChange={(e) =>
+                        setDraft((prev) =>
+                          prev
+                            ? { ...prev, placeholder: e.target.value }
+                            : null,
+                        )
+                      }
+                      placeholder="e.g. Enter details..."
+                      className="text-xs"
+                    />
+                  </div>
+                )}
 
               <div className="space-y-1.5">
                 <Label htmlFor="field-helper" className="text-xs font-semibold">

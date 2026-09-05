@@ -1,10 +1,15 @@
 import { syncManager } from "../sync/sync-manager";
-import type { FormTemplate, FormSubmission, FormAttachment } from "../../types/form";
+import type {
+  FormTemplate,
+  FormSubmission,
+  FormAttachment,
+} from "../../types/form";
 import type { AppConfig } from "../../store/config-store";
 import {
   generateFormSubmissionPdf,
   sanitizeFilenamePart,
 } from "./pdf-generator";
+import { fileToBase64 } from "./media-utils";
 
 export class FormService {
   /**
@@ -441,12 +446,14 @@ export class FormService {
 
     // Determine instance directory: <FormFolder>/Filled Forms/<SubmissionId>
     const instanceFolder =
-      submission.instanceFolderPath || `${filledFormsDir}/${submission.id}`;
+      submission.instanceFolderPath?.trim().replace(/^\/+|\/+$/g, "") ||
+      `${filledFormsDir}/${submission.id}`;
     await adapter.createDirectory(instanceFolder);
 
     // Save and co-locate attachments inside instanceFolder
     const updatedValues = { ...submission.values };
     const allAttachments: FormAttachment[] = [];
+    const valuesForPdf = { ...submission.values };
 
     for (const section of template.sections) {
       for (const field of section.fields) {
@@ -456,21 +463,31 @@ export class FormService {
 
           const rawList: FormAttachment[] = Array.isArray(val) ? val : [val];
           const processedList: FormAttachment[] = [];
+          const pdfList: FormAttachment[] = [];
 
           for (let i = 0; i < rawList.length; i++) {
             const att = { ...rawList[i] };
-            const cleanLabel =
-              sanitizeFilenamePart(field.label) ||
-              (field.type === "photo" ? "Photo" : "Video");
-            const ext =
-              att.type === "video"
-                ? att.name?.split(".").pop() || "mp4"
-                : att.name?.split(".").pop() || "jpg";
+            const cleanFieldId = sanitizeFilenamePart(field.id) || "att";
 
-            // Format human-readable filename e.g. Damage_Inspection_1.jpg, Engine_Sound_1.mp4
+            // Safe extension parsing
+            let ext = att.type === "video" ? "mp4" : "jpg";
+            if (att.name && att.name.includes(".")) {
+              const candidate = att.name.split(".").pop()?.toLowerCase() || "";
+              if (
+                candidate &&
+                candidate.length <= 5 &&
+                /^[a-z0-9]+$/.test(candidate)
+              ) {
+                ext = candidate;
+              }
+            }
+
+            // Format unique filename scoped by field.id
             const targetFilename =
-              att.filename || `${cleanLabel}_${i + 1}.${ext}`;
+              att.filename || `${cleanFieldId}_${i + 1}.${ext}`;
             const targetPath = `${instanceFolder}/${targetFilename}`;
+
+            let inMemoryDataUrl = att.dataUrl;
 
             // If attachment has new dataUrl (pending upload), write binary to disk
             if (att.dataUrl) {
@@ -478,6 +495,31 @@ export class FormService {
               const base64 =
                 commaIdx >= 0 ? att.dataUrl.slice(commaIdx + 1) : att.dataUrl;
               await adapter.saveFile(targetPath, base64, { isBase64: true });
+            } else if (field.type === "photo" && targetPath) {
+              // Existing photo without in-memory dataUrl: rehydrate from disk for PDF snapshot
+              try {
+                if (typeof (adapter as any).readFileBase64 === "function") {
+                  const b64 = await (adapter as any).readFileBase64(targetPath);
+                  inMemoryDataUrl = `data:${att.mimeType || "image/jpeg"};base64,${b64}`;
+                } else {
+                  const fileUrl = await adapter.getFileUrl(targetPath);
+                  if (typeof fetch !== "undefined") {
+                    const res = await fetch(fileUrl);
+                    const blob = await res.blob();
+                    const media = await fileToBase64(
+                      new File([blob], targetFilename, {
+                        type: att.mimeType || "image/jpeg",
+                      }),
+                    );
+                    inMemoryDataUrl = media.dataUrl;
+                  }
+                }
+              } catch (e) {
+                console.warn(
+                  `Could not rehydrate photo for PDF from ${targetPath}:`,
+                  e,
+                );
+              }
             }
 
             // Clean attachment record without large in-memory dataUrl for storage
@@ -488,13 +530,20 @@ export class FormService {
               dataUrl: undefined,
             };
 
+            const pdfAtt: FormAttachment = {
+              ...savedAtt,
+              dataUrl: inMemoryDataUrl,
+            };
+
             processedList.push(savedAtt);
             allAttachments.push(savedAtt);
+            pdfList.push(pdfAtt);
           }
 
           updatedValues[field.id] = Array.isArray(val)
             ? processedList
             : processedList[0];
+          valuesForPdf[field.id] = Array.isArray(val) ? pdfList : pdfList[0];
         }
       }
     }
@@ -505,7 +554,7 @@ export class FormService {
       submission: {
         ...submission,
         instanceFolderPath: instanceFolder,
-        values: submission.values, // keeps in-memory dataUrl for PDF rendering
+        values: valuesForPdf, // contains rehydrated dataUrls for PDF rendering
       },
       config,
       exportDate: now,
@@ -589,6 +638,15 @@ export class FormService {
                   const sub = JSON.parse(text) as FormSubmission;
                   sub.instanceFolderPath = entry.path;
 
+                  // Ensure attachment paths are populated relative to instance directory
+                  if (sub.attachments) {
+                    sub.attachments = sub.attachments.map((att) => ({
+                      ...att,
+                      path:
+                        att.path || `${entry.path}/${att.filename || att.name}`,
+                    }));
+                  }
+
                   // Populate pdfExports from discovered PDFs if empty
                   if (!sub.pdfExports || sub.pdfExports.length === 0) {
                     sub.pdfExports = pdfFiles.map((p) => ({
@@ -602,11 +660,17 @@ export class FormService {
                     submissionMap.set(sub.id, sub);
                   }
                 } catch (e) {
-                  console.warn(`Failed to parse instance submission file ${file.path}:`, e);
+                  console.warn(
+                    `Failed to parse instance submission file ${file.path}:`,
+                    e,
+                  );
                 }
               }
             } catch (e) {
-              console.warn(`Failed to read instance directory ${entry.path}:`, e);
+              console.warn(
+                `Failed to read instance directory ${entry.path}:`,
+                e,
+              );
             }
           } else if (
             !entry.isDirectory &&
@@ -620,7 +684,10 @@ export class FormService {
                 submissionMap.set(sub.id, sub);
               }
             } catch (e) {
-              console.warn(`Failed to parse flat submission file ${entry.path}:`, e);
+              console.warn(
+                `Failed to parse flat submission file ${entry.path}:`,
+                e,
+              );
             }
           }
         }
@@ -662,7 +729,8 @@ export class FormService {
               const files = await adapter.listLocalFiles(entry.path);
               const pdfs = files
                 .filter(
-                  (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+                  (f) =>
+                    !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
                 )
                 .map((f) => ({ name: f.name, path: f.path }));
 

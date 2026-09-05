@@ -24,6 +24,7 @@ export interface StorageAdapter {
   getFileUrl(path: string): Promise<string>;
   getNativeFilePath?(path: string): Promise<string>;
   readFileText(path: string): Promise<string>;
+  readFileBase64?(path: string): Promise<string>;
   verifyPermission(): Promise<boolean>;
   checkConnection?(): Promise<boolean>;
   getPendingUploadsCount?(): Promise<number>;

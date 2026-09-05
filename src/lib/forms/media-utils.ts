@@ -22,10 +22,30 @@ export interface ProcessedMedia {
 export async function fileToBase64(file: File): Promise<ProcessedMedia> {
   const mimeType = file.type || "application/octet-stream";
 
+  // Use native asynchronous FileReader in browser / webview environments
+  if (typeof FileReader !== "undefined") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const commaIdx = dataUrl.indexOf(",");
+        const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
+        resolve({
+          base64,
+          dataUrl,
+          mimeType,
+          size: file.size,
+        });
+      };
+      reader.onerror = (e) => reject(e);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Node / test environment fallback
   if (typeof file.arrayBuffer === "function") {
     const arrayBuffer = await file.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
-    let base64 = "";
 
     const maybeBuffer = (
       globalThis as unknown as {
@@ -34,15 +54,26 @@ export async function fileToBase64(file: File): Promise<ProcessedMedia> {
     ).Buffer;
 
     if (maybeBuffer) {
-      base64 = maybeBuffer.from(bytes).toString("base64");
-    } else {
-      let binary = "";
-      const len = bytes.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      base64 = btoa(binary);
+      const base64 = maybeBuffer.from(bytes).toString("base64");
+      return {
+        base64,
+        dataUrl: `data:${mimeType};base64,${base64}`,
+        mimeType,
+        size: file.size,
+      };
     }
+
+    // Chunked conversion fallback to prevent stack overflow and thread lockup
+    let binary = "";
+    const len = bytes.byteLength;
+    const chunkSize = 0x8000;
+    for (let i = 0; i < len; i += chunkSize) {
+      binary += String.fromCharCode.apply(
+        null,
+        bytes.subarray(i, Math.min(i + chunkSize, len)) as unknown as number[],
+      );
+    }
+    const base64 = btoa(binary);
 
     return {
       base64,
@@ -52,22 +83,7 @@ export async function fileToBase64(file: File): Promise<ProcessedMedia> {
     };
   }
 
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const commaIdx = dataUrl.indexOf(",");
-      const base64 = commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl;
-      resolve({
-        base64,
-        dataUrl,
-        mimeType: file.type || "application/octet-stream",
-        size: file.size,
-      });
-    };
-    reader.onerror = (e) => reject(e);
-    reader.readAsDataURL(file);
-  });
+  throw new Error("No supported file reader found in this environment");
 }
 
 /**
@@ -113,6 +129,10 @@ export async function optimizePhoto(
         fileToBase64(file).then(resolve).catch(reject);
         return;
       }
+
+      // Fill white background to prevent transparent PNG/WebP turning black in JPEG
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, width, height);
 
       ctx.drawImage(img, 0, 0, width, height);
 

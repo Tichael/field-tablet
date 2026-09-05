@@ -462,9 +462,7 @@ describe("pdf-generator", () => {
         exportDate: new Date(2026, 8, 5, 10, 0, 0),
       });
 
-      expect(result.filename).toBe(
-        "Site_Inspection_2026-09-05_100000.pdf",
-      );
+      expect(result.filename).toBe("Site_Inspection_2026-09-05_100000.pdf");
       const pdfRaw = atob(result.base64);
       expect(pdfRaw.startsWith("%PDF")).toBe(true);
 
@@ -477,6 +475,85 @@ describe("pdf-generator", () => {
 
       // Verify photo filename appears
       expect(pdfRaw).toContain("Damage_Photo_1.jpg");
+    });
+
+    it("should handle long photo and video names with maxWidth wrapping without error", async () => {
+      const mediaTemplate: FormTemplate = {
+        id: "site-inspection-long",
+        title: "Site Inspection Long",
+        version: 1,
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-01T00:00:00.000Z",
+        folderPath: "Inspections/Site Inspection",
+        sections: [
+          {
+            id: "sec1",
+            title: "Media",
+            fields: [
+              {
+                id: "damage_photo",
+                type: "photo",
+                label: "Damage Photo",
+              },
+              {
+                id: "engine_video",
+                type: "video",
+                label: "Engine Video",
+              },
+            ],
+          },
+        ],
+      };
+
+      const tinyJpeg =
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=";
+
+      const submission: FormSubmission = {
+        id: "Long_Name_Sub_1",
+        templateId: mediaTemplate.id,
+        templateTitle: mediaTemplate.title,
+        templateVersion: 1,
+        folderPath: mediaTemplate.folderPath,
+        createdAt: "2026-09-05T10:00:00.000Z",
+        updatedAt: "2026-09-05T10:00:00.000Z",
+        status: "completed",
+        values: {
+          damage_photo: {
+            id: "p1",
+            name: "Extremely_Long_Photo_Filename_Describing_The_Full_Crack_Measurement_On_Northern_Facade_Section_4.jpg",
+            filename:
+              "Extremely_Long_Photo_Filename_Describing_The_Full_Crack_Measurement_On_Northern_Facade_Section_4.jpg",
+            path: "Inspections/Site Inspection/Filled Forms/Long_Name_Sub_1/damage_photo_1.jpg",
+            type: "photo",
+            mimeType: "image/jpeg",
+            size: 204800,
+            uploadedAt: "2026-09-05T10:00:00.000Z",
+            dataUrl: tinyJpeg,
+          },
+          engine_video: {
+            id: "v1",
+            name: "Extremely_Long_Video_Filename_Recording_Unusual_Vibration_Noise_From_Secondary_Bearing.mp4",
+            filename: "engine_video_1.mp4",
+            path: "Inspections/Site Inspection/Filled Forms/Long_Name_Sub_1/engine_video_1.mp4",
+            type: "video",
+            mimeType: "video/mp4",
+            size: 15728640,
+            uploadedAt: "2026-09-05T10:00:00.000Z",
+          },
+        },
+        pdfExports: [],
+      };
+
+      const result = await generateFormSubmissionPdf({
+        template: mediaTemplate,
+        submission,
+        config: sampleConfig,
+        exportDate: new Date(2026, 8, 5, 10, 0, 0),
+      });
+
+      expect(result.base64).toBeDefined();
+      const pdfRaw = atob(result.base64);
+      expect(pdfRaw.startsWith("%PDF")).toBe(true);
     });
   });
 });

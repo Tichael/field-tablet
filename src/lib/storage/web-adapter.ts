@@ -187,4 +187,51 @@ export class WebStorageAdapter implements StorageAdapter {
       throw e;
     }
   }
+
+  async readFileBase64(path: string): Promise<string> {
+    try {
+      const parts = path.split("/").filter((p) => p);
+      const fileName = parts.pop();
+      if (!fileName) throw new Error("Invalid file path");
+
+      const dirPath = parts.join("/");
+      const dirHandle = await this.getHandleFromPath(dirPath);
+
+      // @ts-ignore
+      const fileHandle = await dirHandle.getFileHandle(fileName);
+      const file = await fileHandle.getFile();
+
+      if (typeof FileReader !== "undefined") {
+        return new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const dataUrl = reader.result as string;
+            const commaIdx = dataUrl.indexOf(",");
+            resolve(commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = "";
+      const len = bytes.byteLength;
+      const chunkSize = 0x8000;
+      for (let i = 0; i < len; i += chunkSize) {
+        binary += String.fromCharCode.apply(
+          null,
+          bytes.subarray(
+            i,
+            Math.min(i + chunkSize, len),
+          ) as unknown as number[],
+        );
+      }
+      return btoa(binary);
+    } catch (e) {
+      console.error("Failed to read file as base64", e);
+      throw e;
+    }
+  }
 }
