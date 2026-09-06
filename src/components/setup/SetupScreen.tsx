@@ -54,6 +54,7 @@ export function SetupScreen() {
 
   const [smbHost, setSmbHost] = useState("");
   const [smbShare, setSmbShare] = useState("");
+  const [smbPath, setSmbPath] = useState("");
   const [smbDomain, setSmbDomain] = useState("");
   const [smbUser, setSmbUser] = useState("");
   const [smbPass, setSmbPass] = useState("");
@@ -83,13 +84,29 @@ export function SetupScreen() {
 
   const handleNativeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    let cleanShare = smbShare.trim();
+    let cleanSubfolder = smbPath.trim().replace(/^[/\\\\]+|[/\\\\]+$/g, "");
+    if (cleanShare.includes("/") || cleanShare.includes("\\")) {
+      const parts = cleanShare.split(/[/\\\\]/).filter(Boolean);
+      if (parts.length > 0) {
+        cleanShare = parts[0];
+        const extra = parts.slice(1).join("/");
+        if (extra) {
+          cleanSubfolder = cleanSubfolder
+            ? `${extra}/${cleanSubfolder}`
+            : extra;
+        }
+      }
+    }
+
     try {
       const success = await syncManager.configure({
-        host: smbHost,
-        share: smbShare,
-        domain: smbDomain,
-        username: smbUser,
+        host: smbHost.trim(),
+        share: cleanShare,
+        domain: smbDomain.trim(),
+        username: smbUser.trim(),
         password: smbPass,
+        rootPath: cleanSubfolder,
       });
       if (!success) {
         alert(t("setup.smbConnectionError"));
@@ -187,7 +204,7 @@ export function SetupScreen() {
 
   if (step === 2) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4 pt-[calc(var(--sat-native,env(safe-area-inset-top,0px))+1rem)]">
         <div className="max-w-2xl w-full bg-background rounded-xl shadow-lg border p-8 space-y-6 flex flex-col h-[80vh]">
           {renderLanguagePicker()}
           <div className="relative flex items-center justify-center shrink-0">
@@ -230,6 +247,10 @@ export function SetupScreen() {
                 placeholder={t("setup.newConfigPlaceholder")}
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="off"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
@@ -260,7 +281,7 @@ export function SetupScreen() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-muted/30 p-4 pt-[calc(var(--sat-native,env(safe-area-inset-top,0px))+1rem)]">
       <div className="max-w-md w-full bg-background rounded-xl shadow-lg border p-8 space-y-6">
         {renderLanguagePicker()}
         <div className="text-center">
@@ -318,6 +339,10 @@ export function SetupScreen() {
               placeholder={t("setup.smbHost")}
               value={smbHost}
               onChange={(e) => setSmbHost(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
               required
             />
             <Input
@@ -325,19 +350,41 @@ export function SetupScreen() {
               placeholder={t("setup.shareName")}
               value={smbShare}
               onChange={(e) => setSmbShare(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
               required
+            />
+            <Input
+              type="text"
+              placeholder={`${t("setup.subfolder")} (${t("setup.subfolderPlaceholder")})`}
+              value={smbPath}
+              onChange={(e) => setSmbPath(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
             />
             <Input
               type="text"
               placeholder={t("setup.domain")}
               value={smbDomain}
               onChange={(e) => setSmbDomain(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="off"
             />
             <Input
               type="text"
               placeholder={t("setup.username")}
               value={smbUser}
               onChange={(e) => setSmbUser(e.target.value)}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="username"
               required
             />
             <Input
@@ -345,6 +392,7 @@ export function SetupScreen() {
               placeholder={t("setup.password")}
               value={smbPass}
               onChange={(e) => setSmbPass(e.target.value)}
+              autoComplete="current-password"
               required
             />
             <Button

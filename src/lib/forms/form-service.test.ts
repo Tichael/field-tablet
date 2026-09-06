@@ -90,13 +90,17 @@ class MockStorageAdapter implements StorageAdapter {
     this.files.set(cleanPath, { content, isBase64: options?.isBase64 });
     const parts = cleanPath.split("/");
     parts.pop();
-    if (parts.length > 0) {
-      this.dirs.add(parts.join("/"));
+    for (let i = 1; i <= parts.length; i++) {
+      this.dirs.add(parts.slice(0, i).join("/"));
     }
   }
 
   async createDirectory(path: string) {
-    this.dirs.add(path.trim().replace(/^\/+|\/+$/g, ""));
+    const clean = path.trim().replace(/^\/+|\/+$/g, "");
+    const parts = clean.split("/");
+    for (let i = 1; i <= parts.length; i++) {
+      this.dirs.add(parts.slice(0, i).join("/"));
+    }
   }
 
   async listLocalFiles(dirPath: string): Promise<FileInfo[]> {
@@ -915,6 +919,131 @@ describe("FormService", () => {
       // Verify second PDF re-hydrated the photo from disk (filename appears in PDF)
       const updatePdfRaw = atob(updatePdfFile!.content);
       expect(updatePdfRaw).toContain("damage_photo_1.jpg");
+    });
+
+    it("should support localized filled forms directory for French language and forms in folders with spaces", () => {
+      return (async () => {
+        const frenchConfig: AppConfig = {
+          theme: { primaryColor: "#0f172a", darkMode: "system" },
+          branding: { appTitle: "Tablette de terrain" },
+          language: "fr-CA",
+        };
+
+        const spacesTemplate: FormTemplate = {
+          ...TEST_REPORT_TEMPLATE,
+          id: "daily-inspection",
+          title: "Inspection quotidienne",
+          folderPath: "Rapports Quotidiens/Contrôle de Sécurité",
+        };
+
+        const sub: FormSubmission = {
+          id: "sub_fr_101",
+          templateId: spacesTemplate.id,
+          templateTitle: spacesTemplate.title,
+          templateVersion: 1,
+          folderPath: spacesTemplate.folderPath,
+          status: "completed",
+          createdAt: "2026-09-06T10:00:00.000Z",
+          updatedAt: "2026-09-06T10:00:00.000Z",
+          values: {
+            work_date: "2026-09-06",
+            shift: "day",
+            supervisor_name: "Jean Dupont",
+            work_completed: "Inspection terminée sans anomalie.",
+          },
+          pdfExports: [],
+        };
+
+        const result = await formService.saveSubmissionAndExportPdf(
+          spacesTemplate,
+          sub,
+          frenchConfig,
+        );
+
+        // Verify folder path has spaces and uses "Formulaires remplis"
+        expect(result.submission.instanceFolderPath).toBe(
+          "Rapports Quotidiens/Contrôle de Sécurité/Formulaires remplis/sub_fr_101",
+        );
+        expect(result.pdfPath).toContain(
+          "Rapports Quotidiens/Contrôle de Sécurité/Formulaires remplis/sub_fr_101",
+        );
+
+        // Verify discoverForms ignores "Formulaires remplis"
+        const discovered = await formService.discoverForms([
+          "Rapports Quotidiens",
+        ]);
+        expect(discovered.length).toBe(1);
+        expect(discovered[0].id).toBe("daily-inspection");
+
+        // Verify listSubmissions reads the French localized submission
+        const subs = await formService.listSubmissions(
+          "Rapports Quotidiens/Contrôle de Sécurité",
+        );
+        expect(subs.length).toBe(1);
+        expect(subs[0].id).toBe("sub_fr_101");
+      })();
+    });
+
+    it("should seamlessly discover submissions from both 'Filled Forms' and 'Formulaires remplis'", () => {
+      return (async () => {
+        const folder = "MixedLang/FormFolder";
+        await mockAdapter.createDirectory(folder);
+
+        // English submission in "Filled Forms"
+        const enDir = `${folder}/Filled Forms/en_sub_1`;
+        await mockAdapter.createDirectory(enDir);
+        await mockAdapter.saveFile(
+          `${enDir}/submission.json`,
+          JSON.stringify({
+            id: "en_sub_1",
+            templateId: "mixed-form",
+            status: "completed",
+            createdAt: "2026-09-01T10:00:00.000Z",
+            values: { title: "English Submission" },
+          }),
+        );
+
+        // French submission in "Formulaires remplis"
+        const frDir = `${folder}/Formulaires remplis/fr_sub_2`;
+        await mockAdapter.createDirectory(frDir);
+        await mockAdapter.saveFile(
+          `${frDir}/submission.json`,
+          JSON.stringify({
+            id: "fr_sub_2",
+            templateId: "mixed-form",
+            status: "completed",
+            createdAt: "2026-09-02T10:00:00.000Z",
+            values: { title: "Soumission Française" },
+          }),
+        );
+
+        const subs = await formService.listSubmissions(folder);
+        expect(subs.length).toBe(2);
+        const ids = subs.map((s) => s.id);
+        expect(ids).toContain("en_sub_1");
+        expect(ids).toContain("fr_sub_2");
+      })();
+    });
+
+    it("should never return leading slash when resolving filled forms directories with empty or root path", async () => {
+      const enDir = await formService.resolveFilledFormsDir("", "en");
+      expect(enDir).toBe("Filled Forms");
+      expect(enDir.startsWith("/")).toBe(false);
+
+      const frDir = await formService.resolveFilledFormsDir(" / ", "fr-CA");
+      expect(frDir).toBe("Formulaires remplis");
+      expect(frDir.startsWith("/")).toBe(false);
+
+      const enList = await formService.getExistingFilledFormsDirs("", "en");
+      expect(enList).toEqual(["Filled Forms"]);
+      expect(enList[0].startsWith("/")).toBe(false);
+
+      const frList = await formService.getExistingFilledFormsDirs(
+        " / ",
+        "fr-CA",
+      );
+      expect(frList).toEqual(["Formulaires remplis"]);
+      expect(frList[0].startsWith("/")).toBe(false);
     });
   });
 });

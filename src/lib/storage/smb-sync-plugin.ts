@@ -8,6 +8,7 @@ export interface SmbSyncPlugin {
     username?: string;
     password?: string;
     domain?: string;
+    rootPath?: string;
   }): Promise<{ success: boolean }>;
 
   startBackgroundSync(options?: {
@@ -49,6 +50,7 @@ export interface SmbSyncPlugin {
   getFileUrl(options: { path: string }): Promise<{ url: string }>;
   readFileText(options: { path: string }): Promise<{ content: string }>;
   checkConnection(): Promise<{ connected: boolean; error?: string }>;
+  setStatusBarStyle(options: { light: boolean }): Promise<{ success: boolean }>;
 }
 
 export const SmbSync = registerPlugin<SmbSyncPlugin>("SmbSync");

@@ -54,6 +54,26 @@ export function sanitizeFilenamePart(text: string): string {
 }
 
 /**
+ * Sanitize form folder paths while allowing spaces within folder and subfolder names.
+ * Cleans illegal filesystem/SMB characters and ensures valid segment boundaries.
+ */
+export function sanitizeFormFolderPath(text?: string): string {
+  return (text || "")
+    .split(/[/\\\\]/)
+    .map((segment) =>
+      segment
+        .trim()
+        .replace(/[/\\:*?"<>|#%&`'$;{}@^~!=+()[\]]/g, "")
+        .replace(/[ \t]+/g, " ")
+        .trim()
+        .replace(/^\.+|\.+$/g, "")
+        .trim(),
+    )
+    .filter(Boolean)
+    .join("/");
+}
+
+/**
  * Generates a clean, dated PDF filename without cryptic UUIDs.
  * Example: Daily_Report_2026-09-03_143000.pdf
  * Or with identifier: Equipment_Check_Unit-402_2026-09-03_143000.pdf

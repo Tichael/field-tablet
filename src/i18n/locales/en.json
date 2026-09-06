@@ -87,6 +87,8 @@
     "selectMainFolderDesc": "Please make sure to select the main, top-level folder of your server drive. If you select a sub-folder, the paths might not match and the app may not work correctly on other devices.",
     "smbHost": "SMB Host (e.g. 192.168.1.10)",
     "shareName": "Share Name",
+    "subfolder": "Root Folder / Subfolder (Optional)",
+    "subfolderPlaceholder": "e.g. FieldTablet or Projects/Tablet1",
     "domain": "Domain (Optional)",
     "username": "Username",
     "password": "Password",

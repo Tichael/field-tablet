@@ -1,4 +1,6 @@
 import type { AppConfig } from "../store/config-store";
+import { Capacitor } from "@capacitor/core";
+import { SmbSync } from "./storage/smb-sync-plugin";
 
 /**
  * Checks if the given hex color is the default monochrome/dark slate theme.
@@ -171,6 +173,9 @@ export function applyTheme(theme: AppConfig["theme"]) {
       html.classList.remove("dark");
     }
     updateColors(isDark);
+    if (Capacitor.isNativePlatform()) {
+      SmbSync.setStatusBarStyle({ light: !isDark }).catch(() => {});
+    }
   };
 
   const cleanupVars = () => {
@@ -179,6 +184,9 @@ export function applyTheme(theme: AppConfig["theme"]) {
     html.style.removeProperty("--primary-foreground");
     html.style.removeProperty("--color-primary-foreground");
     html.classList.remove("dark");
+    if (Capacitor.isNativePlatform()) {
+      SmbSync.setStatusBarStyle({ light: true }).catch(() => {});
+    }
   };
 
   if (theme.darkMode === "system") {

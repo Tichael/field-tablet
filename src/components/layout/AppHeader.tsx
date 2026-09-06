@@ -40,6 +40,7 @@ export function AppHeader({
     <header
       className={cn(
         "border-b bg-background/95 backdrop-blur-md text-foreground shadow-xs z-20 shrink-0",
+        "pt-[var(--sat-native,env(safe-area-inset-top,0px))]",
         sticky && "sticky top-0",
         className,
       )}

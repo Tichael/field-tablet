@@ -33,14 +33,28 @@ public class SmbService {
         this.context = context;
     }
 
+    public static String resolveSmbPath(String rootPath, String relativePath) {
+        String cleanRoot = (rootPath == null) ? "" : rootPath.trim().replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "");
+        String cleanRel = (relativePath == null) ? "" : relativePath.trim().replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "");
+        if (cleanRoot.isEmpty()) return cleanRel;
+        if (cleanRel.isEmpty()) return cleanRoot;
+        return cleanRoot + "\\" + cleanRel;
+    }
+
     public void testConnection(String host, String shareName, String username, String password, String domain) throws Exception {
+        testConnection(host, shareName, username, password, domain, "");
+    }
+
+    public void testConnection(String host, String shareName, String username, String password, String domain, String rootPath) throws Exception {
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
             AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
-                // Connection successful
+                if (rootPath != null && !rootPath.trim().isEmpty()) {
+                    ensureDirectoriesExist(share, rootPath);
+                }
             }
         } finally {
             client.close();
@@ -48,6 +62,10 @@ public class SmbService {
     }
 
     public JSONArray listRemoteFiles(String host, String shareName, String username, String password, String domain, String path) throws Exception {
+        return listRemoteFiles(host, shareName, username, password, domain, "", path);
+    }
+
+    public JSONArray listRemoteFiles(String host, String shareName, String username, String password, String domain, String rootPath, String path) throws Exception {
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
@@ -57,7 +75,7 @@ public class SmbService {
                 
                 JSONArray result = new JSONArray();
                 try {
-                    String smbPath = (path == null) ? "" : path.replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "");
+                    String smbPath = resolveSmbPath(rootPath, path);
                     List<FileIdBothDirectoryInformation> files = share.list(smbPath);
                     for (FileIdBothDirectoryInformation fileInfo : files) {
                         String fileName = fileInfo.getFileName();
@@ -151,6 +169,10 @@ public class SmbService {
     }
 
     public int flushPendingUploads(String host, String shareName, String username, String password, String domain) {
+        return flushPendingUploads(host, shareName, username, password, domain, "");
+    }
+
+    public int flushPendingUploads(String host, String shareName, String username, String password, String domain, String rootPath) {
         List<String> pending = getPendingUploads();
         if (pending.isEmpty()) return 0;
 
@@ -174,7 +196,7 @@ public class SmbService {
                         bytesRead += r;
                     }
                 }
-                uploadFileBytes(host, shareName, username, password, domain, path, bytes);
+                uploadFileBytes(host, shareName, username, password, domain, rootPath, path, bytes);
                 Log.i(TAG, "Successfully uploaded pending file: " + path);
                 successfulUploads.add(path);
             } catch (Exception e) {
@@ -191,9 +213,13 @@ public class SmbService {
     }
 
     public void syncFiles(String host, String shareName, String username, String password, String domain, List<String> syncFolders, String configFile) throws Exception {
+        syncFiles(host, shareName, username, password, domain, "", syncFolders, configFile);
+    }
+
+    public void syncFiles(String host, String shareName, String username, String password, String domain, String rootPath, List<String> syncFolders, String configFile) throws Exception {
         // Flush any offline uploads first before pulling remote changes
         try {
-            flushPendingUploads(host, shareName, username, password, domain);
+            flushPendingUploads(host, shareName, username, password, domain, rootPath);
         } catch (Exception e) {
             Log.w(TAG, "Could not flush pending uploads during sync: " + e.getMessage());
         }
@@ -216,7 +242,8 @@ public class SmbService {
 
                 if (configFile != null && !configFile.isEmpty()) {
                     try {
-                        downloadFile(share, configFile, configFile);
+                        String remoteConfigPath = resolveSmbPath(rootPath, configFile);
+                        downloadFile(share, remoteConfigPath, configFile);
                     } catch (SMBApiException e) {
                         if (e.getStatusCode() == 0xC0000034) { // STATUS_OBJECT_NAME_NOT_FOUND
                             Log.w(TAG, "Config file does not exist on remote share yet: " + configFile);
@@ -228,8 +255,13 @@ public class SmbService {
                     if (localConfigFile.exists()) {
                         try (java.io.FileInputStream fis = new java.io.FileInputStream(localConfigFile)) {
                             byte[] data = new byte[(int) localConfigFile.length()];
-                            fis.read(data);
-                            String content = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                            int bytesRead = 0;
+                            while (bytesRead < data.length) {
+                                int r = fis.read(data, bytesRead, data.length - bytesRead);
+                                if (r == -1) break;
+                                bytesRead += r;
+                            }
+                            String content = new String(data, 0, bytesRead, java.nio.charset.StandardCharsets.UTF_8);
                             JSONObject configJson = new JSONObject(content);
                             if (configJson.has("syncFolders")) {
                                 JSONArray arr = configJson.getJSONArray("syncFolders");
@@ -268,13 +300,14 @@ public class SmbService {
                     }
                 } else {
                     // Sync json in root if no config folder specified
-                    syncRootConfig(share);
+                    syncRootConfig(share, rootPath);
                 }
 
                 if (effectiveSyncFolders != null) {
                     for (String folder : effectiveSyncFolders) {
                         try {
-                            syncDirectory(share, folder, folder);
+                            String remoteFolder = resolveSmbPath(rootPath, folder);
+                            syncDirectory(share, remoteFolder, folder);
                         } catch (Exception e) {
                             Log.w(TAG, "Could not sync folder: " + folder + ", skipping", e);
                         }
@@ -286,26 +319,37 @@ public class SmbService {
         }
     }
 
-    private void syncRootConfig(DiskShare share) throws Exception {
-        List<FileIdBothDirectoryInformation> files = share.list("", "*.json");
+    private void syncRootConfig(DiskShare share, String rootPath) throws Exception {
+        String remoteDir = resolveSmbPath(rootPath, "");
+        List<FileIdBothDirectoryInformation> files;
+        try {
+            files = share.list(remoteDir, "*.json");
+        } catch (SMBApiException e) {
+            if (e.getStatusCode() == 0xC0000034) { // STATUS_OBJECT_NAME_NOT_FOUND
+                return;
+            }
+            throw e;
+        }
         for (FileIdBothDirectoryInformation fileInfo : files) {
             String fileName = fileInfo.getFileName();
             if (fileName.equals(".") || fileName.equals("..")) continue;
-            downloadFile(share, fileName, fileName);
+            String remoteFilePath = resolveSmbPath(rootPath, fileName);
+            downloadFile(share, remoteFilePath, fileName);
         }
     }
 
     private void syncDirectory(DiskShare share, String smbPath, String localSubPath) throws Exception {
+        String cleanSmbPath = smbPath.replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "").trim();
         List<FileIdBothDirectoryInformation> files;
         try {
-            files = share.list(smbPath.replace("/", "\\"));
+            files = share.list(cleanSmbPath);
         } catch (SMBApiException e) {
             if (e.getStatusCode() == 0xC0000034) {
                 try {
-                    ensureDirectoriesExist(share, smbPath.replace("/", "\\"));
-                    files = share.list(smbPath.replace("/", "\\"));
+                    ensureDirectoriesExist(share, cleanSmbPath);
+                    files = share.list(cleanSmbPath);
                 } catch (Exception createEx) {
-                    Log.w(TAG, "Remote folder does not exist on share and could not be created: " + smbPath);
+                    Log.w(TAG, "Remote folder does not exist on share and could not be created: " + cleanSmbPath);
                     return;
                 }
             } else {
@@ -323,8 +367,8 @@ public class SmbService {
             if (fileName.equals(".") || fileName.equals("..")) continue;
 
             boolean isDirectory = (fileInfo.getFileAttributes() & 0x10) == 0x10;
-            String childSmbPath = smbPath + "\\" + fileName;
-            String childLocalPath = localSubPath + "/" + fileName;
+            String childSmbPath = cleanSmbPath.isEmpty() ? fileName : (cleanSmbPath + "\\" + fileName);
+            String childLocalPath = localSubPath.isEmpty() ? fileName : (localSubPath + "/" + fileName);
 
             if (isDirectory) {
                 syncDirectory(share, childSmbPath, childLocalPath);
@@ -335,24 +379,32 @@ public class SmbService {
     }
 
     public void uploadFile(String host, String shareName, String username, String password, String domain, String path, String content) throws Exception {
-        uploadFileBytes(host, shareName, username, password, domain, path, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        uploadFile(host, shareName, username, password, domain, "", path, content);
+    }
+
+    public void uploadFile(String host, String shareName, String username, String password, String domain, String rootPath, String path, String content) throws Exception {
+        uploadFileBytes(host, shareName, username, password, domain, rootPath, path, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     public void uploadFileBytes(String host, String shareName, String username, String password, String domain, String path, byte[] data) throws Exception {
+        uploadFileBytes(host, shareName, username, password, domain, "", path, data);
+    }
+
+    public void uploadFileBytes(String host, String shareName, String username, String password, String domain, String rootPath, String path, byte[] data) throws Exception {
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
             AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
-                String smbPath = path.replace("/", "\\");
-                int lastSlash = smbPath.lastIndexOf('\\');
+                String fullSmbPath = resolveSmbPath(rootPath, path);
+                int lastSlash = fullSmbPath.lastIndexOf('\\');
                 if (lastSlash > 0) {
-                    String parentSmbDir = smbPath.substring(0, lastSlash);
+                    String parentSmbDir = fullSmbPath.substring(0, lastSlash);
                     ensureDirectoriesExist(share, parentSmbDir);
                 }
 
-                try (File smbFile = share.openFile(smbPath, 
+                try (File smbFile = share.openFile(fullSmbPath, 
                         EnumSet.of(AccessMask.GENERIC_WRITE),
                         null,
                         SMB2ShareAccess.ALL,
@@ -370,13 +422,18 @@ public class SmbService {
     }
 
     public void createDirectory(String host, String shareName, String username, String password, String domain, String path) throws Exception {
+        createDirectory(host, shareName, username, password, domain, "", path);
+    }
+
+    public void createDirectory(String host, String shareName, String username, String password, String domain, String rootPath, String path) throws Exception {
         SMBClient client = new SMBClient();
         try (Connection connection = client.connect(host)) {
             String actualDomain = (domain != null && !domain.isEmpty()) ? domain : null;
             AuthenticationContext ac = new AuthenticationContext(username, password.toCharArray(), actualDomain);
             Session session = connection.authenticate(ac);
             try (DiskShare share = (DiskShare) session.connectShare(shareName)) {
-                ensureDirectoriesExist(share, path);
+                String fullPath = resolveSmbPath(rootPath, path);
+                ensureDirectoriesExist(share, fullPath);
             }
         } finally {
             client.close();
@@ -387,11 +444,12 @@ public class SmbService {
         String[] parts = path.split("[/\\\\]");
         StringBuilder current = new StringBuilder();
         for (String part : parts) {
-            if (part.isEmpty()) continue;
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
             if (current.length() > 0) {
                 current.append("\\");
             }
-            current.append(part);
+            current.append(trimmed);
             String subPath = current.toString();
             try {
                 if (!share.folderExists(subPath)) {

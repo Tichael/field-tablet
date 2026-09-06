@@ -5,7 +5,8 @@ import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { useTranslation } from "react-i18next";
-import { sanitizeFilenamePart } from "../../../lib/forms/pdf-generator";
+import { sanitizeFormFolderPath } from "../../../lib/forms/pdf-generator";
+import { getLocalizedFilledFormsDirName } from "../../../lib/forms/form-service";
 import { GenericFileBrowser } from "../../documents/GenericFileBrowser";
 import { AppDialog } from "../../ui/app-dialog";
 import {
@@ -37,9 +38,9 @@ export function TemplateSaveDialog({
   // Direct folder path
   const [folderPath, setFolderPath] = useState<string>(() => {
     if (template.folderPath) {
-      return template.folderPath.trim().replace(/^\/+|\/+$/g, "");
+      return sanitizeFormFolderPath(template.folderPath);
     }
-    return sanitizeFilenamePart(template.title) || "Custom Form";
+    return sanitizeFormFolderPath(template.title) || "Custom Form";
   });
 
   const [isFolderManuallyEdited, setIsFolderManuallyEdited] = useState(false);
@@ -55,10 +56,10 @@ export function TemplateSaveDialog({
     setCategory(template.category || "");
 
     if (template.folderPath) {
-      setFolderPath(template.folderPath.trim().replace(/^\/+|\/+$/g, ""));
+      setFolderPath(sanitizeFormFolderPath(template.folderPath));
       setIsFolderManuallyEdited(true);
     } else {
-      setFolderPath(sanitizeFilenamePart(template.title) || "Custom Form");
+      setFolderPath(sanitizeFormFolderPath(template.title) || "Custom Form");
       setIsFolderManuallyEdited(false);
     }
     setError(null);
@@ -66,7 +67,7 @@ export function TemplateSaveDialog({
 
   if (!isOpen) return null;
 
-  const targetFolder = folderPath.trim().replace(/^\/+|\/+$/g, "");
+  const targetFolder = sanitizeFormFolderPath(folderPath);
 
   const handleConfirmSave = async () => {
     if (!title.trim()) {
@@ -188,7 +189,7 @@ export function TemplateSaveDialog({
                 setTitle(newTitle);
                 if (!template.folderPath && !isFolderManuallyEdited) {
                   setFolderPath(
-                    sanitizeFilenamePart(newTitle) || "Custom Form",
+                    sanitizeFormFolderPath(newTitle) || "Custom Form",
                   );
                 }
               }}
@@ -246,6 +247,10 @@ export function TemplateSaveDialog({
                     setFolderPath(e.target.value);
                     setIsFolderManuallyEdited(true);
                   }}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="off"
                   placeholder={t("editor.saveDialog.folderPathPlaceholder")}
                   className="font-mono text-xs pl-6"
                 />
@@ -282,7 +287,7 @@ export function TemplateSaveDialog({
                 <div>
                   {t("editor.saveDialog.submissionsPathLabel")}{" "}
                   <span className="text-foreground">
-                    /{targetFolder || "..."}/Filled Forms/
+                    /{targetFolder || "..."}/{getLocalizedFilledFormsDirName()}/
                   </span>
                 </div>
               </div>

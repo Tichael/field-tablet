@@ -2,6 +2,8 @@ package com.tichael.fieldtablet;
 
 import android.util.Log;
 
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -28,6 +30,10 @@ public class SmbSyncPlugin extends Plugin {
     private static final String TAG = "SmbSyncPlugin";
     private static final String WORK_NAME = "SmbSyncWork";
 
+    private String cleanRelativePath(String path) {
+        return (path == null) ? "" : path.replace("\\", "/").replaceAll("^/+", "");
+    }
+
     @PluginMethod
     public void configure(PluginCall call) {
         String host = call.getString("host");
@@ -35,6 +41,7 @@ public class SmbSyncPlugin extends Plugin {
         String user = call.getString("username");
         String pass = call.getString("password");
         String domain = call.getString("domain", "");
+        String rootPath = call.getString("rootPath", "");
 
         if (host == null || share == null || user == null || pass == null) {
             call.reject("Missing required parameters");
@@ -44,7 +51,7 @@ public class SmbSyncPlugin extends Plugin {
         new Thread(() -> {
             try {
                 SmbService smbService = new SmbService(getContext());
-                smbService.testConnection(host, share, user, pass, domain);
+                smbService.testConnection(host, share, user, pass, domain, rootPath);
 
                 SecureStorage storage = new SecureStorage(getContext());
                 storage.saveString("smb_host", host);
@@ -52,6 +59,7 @@ public class SmbSyncPlugin extends Plugin {
                 storage.saveString("smb_user", user);
                 storage.saveString("smb_pass", pass);
                 storage.saveString("smb_domain", domain);
+                storage.saveString("smb_root_path", rootPath != null ? rootPath.trim() : "");
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -140,6 +148,7 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host == null || share == null || user == null || pass == null) {
                     call.reject("SMB not configured");
@@ -147,7 +156,7 @@ public class SmbSyncPlugin extends Plugin {
                 }
 
                 SmbService smbService = new SmbService(getContext());
-                smbService.syncFiles(host, share, user, pass, domain, syncFolders, configFile);
+                smbService.syncFiles(host, share, user, pass, domain, rootPath, syncFolders, configFile);
                 int pendingCount = smbService.getPendingUploads().size();
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -200,11 +209,11 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void saveFile(PluginCall call) {
-        String path = call.getString("path");
+        String path = cleanRelativePath(call.getString("path"));
         String content = call.getString("content");
         boolean isBase64 = Boolean.TRUE.equals(call.getBoolean("isBase64", false));
         
-        if (path == null || content == null) {
+        if (path.isEmpty() || content == null) {
             call.reject("Path and content are required");
             return;
         }
@@ -235,11 +244,12 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 SmbService smbService = new SmbService(getContext());
                 if (host != null && share != null && user != null && pass != null) {
                     try {
-                        smbService.uploadFileBytes(host, share, user, pass, domain, path, bytes);
+                        smbService.uploadFileBytes(host, share, user, pass, domain, rootPath, path, bytes);
                         smbService.removePendingUpload(path);
                     } catch (Exception uploadEx) {
                         Log.w(TAG, "Failed to upload file to SMB (device may be offline): " + uploadEx.getMessage());
@@ -279,7 +289,7 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void listRemoteFiles(PluginCall call) {
-        String path = call.getString("path", "");
+        String path = cleanRelativePath(call.getString("path", ""));
         new Thread(() -> {
             try {
                 SecureStorage storage = new SecureStorage(getContext());
@@ -288,6 +298,7 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host == null || share == null) {
                     call.reject("SMB not configured");
@@ -295,7 +306,7 @@ public class SmbSyncPlugin extends Plugin {
                 }
 
                 SmbService smbService = new SmbService(getContext());
-                org.json.JSONArray files = smbService.listRemoteFiles(host, share, user, pass, domain, path);
+                org.json.JSONArray files = smbService.listRemoteFiles(host, share, user, pass, domain, rootPath, path);
                 
                 JSObject ret = new JSObject();
                 JSArray jsArray = new JSArray(files.toString());
@@ -309,7 +320,7 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void listLocalFiles(PluginCall call) {
-        String path = call.getString("path", "");
+        String path = cleanRelativePath(call.getString("path", ""));
         try {
             File dir = new File(getContext().getFilesDir(), path);
             JSArray filesArray = new JSArray();
@@ -337,11 +348,12 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void getFileUrl(PluginCall call) {
-        String path = call.getString("path");
-        if (path == null) {
+        String rawPath = call.getString("path");
+        if (rawPath == null) {
             call.reject("Path is required");
             return;
         }
+        String path = cleanRelativePath(rawPath);
         File file = new File(getContext().getFilesDir(), path);
         JSObject ret = new JSObject();
         ret.put("url", file.getAbsolutePath());
@@ -350,11 +362,12 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void readFileText(PluginCall call) {
-        String path = call.getString("path");
-        if (path == null) {
+        String rawPath = call.getString("path");
+        if (rawPath == null) {
             call.reject("Path is required");
             return;
         }
+        String path = cleanRelativePath(rawPath);
         try {
             File file = new File(getContext().getFilesDir(), path);
             if (!file.exists()) {
@@ -377,11 +390,12 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void createDirectory(PluginCall call) {
-        String path = call.getString("path");
-        if (path == null || path.trim().isEmpty()) {
+        String rawPath = call.getString("path");
+        if (rawPath == null || rawPath.trim().isEmpty()) {
             call.reject("Path is required");
             return;
         }
+        String path = cleanRelativePath(rawPath);
         new Thread(() -> {
             try {
                 File localDir = new File(getContext().getFilesDir(), path);
@@ -395,11 +409,12 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host != null && share != null && user != null && pass != null) {
                     try {
                         SmbService smbService = new SmbService(getContext());
-                        smbService.createDirectory(host, share, user, pass, domain, path);
+                        smbService.createDirectory(host, share, user, pass, domain, rootPath, path);
                     } catch (Exception e) {
                         Log.w(TAG, "Failed to create directory on remote SMB (offline?), local directory created: " + e.getMessage());
                     }
@@ -425,6 +440,7 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host == null || share == null || user == null || pass == null) {
                     JSObject ret = new JSObject();
@@ -434,7 +450,7 @@ public class SmbSyncPlugin extends Plugin {
                 }
 
                 SmbService smbService = new SmbService(getContext());
-                smbService.testConnection(host, share, user, pass, domain);
+                smbService.testConnection(host, share, user, pass, domain, rootPath);
 
                 JSObject ret = new JSObject();
                 ret.put("connected", true);
@@ -446,5 +462,24 @@ public class SmbSyncPlugin extends Plugin {
                 call.resolve(ret);
             }
         }).start();
+    }
+
+    @PluginMethod
+    public void setStatusBarStyle(PluginCall call) {
+        boolean light = Boolean.TRUE.equals(call.getBoolean("light", true));
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+                    getActivity().getWindow(),
+                    getActivity().getWindow().getDecorView()
+                );
+                if (controller != null) {
+                    controller.setAppearanceLightStatusBars(light);
+                }
+            });
+        }
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
     }
 }
