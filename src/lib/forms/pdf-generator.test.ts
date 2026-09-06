@@ -158,6 +158,15 @@ describe("pdf-generator", () => {
         "Reports/Check",
       );
     });
+
+    it("should gracefully handle null, undefined, empty strings, and mixed slashes", () => {
+      expect(sanitizeFormFolderPath("")).toBe("");
+      expect(sanitizeFormFolderPath(undefined)).toBe("");
+      expect(sanitizeFormFolderPath(null as any)).toBe("");
+      expect(sanitizeFormFolderPath("Folder///Subfolder\\\\Another")).toBe(
+        "Folder/Subfolder/Another",
+      );
+    });
   });
 
   describe("formatDateTime", () => {

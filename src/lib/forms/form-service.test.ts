@@ -1024,5 +1024,26 @@ describe("FormService", () => {
         expect(ids).toContain("fr_sub_2");
       })();
     });
+
+    it("should never return leading slash when resolving filled forms directories with empty or root path", async () => {
+      const enDir = await formService.resolveFilledFormsDir("", "en");
+      expect(enDir).toBe("Filled Forms");
+      expect(enDir.startsWith("/")).toBe(false);
+
+      const frDir = await formService.resolveFilledFormsDir(" / ", "fr-CA");
+      expect(frDir).toBe("Formulaires remplis");
+      expect(frDir.startsWith("/")).toBe(false);
+
+      const enList = await formService.getExistingFilledFormsDirs("", "en");
+      expect(enList).toEqual(["Filled Forms"]);
+      expect(enList[0].startsWith("/")).toBe(false);
+
+      const frList = await formService.getExistingFilledFormsDirs(
+        " / ",
+        "fr-CA",
+      );
+      expect(frList).toEqual(["Formulaires remplis"]);
+      expect(frList[0].startsWith("/")).toBe(false);
+    });
   });
 });

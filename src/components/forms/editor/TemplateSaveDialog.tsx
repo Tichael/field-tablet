@@ -6,6 +6,7 @@ import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { useTranslation } from "react-i18next";
 import { sanitizeFormFolderPath } from "../../../lib/forms/pdf-generator";
+import { getLocalizedFilledFormsDirName } from "../../../lib/forms/form-service";
 import { GenericFileBrowser } from "../../documents/GenericFileBrowser";
 import { AppDialog } from "../../ui/app-dialog";
 import {
@@ -286,7 +287,7 @@ export function TemplateSaveDialog({
                 <div>
                   {t("editor.saveDialog.submissionsPathLabel")}{" "}
                   <span className="text-foreground">
-                    /{targetFolder || "..."}/Filled Forms/
+                    /{targetFolder || "..."}/{getLocalizedFilledFormsDirName()}/
                   </span>
                 </div>
               </div>

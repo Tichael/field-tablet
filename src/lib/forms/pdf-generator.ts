@@ -57,8 +57,8 @@ export function sanitizeFilenamePart(text: string): string {
  * Sanitize form folder paths while allowing spaces within folder and subfolder names.
  * Cleans illegal filesystem/SMB characters and ensures valid segment boundaries.
  */
-export function sanitizeFormFolderPath(text: string): string {
-  return text
+export function sanitizeFormFolderPath(text?: string): string {
+  return (text || "")
     .split(/[/\\\\]/)
     .map((segment) =>
       segment

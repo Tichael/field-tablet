@@ -8,6 +8,14 @@ import {
   resolvePrimaryColors,
   applyTheme,
 } from "./theme";
+import { Capacitor } from "@capacitor/core";
+import { SmbSync } from "./storage/smb-sync-plugin";
+
+vi.mock("./storage/smb-sync-plugin", () => ({
+  SmbSync: {
+    setStatusBarStyle: vi.fn().mockResolvedValue({ success: true }),
+  },
+}));
 
 describe("theme utility", () => {
   let mockHtml: {
@@ -164,6 +172,21 @@ describe("theme utility", () => {
 
       cleanup();
       expect(mockHtml.style.removeProperty).toHaveBeenCalledWith("--primary");
+    });
+
+    it("notifies SmbSync.setStatusBarStyle when running on native platform", () => {
+      vi.spyOn(Capacitor, "isNativePlatform").mockReturnValue(true);
+      vi.mocked(SmbSync.setStatusBarStyle).mockClear();
+
+      const cleanup = applyTheme({
+        primaryColor: "#0f172a",
+        darkMode: "dark",
+      });
+
+      expect(SmbSync.setStatusBarStyle).toHaveBeenCalledWith({ light: false });
+
+      cleanup();
+      expect(SmbSync.setStatusBarStyle).toHaveBeenCalledWith({ light: true });
     });
   });
 });

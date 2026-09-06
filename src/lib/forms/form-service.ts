@@ -33,19 +33,19 @@ export class FormService {
     lang?: string,
   ): Promise<string> {
     const adapter = syncManager.getAdapter();
-    const cleanFolder = formFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    const cleanFolder = (formFolderPath || "").trim().replace(/^\/+|\/+$/g, "");
     try {
       const items = await adapter.listLocalFiles(cleanFolder);
       for (const known of KNOWN_FILLED_FORMS_DIR_NAMES) {
         if (items.some((item) => item.isDirectory && item.name === known)) {
-          return `${cleanFolder}/${known}`;
+          return cleanFolder ? `${cleanFolder}/${known}` : known;
         }
       }
     } catch {
       // ignore
     }
     const localizedName = getLocalizedFilledFormsDirName(lang);
-    return `${cleanFolder}/${localizedName}`;
+    return cleanFolder ? `${cleanFolder}/${localizedName}` : localizedName;
   }
 
   /**
@@ -57,20 +57,23 @@ export class FormService {
     lang?: string,
   ): Promise<string[]> {
     const adapter = syncManager.getAdapter();
-    const cleanFolder = formFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    const cleanFolder = (formFolderPath || "").trim().replace(/^\/+|\/+$/g, "");
     const foundDirs: string[] = [];
     try {
       const items = await adapter.listLocalFiles(cleanFolder);
       for (const known of KNOWN_FILLED_FORMS_DIR_NAMES) {
         if (items.some((item) => item.isDirectory && item.name === known)) {
-          foundDirs.push(`${cleanFolder}/${known}`);
+          foundDirs.push(cleanFolder ? `${cleanFolder}/${known}` : known);
         }
       }
     } catch {
       // ignore
     }
     if (foundDirs.length === 0) {
-      foundDirs.push(`${cleanFolder}/${getLocalizedFilledFormsDirName(lang)}`);
+      const localizedName = getLocalizedFilledFormsDirName(lang);
+      foundDirs.push(
+        cleanFolder ? `${cleanFolder}/${localizedName}` : localizedName,
+      );
     }
     return foundDirs;
   }
@@ -490,7 +493,7 @@ export class FormService {
     filename: string;
   }> {
     const adapter = syncManager.getAdapter();
-    const cleanFolderPath = template.folderPath
+    const cleanFolderPath = (template.folderPath || "")
       .trim()
       .replace(/^\/+|\/+$/g, "");
     const filledFormsDir = await this.resolveFilledFormsDir(
@@ -499,7 +502,9 @@ export class FormService {
     );
 
     // Ensure template folder and Filled Forms directory exist
-    await adapter.createDirectory(cleanFolderPath);
+    if (cleanFolderPath) {
+      await adapter.createDirectory(cleanFolderPath);
+    }
     await adapter.createDirectory(filledFormsDir);
 
     // Ensure form.json exists in this folder

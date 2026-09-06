@@ -85,13 +85,16 @@ export function SetupScreen() {
   const handleNativeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     let cleanShare = smbShare.trim();
-    let cleanSubfolder = smbPath.trim().replace(/^\/+|\/+$/g, "");
+    let cleanSubfolder = smbPath.trim().replace(/^[/\\\\]+|[/\\\\]+$/g, "");
     if (cleanShare.includes("/") || cleanShare.includes("\\")) {
       const parts = cleanShare.split(/[/\\\\]/).filter(Boolean);
       if (parts.length > 0) {
         cleanShare = parts[0];
-        if (!cleanSubfolder && parts.length > 1) {
-          cleanSubfolder = parts.slice(1).join("/");
+        const extra = parts.slice(1).join("/");
+        if (extra) {
+          cleanSubfolder = cleanSubfolder
+            ? `${extra}/${cleanSubfolder}`
+            : extra;
         }
       }
     }
@@ -355,7 +358,7 @@ export function SetupScreen() {
             />
             <Input
               type="text"
-              placeholder={t("setup.subfolderPlaceholder")}
+              placeholder={`${t("setup.subfolder")} (${t("setup.subfolderPlaceholder")})`}
               value={smbPath}
               onChange={(e) => setSmbPath(e.target.value)}
               autoCapitalize="none"

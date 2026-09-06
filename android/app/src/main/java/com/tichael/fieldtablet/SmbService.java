@@ -34,8 +34,8 @@ public class SmbService {
     }
 
     public static String resolveSmbPath(String rootPath, String relativePath) {
-        String cleanRoot = (rootPath == null) ? "" : rootPath.replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "").trim();
-        String cleanRel = (relativePath == null) ? "" : relativePath.replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "").trim();
+        String cleanRoot = (rootPath == null) ? "" : rootPath.trim().replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "");
+        String cleanRel = (relativePath == null) ? "" : relativePath.trim().replace("/", "\\").replaceAll("^\\\\+|\\\\+$", "");
         if (cleanRoot.isEmpty()) return cleanRel;
         if (cleanRel.isEmpty()) return cleanRoot;
         return cleanRoot + "\\" + cleanRel;
@@ -255,8 +255,13 @@ public class SmbService {
                     if (localConfigFile.exists()) {
                         try (java.io.FileInputStream fis = new java.io.FileInputStream(localConfigFile)) {
                             byte[] data = new byte[(int) localConfigFile.length()];
-                            fis.read(data);
-                            String content = new String(data, java.nio.charset.StandardCharsets.UTF_8);
+                            int bytesRead = 0;
+                            while (bytesRead < data.length) {
+                                int r = fis.read(data, bytesRead, data.length - bytesRead);
+                                if (r == -1) break;
+                                bytesRead += r;
+                            }
+                            String content = new String(data, 0, bytesRead, java.nio.charset.StandardCharsets.UTF_8);
                             JSONObject configJson = new JSONObject(content);
                             if (configJson.has("syncFolders")) {
                                 JSONArray arr = configJson.getJSONArray("syncFolders");
@@ -316,7 +321,15 @@ public class SmbService {
 
     private void syncRootConfig(DiskShare share, String rootPath) throws Exception {
         String remoteDir = resolveSmbPath(rootPath, "");
-        List<FileIdBothDirectoryInformation> files = share.list(remoteDir, "*.json");
+        List<FileIdBothDirectoryInformation> files;
+        try {
+            files = share.list(remoteDir, "*.json");
+        } catch (SMBApiException e) {
+            if (e.getStatusCode() == 0xC0000034) { // STATUS_OBJECT_NAME_NOT_FOUND
+                return;
+            }
+            throw e;
+        }
         for (FileIdBothDirectoryInformation fileInfo : files) {
             String fileName = fileInfo.getFileName();
             if (fileName.equals(".") || fileName.equals("..")) continue;

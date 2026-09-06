@@ -2,6 +2,8 @@ package com.tichael.fieldtablet;
 
 import android.util.Log;
 
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.work.Constraints;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
@@ -27,6 +29,10 @@ import java.util.concurrent.TimeUnit;
 public class SmbSyncPlugin extends Plugin {
     private static final String TAG = "SmbSyncPlugin";
     private static final String WORK_NAME = "SmbSyncWork";
+
+    private String cleanRelativePath(String path) {
+        return (path == null) ? "" : path.replace("\\", "/").replaceAll("^/+", "");
+    }
 
     @PluginMethod
     public void configure(PluginCall call) {
@@ -203,11 +209,11 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void saveFile(PluginCall call) {
-        String path = call.getString("path");
+        String path = cleanRelativePath(call.getString("path"));
         String content = call.getString("content");
         boolean isBase64 = Boolean.TRUE.equals(call.getBoolean("isBase64", false));
         
-        if (path == null || content == null) {
+        if (path.isEmpty() || content == null) {
             call.reject("Path and content are required");
             return;
         }
@@ -283,7 +289,7 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void listRemoteFiles(PluginCall call) {
-        String path = call.getString("path", "");
+        String path = cleanRelativePath(call.getString("path", ""));
         new Thread(() -> {
             try {
                 SecureStorage storage = new SecureStorage(getContext());
@@ -314,7 +320,7 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void listLocalFiles(PluginCall call) {
-        String path = call.getString("path", "");
+        String path = cleanRelativePath(call.getString("path", ""));
         try {
             File dir = new File(getContext().getFilesDir(), path);
             JSArray filesArray = new JSArray();
@@ -342,11 +348,12 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void getFileUrl(PluginCall call) {
-        String path = call.getString("path");
-        if (path == null) {
+        String rawPath = call.getString("path");
+        if (rawPath == null) {
             call.reject("Path is required");
             return;
         }
+        String path = cleanRelativePath(rawPath);
         File file = new File(getContext().getFilesDir(), path);
         JSObject ret = new JSObject();
         ret.put("url", file.getAbsolutePath());
@@ -355,11 +362,12 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void readFileText(PluginCall call) {
-        String path = call.getString("path");
-        if (path == null) {
+        String rawPath = call.getString("path");
+        if (rawPath == null) {
             call.reject("Path is required");
             return;
         }
+        String path = cleanRelativePath(rawPath);
         try {
             File file = new File(getContext().getFilesDir(), path);
             if (!file.exists()) {
@@ -382,11 +390,12 @@ public class SmbSyncPlugin extends Plugin {
 
     @PluginMethod
     public void createDirectory(PluginCall call) {
-        String path = call.getString("path");
-        if (path == null || path.trim().isEmpty()) {
+        String rawPath = call.getString("path");
+        if (rawPath == null || rawPath.trim().isEmpty()) {
             call.reject("Path is required");
             return;
         }
+        String path = cleanRelativePath(rawPath);
         new Thread(() -> {
             try {
                 File localDir = new File(getContext().getFilesDir(), path);
@@ -453,5 +462,24 @@ public class SmbSyncPlugin extends Plugin {
                 call.resolve(ret);
             }
         }).start();
+    }
+
+    @PluginMethod
+    public void setStatusBarStyle(PluginCall call) {
+        boolean light = Boolean.TRUE.equals(call.getBoolean("light", true));
+        if (getActivity() != null) {
+            getActivity().runOnUiThread(() -> {
+                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
+                    getActivity().getWindow(),
+                    getActivity().getWindow().getDecorView()
+                );
+                if (controller != null) {
+                    controller.setAppearanceLightStatusBars(light);
+                }
+            });
+        }
+        JSObject ret = new JSObject();
+        ret.put("success", true);
+        call.resolve(ret);
     }
 }

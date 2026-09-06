@@ -1,13 +1,16 @@
 package com.tichael.fieldtablet;
 
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.webkit.WebSettings;
+import android.webkit.WebView;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
 import java.io.File;
 
 public class MainActivity extends BridgeActivity {
@@ -20,10 +23,24 @@ public class MainActivity extends BridgeActivity {
         clearServiceWorkerCache();
         super.onCreate(savedInstanceState);
 
-        // Ensure light status bar icons (dark icons on light background)
+        // Initialize status bar icons according to system night mode (dark icons on light background)
+        int nightModeFlags = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
+        boolean isNightMode = nightModeFlags == Configuration.UI_MODE_NIGHT_YES;
         WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         if (insetsController != null) {
-            insetsController.setAppearanceLightStatusBars(true);
+            insetsController.setAppearanceLightStatusBars(!isNightMode);
+        }
+
+        // Re-apply insets once the WebView finishes loading the page
+        if (getBridge() != null) {
+            getBridge().addWebViewListener(new WebViewListener() {
+                @Override
+                public void onPageLoaded(WebView webView) {
+                    if (lastTopDp >= 0 && lastBottomDp >= 0) {
+                        applyWindowInsetsToWebview(lastTopDp, lastBottomDp);
+                    }
+                }
+            });
         }
 
         // Listen for window insets (status bar, navigation bar, cutouts) and forward to CSS variables
