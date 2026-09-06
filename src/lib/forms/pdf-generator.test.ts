@@ -3,6 +3,7 @@ import {
   generateFormSubmissionPdf,
   generateDatedPdfFilename,
   sanitizeFilenamePart,
+  sanitizeFormFolderPath,
   formatDateTime,
 } from "./pdf-generator";
 import type { FormSubmission, FormTemplate } from "../../types/form";
@@ -130,6 +131,32 @@ describe("pdf-generator", () => {
         "Truck_42_100_inspected",
       );
       expect(sanitizeFilenamePart("..file.name..")).toBe("file.name");
+    });
+  });
+
+  describe("sanitizeFormFolderPath", () => {
+    it("should preserve spaces within folder and subfolder names", () => {
+      expect(sanitizeFormFolderPath("Daily Safety Inspection")).toBe(
+        "Daily Safety Inspection",
+      );
+      expect(
+        sanitizeFormFolderPath("Field Reports / Daily Inspection 2026"),
+      ).toBe("Field Reports/Daily Inspection 2026");
+    });
+
+    it("should strip illegal filesystem and SMB characters while preserving path slashes", () => {
+      expect(
+        sanitizeFormFolderPath("Reports: Quality? / Unit * 12 <Test>"),
+      ).toBe("Reports Quality/Unit 12 Test");
+    });
+
+    it("should collapse multiple consecutive spaces and trim segment boundaries", () => {
+      expect(
+        sanitizeFormFolderPath("   Reports    Folder   /   Site   Check   "),
+      ).toBe("Reports Folder/Site Check");
+      expect(sanitizeFormFolderPath("..Reports../..Check..")).toBe(
+        "Reports/Check",
+      );
     });
   });
 

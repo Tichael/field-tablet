@@ -8,6 +8,7 @@ export interface SmbSyncPlugin {
     username?: string;
     password?: string;
     domain?: string;
+    rootPath?: string;
   }): Promise<{ success: boolean }>;
 
   startBackgroundSync(options?: {

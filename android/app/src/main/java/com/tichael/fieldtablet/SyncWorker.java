@@ -25,6 +25,7 @@ public class SyncWorker extends Worker {
             String user = secureStorage.getString("smb_user");
             String pass = secureStorage.getString("smb_pass");
             String domain = secureStorage.getString("smb_domain");
+            String rootPath = secureStorage.getString("smb_root_path");
 
             if (host == null || share == null || user == null || pass == null) {
                 Log.w(TAG, "Missing SMB credentials, skipping sync.");
@@ -49,7 +50,7 @@ public class SyncWorker extends Worker {
             }
 
             try {
-                smbService.syncFiles(host, share, user, pass, domain, syncFolders, configFile);
+                smbService.syncFiles(host, share, user, pass, domain, rootPath, syncFolders, configFile);
                 Log.i(TAG, "Background sync completed successfully.");
                 return Result.success();
             } catch (Exception e) {

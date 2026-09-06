@@ -12,7 +12,69 @@ import {
 import { fileToBase64 } from "./media-utils";
 import i18n from "../../i18n";
 
+export const KNOWN_FILLED_FORMS_DIR_NAMES = [
+  "Filled Forms",
+  "Formulaires remplis",
+];
+
+export function getLocalizedFilledFormsDirName(lang?: string): string {
+  const currentLang = lang || i18n.language || "en";
+  return currentLang.startsWith("fr") ? "Formulaires remplis" : "Filled Forms";
+}
+
 export class FormService {
+  /**
+   * Returns the primary filled forms directory for saving new submissions.
+   * Reuses an existing directory matching any known filled forms folder name,
+   * otherwise returns the localized directory name.
+   */
+  async resolveFilledFormsDir(
+    formFolderPath: string,
+    lang?: string,
+  ): Promise<string> {
+    const adapter = syncManager.getAdapter();
+    const cleanFolder = formFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    try {
+      const items = await adapter.listLocalFiles(cleanFolder);
+      for (const known of KNOWN_FILLED_FORMS_DIR_NAMES) {
+        if (items.some((item) => item.isDirectory && item.name === known)) {
+          return `${cleanFolder}/${known}`;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    const localizedName = getLocalizedFilledFormsDirName(lang);
+    return `${cleanFolder}/${localizedName}`;
+  }
+
+  /**
+   * Returns all existing filled forms directories for a given form folder,
+   * or the localized default if none exist.
+   */
+  async getExistingFilledFormsDirs(
+    formFolderPath: string,
+    lang?: string,
+  ): Promise<string[]> {
+    const adapter = syncManager.getAdapter();
+    const cleanFolder = formFolderPath.trim().replace(/^\/+|\/+$/g, "");
+    const foundDirs: string[] = [];
+    try {
+      const items = await adapter.listLocalFiles(cleanFolder);
+      for (const known of KNOWN_FILLED_FORMS_DIR_NAMES) {
+        if (items.some((item) => item.isDirectory && item.name === known)) {
+          foundDirs.push(`${cleanFolder}/${known}`);
+        }
+      }
+    } catch {
+      // ignore
+    }
+    if (foundDirs.length === 0) {
+      foundDirs.push(`${cleanFolder}/${getLocalizedFilledFormsDirName(lang)}`);
+    }
+    return foundDirs;
+  }
+
   /**
    * Discovers all forms across configured form folders.
    * Checks both:
@@ -55,7 +117,10 @@ export class FormService {
       try {
         const subItems = await adapter.listLocalFiles(cleanFolder);
         for (const item of subItems) {
-          if (item.isDirectory && item.name !== "Filled Forms") {
+          if (
+            item.isDirectory &&
+            !KNOWN_FILLED_FORMS_DIR_NAMES.includes(item.name)
+          ) {
             const isSubMoved = await adapter
               .readFileText(`${item.path}/_MOVED_TO.txt`)
               .then(() => true)
@@ -291,7 +356,7 @@ export class FormService {
     }
 
     const templateFilePath = `${destinationFolder}/form.json`;
-    const filledFormsDir = `${destinationFolder}/Filled Forms`;
+    const filledFormsDir = await this.resolveFilledFormsDir(destinationFolder);
 
     await adapter.createDirectory(destinationFolder);
     await adapter.createDirectory(filledFormsDir);
@@ -428,7 +493,10 @@ export class FormService {
     const cleanFolderPath = template.folderPath
       .trim()
       .replace(/^\/+|\/+$/g, "");
-    const filledFormsDir = `${cleanFolderPath}/Filled Forms`;
+    const filledFormsDir = await this.resolveFilledFormsDir(
+      cleanFolderPath,
+      config?.language,
+    );
 
     // Ensure template folder and Filled Forms directory exist
     await adapter.createDirectory(cleanFolderPath);
@@ -620,82 +688,86 @@ export class FormService {
     const submissionMap = new Map<string, FormSubmission>();
 
     for (const folder of foldersToScan) {
-      const filledFormsDir = `${folder}/Filled Forms`;
-      try {
-        const entries = await adapter.listLocalFiles(filledFormsDir);
+      const filledDirs = await this.getExistingFilledFormsDirs(folder);
+      for (const filledFormsDir of filledDirs) {
+        try {
+          const entries = await adapter.listLocalFiles(filledFormsDir);
 
-        for (const entry of entries) {
-          if (entry.isDirectory) {
-            try {
-              const instanceFiles = await adapter.listLocalFiles(entry.path);
-              const jsonFiles = instanceFiles.filter(
-                (f) => !f.isDirectory && f.name.endsWith(".json"),
-              );
-              const pdfFiles = instanceFiles.filter(
-                (f) => !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
-              );
+          for (const entry of entries) {
+            if (entry.isDirectory) {
+              try {
+                const instanceFiles = await adapter.listLocalFiles(entry.path);
+                const jsonFiles = instanceFiles.filter(
+                  (f) => !f.isDirectory && f.name.endsWith(".json"),
+                );
+                const pdfFiles = instanceFiles.filter(
+                  (f) =>
+                    !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+                );
 
-              for (const file of jsonFiles) {
-                try {
-                  const text = await adapter.readFileText(file.path);
-                  const sub = JSON.parse(text) as FormSubmission;
-                  sub.instanceFolderPath = entry.path;
+                for (const file of jsonFiles) {
+                  try {
+                    const text = await adapter.readFileText(file.path);
+                    const sub = JSON.parse(text) as FormSubmission;
+                    sub.instanceFolderPath = entry.path;
 
-                  // Ensure attachment paths are populated relative to instance directory
-                  if (sub.attachments) {
-                    sub.attachments = sub.attachments.map((att) => ({
-                      ...att,
-                      path:
-                        att.path || `${entry.path}/${att.filename || att.name}`,
-                    }));
+                    // Ensure attachment paths are populated relative to instance directory
+                    if (sub.attachments) {
+                      sub.attachments = sub.attachments.map((att) => ({
+                        ...att,
+                        path:
+                          att.path ||
+                          `${entry.path}/${att.filename || att.name}`,
+                      }));
+                    }
+
+                    // Populate pdfExports from discovered PDFs if empty
+                    if (!sub.pdfExports || sub.pdfExports.length === 0) {
+                      sub.pdfExports = pdfFiles.map((p) => ({
+                        path: p.path,
+                        filename: p.name,
+                        exportedAt: sub.updatedAt || sub.createdAt,
+                      }));
+                    }
+
+                    if (!submissionMap.has(sub.id)) {
+                      submissionMap.set(sub.id, sub);
+                    }
+                  } catch (e) {
+                    console.warn(
+                      `Failed to parse instance submission file ${file.path}:`,
+                      e,
+                    );
                   }
-
-                  // Populate pdfExports from discovered PDFs if empty
-                  if (!sub.pdfExports || sub.pdfExports.length === 0) {
-                    sub.pdfExports = pdfFiles.map((p) => ({
-                      path: p.path,
-                      filename: p.name,
-                      exportedAt: sub.updatedAt || sub.createdAt,
-                    }));
-                  }
-
-                  if (!submissionMap.has(sub.id)) {
-                    submissionMap.set(sub.id, sub);
-                  }
-                } catch (e) {
-                  console.warn(
-                    `Failed to parse instance submission file ${file.path}:`,
-                    e,
-                  );
                 }
+              } catch (e) {
+                console.warn(
+                  `Failed to read instance directory ${entry.path}:`,
+                  e,
+                );
               }
-            } catch (e) {
-              console.warn(
-                `Failed to read instance directory ${entry.path}:`,
-                e,
-              );
-            }
-          } else if (
-            !entry.isDirectory &&
-            entry.name.endsWith(".json") &&
-            entry.name !== "form.json"
-          ) {
-            try {
-              const text = await adapter.readFileText(entry.path);
-              const sub = JSON.parse(text) as FormSubmission;
-              if (!submissionMap.has(sub.id)) {
-                submissionMap.set(sub.id, sub);
+            } else if (
+              !entry.isDirectory &&
+              entry.name.endsWith(".json") &&
+              entry.name !== "form.json"
+            ) {
+              try {
+                const text = await adapter.readFileText(entry.path);
+                const sub = JSON.parse(text) as FormSubmission;
+                if (!submissionMap.has(sub.id)) {
+                  submissionMap.set(sub.id, sub);
+                }
+              } catch (e) {
+                console.warn(
+                  `Failed to parse flat submission file ${entry.path}:`,
+                  e,
+                );
               }
-            } catch (e) {
-              console.warn(
-                `Failed to parse flat submission file ${entry.path}:`,
-                e,
-              );
             }
           }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
     }
 
@@ -723,39 +795,41 @@ export class FormService {
     const pdfMap = new Map<string, { name: string; path: string }>();
 
     for (const folder of foldersToScan) {
-      const filledFormsDir = `${folder}/Filled Forms`;
-      try {
-        const entries = await adapter.listLocalFiles(filledFormsDir);
-        for (const entry of entries) {
-          if (entry.isDirectory) {
-            try {
-              const files = await adapter.listLocalFiles(entry.path);
-              const pdfs = files
-                .filter(
-                  (f) =>
-                    !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
-                )
-                .map((f) => ({ name: f.name, path: f.path }));
+      const filledDirs = await this.getExistingFilledFormsDirs(folder);
+      for (const filledFormsDir of filledDirs) {
+        try {
+          const entries = await adapter.listLocalFiles(filledFormsDir);
+          for (const entry of entries) {
+            if (entry.isDirectory) {
+              try {
+                const files = await adapter.listLocalFiles(entry.path);
+                const pdfs = files
+                  .filter(
+                    (f) =>
+                      !f.isDirectory && f.name.toLowerCase().endsWith(".pdf"),
+                  )
+                  .map((f) => ({ name: f.name, path: f.path }));
 
-              for (const pdf of pdfs) {
-                if (!pdfMap.has(pdf.name)) {
-                  pdfMap.set(pdf.name, pdf);
+                for (const pdf of pdfs) {
+                  if (!pdfMap.has(pdf.name)) {
+                    pdfMap.set(pdf.name, pdf);
+                  }
                 }
+              } catch {
+                // ignore
               }
-            } catch {
-              // ignore
-            }
-          } else if (
-            !entry.isDirectory &&
-            entry.name.toLowerCase().endsWith(".pdf")
-          ) {
-            if (!pdfMap.has(entry.name)) {
-              pdfMap.set(entry.name, { name: entry.name, path: entry.path });
+            } else if (
+              !entry.isDirectory &&
+              entry.name.toLowerCase().endsWith(".pdf")
+            ) {
+              if (!pdfMap.has(entry.name)) {
+                pdfMap.set(entry.name, { name: entry.name, path: entry.path });
+              }
             }
           }
+        } catch {
+          // ignore
         }
-      } catch {
-        // ignore
       }
     }
 

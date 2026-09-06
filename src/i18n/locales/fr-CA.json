@@ -87,6 +87,8 @@
     "selectMainFolderDesc": "Assurez-vous de sélectionner le dossier principal de votre lecteur serveur. Si vous sélectionnez un sous-dossier, les chemins pourraient ne pas correspondre et l'application pourrait ne pas fonctionner correctement sur d'autres appareils.",
     "smbHost": "Hôte SMB (ex. 192.168.1.10)",
     "shareName": "Nom du partage",
+    "subfolder": "Dossier racine / sous-dossier (facultatif)",
+    "subfolderPlaceholder": "ex. FieldTablet ou Projets/Tablette1",
     "domain": "Domaine (facultatif)",
     "username": "Nom d'utilisateur",
     "password": "Mot de passe",

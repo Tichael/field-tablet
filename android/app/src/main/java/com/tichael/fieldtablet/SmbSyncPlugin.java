@@ -35,6 +35,7 @@ public class SmbSyncPlugin extends Plugin {
         String user = call.getString("username");
         String pass = call.getString("password");
         String domain = call.getString("domain", "");
+        String rootPath = call.getString("rootPath", "");
 
         if (host == null || share == null || user == null || pass == null) {
             call.reject("Missing required parameters");
@@ -44,7 +45,7 @@ public class SmbSyncPlugin extends Plugin {
         new Thread(() -> {
             try {
                 SmbService smbService = new SmbService(getContext());
-                smbService.testConnection(host, share, user, pass, domain);
+                smbService.testConnection(host, share, user, pass, domain, rootPath);
 
                 SecureStorage storage = new SecureStorage(getContext());
                 storage.saveString("smb_host", host);
@@ -52,6 +53,7 @@ public class SmbSyncPlugin extends Plugin {
                 storage.saveString("smb_user", user);
                 storage.saveString("smb_pass", pass);
                 storage.saveString("smb_domain", domain);
+                storage.saveString("smb_root_path", rootPath != null ? rootPath.trim() : "");
 
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -140,6 +142,7 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host == null || share == null || user == null || pass == null) {
                     call.reject("SMB not configured");
@@ -147,7 +150,7 @@ public class SmbSyncPlugin extends Plugin {
                 }
 
                 SmbService smbService = new SmbService(getContext());
-                smbService.syncFiles(host, share, user, pass, domain, syncFolders, configFile);
+                smbService.syncFiles(host, share, user, pass, domain, rootPath, syncFolders, configFile);
                 int pendingCount = smbService.getPendingUploads().size();
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -235,11 +238,12 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 SmbService smbService = new SmbService(getContext());
                 if (host != null && share != null && user != null && pass != null) {
                     try {
-                        smbService.uploadFileBytes(host, share, user, pass, domain, path, bytes);
+                        smbService.uploadFileBytes(host, share, user, pass, domain, rootPath, path, bytes);
                         smbService.removePendingUpload(path);
                     } catch (Exception uploadEx) {
                         Log.w(TAG, "Failed to upload file to SMB (device may be offline): " + uploadEx.getMessage());
@@ -288,6 +292,7 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host == null || share == null) {
                     call.reject("SMB not configured");
@@ -295,7 +300,7 @@ public class SmbSyncPlugin extends Plugin {
                 }
 
                 SmbService smbService = new SmbService(getContext());
-                org.json.JSONArray files = smbService.listRemoteFiles(host, share, user, pass, domain, path);
+                org.json.JSONArray files = smbService.listRemoteFiles(host, share, user, pass, domain, rootPath, path);
                 
                 JSObject ret = new JSObject();
                 JSArray jsArray = new JSArray(files.toString());
@@ -395,11 +400,12 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host != null && share != null && user != null && pass != null) {
                     try {
                         SmbService smbService = new SmbService(getContext());
-                        smbService.createDirectory(host, share, user, pass, domain, path);
+                        smbService.createDirectory(host, share, user, pass, domain, rootPath, path);
                     } catch (Exception e) {
                         Log.w(TAG, "Failed to create directory on remote SMB (offline?), local directory created: " + e.getMessage());
                     }
@@ -425,6 +431,7 @@ public class SmbSyncPlugin extends Plugin {
                 String user = storage.getString("smb_user");
                 String pass = storage.getString("smb_pass");
                 String domain = storage.getString("smb_domain");
+                String rootPath = storage.getString("smb_root_path");
 
                 if (host == null || share == null || user == null || pass == null) {
                     JSObject ret = new JSObject();
@@ -434,7 +441,7 @@ public class SmbSyncPlugin extends Plugin {
                 }
 
                 SmbService smbService = new SmbService(getContext());
-                smbService.testConnection(host, share, user, pass, domain);
+                smbService.testConnection(host, share, user, pass, domain, rootPath);
 
                 JSObject ret = new JSObject();
                 ret.put("connected", true);
